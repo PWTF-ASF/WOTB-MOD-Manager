@@ -1,4 +1,5 @@
 <script setup lang="ts">
+<<<<<<< HEAD
 import GreetComponent from './components/GreetComponent.vue'
 const store = useStore()
 store.initApp()
@@ -23,4 +24,13 @@ store.initApp()
 
     <GreetComponent />
   </main>
+=======
+  import HomePage from './views/HomePage.vue'
+</script>
+
+<template>
+  <div id="app">
+    <HomePage />
+  </div>
+>>>>>>> 016d1dd (初始样式)
 </template>

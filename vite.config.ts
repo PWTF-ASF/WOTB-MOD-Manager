@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 import tailwind from '@tailwindcss/vite'
+=======
+>>>>>>> 016d1dd (初始样式)
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 import AutoImport from 'unplugin-auto-import/vite'
@@ -8,6 +11,10 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import topLevelAwait from 'vite-plugin-top-level-await'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import { version as pkgVersion } from './package.json'
+<<<<<<< HEAD
+=======
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
+>>>>>>> 016d1dd (初始样式)
 
 const HOST = process.env.TAURI_DEV_HOST
 const PLATFORM = process.env.TAURI_ENV_PLATFORM
@@ -18,8 +25,12 @@ if (process.env.NODE_ENV === 'production') {
 
 // https://vitejs.dev/config/
 export default defineConfig({
+<<<<<<< HEAD
  plugins: [
     tailwind(),
+=======
+  plugins: [
+>>>>>>> 016d1dd (初始样式)
     topLevelAwait(),
     vue(),
     vueDevTools(),
@@ -32,10 +43,18 @@ export default defineConfig({
           '@/store': ['useStore'],
         },
       ],
+<<<<<<< HEAD
+=======
+      resolvers: [ElementPlusResolver()],
+>>>>>>> 016d1dd (初始样式)
       dts: 'auto-imports.d.ts',
       vueTemplate: true,
     }),
     Components({
+<<<<<<< HEAD
+=======
+      resolvers: [ElementPlusResolver()],
+>>>>>>> 016d1dd (初始样式)
       dts: 'components.d.ts',
     }),
     nodePolyfills({
