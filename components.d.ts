@@ -8,11 +8,8 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-<<<<<<< HEAD
-=======
     ElButton: typeof import('element-plus/es')['ElButton']
     ElInput: typeof import('element-plus/es')['ElInput']
->>>>>>> 016d1dd (初始样式)
     GreetComponent: typeof import('./src/components/GreetComponent.vue')['default']
   }
 }
