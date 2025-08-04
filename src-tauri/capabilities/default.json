@@ -1,0 +1,18 @@
+{
+  "identifier": "default",
+  "description": "Allow dialog and scoped FS access",
+  "windows": ["main"],
+  "permissions": [
+    "dialog:default",
+    {
+      "identifier": "fs:default",
+      "allow": [
+        {
+          "path": "$APPCONFIG/*",
+          "read": true,
+          "write": true
+        }
+      ]
+    }
+  ]
+}

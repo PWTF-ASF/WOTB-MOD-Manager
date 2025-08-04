@@ -2,7 +2,8 @@
     <div class="HomePage">
         <!-- 顶部卡片 -->
         <div class="top-card">
-            <el-button type="success" :icon="Plus" class="add-mod-btn" style="height: 48px"> </el-button>
+            <el-button type="success" :icon="Plus" class="add-mod-btn" style="height: 48px" @click="selectModFolder">
+            </el-button>
             <el-input :prefix-icon="Search" clearable style="width: 160px" class="search-box" />
         </div>
         <!-- 展示mod文件卡片 -->
@@ -32,37 +33,30 @@
         <!-- 底部卡片 -->
         <div class="bottom-card">
             <el-button type="primary" class="bottom-card-btn">加载MOD</el-button>
-            <el-button type="success" class="bottom-card-btn">启动WOTB</el-button>
+            <el-button type="success" class="bottom-card-btn" @click="startGame">启动WOTB</el-button>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-// script setup 中引入图标
-import { reactive, computed } from 'vue';
+import { reactive, computed, ref, onMounted } from 'vue';
 import { Plus, Search } from '@element-plus/icons-vue'
+import { open } from '@tauri-apps/plugin-dialog'
+import { invoke } from '@tauri-apps/api/core';
+import { ElMessage } from 'element-plus'
 
 const activeTap = ref('全部'); // 默认为全部
 
 // 计算属性：根据选中的标签过滤 modList
 const filteredModList = computed(() => {
-    if (activeTap.value === '全部') {
-        return ModData.modList
-    }
-    return ModData.modList.filter(mod => mod.type === activeTap.value)
-})
+    return activeTap.value === '全部'
+        ? ModData.modList
+        : ModData.modList.filter((mod) => mod.type === activeTap.value);
+});
 
 //mod数据
 let ModData = reactive({
-    modList: [
-        { name: 'mod1', type: '语音包', author: '张三', version: '1.0.0' },
-        { name: 'mod2', type: '坦克模型', author: '李四', version: '2.0.0' },
-        { name: 'mod3', type: '语音包', author: '王五', version: '3.0.0' },
-        { name: 'mod3', type: '语音包', author: '王五', version: '3.0.0' },
-        { name: 'mod3', type: '语音包', author: '王五', version: '3.0.0' },
-        { name: 'mod3', type: '语音包', author: '王五', version: '3.0.0' },
-        { name: 'mod3', type: '其他', author: '王五', version: '3.0.0' },
-    ],
+    modList: [] as Array<{ name: string; type: string; author: string; version: string }>,
     tapList: [
         { name: '全部', type: '全部' },
         { name: '语音包', type: '语音包' },
@@ -70,6 +64,82 @@ let ModData = reactive({
         { name: '其他', type: '其他' },
     ]
 })
+
+// 选择mod压缩包
+const selectModFolder = async () => {
+    const selected = (await open({
+        title: '请选择 Mod 压缩包文件',
+        multiple: false,
+        filters: [{ name: 'Mod 包', extensions: ['zip'] }],
+    })) as string | null;
+
+    if (!selected) {
+        ElMessage.info('未选择任何文件');
+        return;
+    }
+
+    try {
+        await invoke('copy_mod_file', { src: selected });
+        ElMessage.success('已复制 Mod 包到本地 mods 目录');
+        await fetchModList();
+    } catch (err) {
+        console.error(err);
+        ElMessage.error('复制 Mod 包失败');
+    }
+}
+
+// 拉取 mods 目录下所有 ZIP 文件
+async function fetchModList() {
+    try {
+        const files = (await invoke('list_mods')) as string[];
+        ModData.modList = files.map((f) => ({
+            name: f,
+            type: '其他', // 可改为按文件名解析类型
+            author: '',
+            version: '',
+        }));
+    } catch (e) {
+        console.error('fetchModList error', e);
+    }
+}
+
+//启动游戏
+async function startGame() {
+    try {
+        // 先读配置
+        const path: string | null = await invoke('get_game_path')
+        console.log('本地存储的游戏路径：', path)
+
+        // 如果配置里有路径，直接尝试启动
+        if (path) {
+            await invoke('launch_game')
+            return
+        }
+
+        // 否则让用户选目录、设路径、再启动
+        const selected = await open({
+            title: '请选择 WOTB 游戏目录',
+            directory: true,
+            multiple: false
+        }) as string | null
+
+        if (!selected) {
+            ElMessage.warning('未选择游戏目录，已取消启动')
+            return
+        }
+
+        await invoke('set_game_path', { path: selected })
+        await invoke('launch_game')
+    }
+    catch (err: any) {
+        console.error('启动游戏过程中发生错误：', err)
+        ElMessage.error(err.message || '启动游戏失败，请检查路径或日志')
+    }
+}
+
+onMounted(() => {
+    fetchModList();
+});
 </script>
 
 <style scoped>
@@ -130,10 +200,12 @@ let ModData = reactive({
     white-space: nowrap;
 
 }
+
 .tap-bar-item.active {
     background-color: rgb(74, 81, 91);
     color: #fff;
 }
+
 /* WebKit (Chrome, Safari) */
 .mod-tap-bar::-webkit-scrollbar {
     width: 6px;
