@@ -14,38 +14,69 @@
                     :class="{ active: activeTap === tap.type }" @click="activeTap = tap.type">
                     {{ tap.name }}
                 </div>
+                <el-checkbox :indeterminate="isIndeterminate" v-model="checkAll" @change="handleCheckAllChange">
+                    全选
+                </el-checkbox>
             </div>
             <!-- mod列表 -->
             <div class="mod-list">
-                <!-- 列表项 -->
-                <div class="mod-list-item" v-for="(mod, index) in filteredModList" :key="index">
-                    <div class="mod-title">
-                        <span>{{ mod.name }}</span>
-                        <span>{{ mod.type }}</span>
+                <el-checkbox-group v-model="selectedMods">
+                    <!-- 列表项 -->
+                    <div class="mod-list-item" v-for="(mod, index) in filteredModList" :key="index">
+                        <el-checkbox :label="mod.name" v-model="selectedMods" style="margin-bottom: 8px"
+                            class="mod-checkbox" />
+                        <div class="mod-title">
+                            <!-- <span>{{ mod.name }}</span> -->
+                            <span>{{ mod.type }}</span>
+                        </div>
+                        <div class="mod-overview">
+                            <span>{{ mod.author }}</span>
+                            <span>{{ mod.version }}</span>
+                        </div>
                     </div>
-                    <div class="mod-overview">
-                        <span>{{ mod.author }}</span>
-                        <span>{{ mod.version }}</span>
-                    </div>
-                </div>
+                </el-checkbox-group>
             </div>
         </div>
         <!-- 底部卡片 -->
         <div class="bottom-card">
-            <el-button type="primary" class="bottom-card-btn">加载MOD</el-button>
+            <el-button type="primary" class="bottom-card-btn" @click="loadSelectedMods">加载MOD</el-button>
             <el-button type="success" class="bottom-card-btn" @click="startGame">启动WOTB</el-button>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, computed, ref, onMounted } from 'vue';
+import { reactive, computed, ref, onMounted, watch } from 'vue';
 import { Plus, Search } from '@element-plus/icons-vue'
 import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core';
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElLoading } from 'element-plus'
 
 const activeTap = ref('全部'); // 默认为全部
+let loadingInstance: ReturnType<typeof ElLoading.service> | null = null;
+const selectedMods = ref<string[]>([]);
+
+// 全选勾选状态
+const checkAll = ref(false);
+// 是否显示半选状态
+const isIndeterminate = computed(() => {
+    const len = selectedMods.value.length;
+    return len > 0 && len < filteredModList.value.length;
+});
+
+// 当用户点“全选”时，同步更新 selectedMods
+function handleCheckAllChange(val: boolean) {
+    if (val) {
+        selectedMods.value = filteredModList.value.map(m => m.name);
+    } else {
+        selectedMods.value = [];
+    }
+}
+
+// 当 selectedMods 变化时，更新 checkAll（全选框状态）
+watch(selectedMods, (newVal) => {
+    checkAll.value = newVal.length === filteredModList.value.length;
+});
 
 // 计算属性：根据选中的标签过滤 modList
 const filteredModList = computed(() => {
@@ -67,24 +98,32 @@ let ModData = reactive({
 
 // 选择mod压缩包
 const selectModFolder = async () => {
-    const selected = (await open({
-        title: '请选择 Mod 压缩包文件',
-        multiple: false,
-        filters: [{ name: 'Mod 包', extensions: ['zip'] }],
-    })) as string | null;
-
-    if (!selected) {
-        ElMessage.info('未选择任何文件');
-        return;
-    }
-
+    // 开始加载动画
+    loadingInstance = ElLoading.service({
+        lock: true,
+        text: '正在添加 MOD...',
+        background: 'rgba(0, 0, 0, 0.4)',
+    });
     try {
+        const selected = await open({
+            title: '请选择 Mod 压缩包文件',
+            multiple: false,
+            filters: [{ name: 'Mod 包', extensions: ['zip'] }],
+        }) as string | null;
+
+        if (!selected) {
+            ElMessage.info('未选择任何文件');
+            return;
+        }
+
         await invoke('copy_mod_file', { src: selected });
         ElMessage.success('已复制 Mod 包到本地 mods 目录');
         await fetchModList();
     } catch (err) {
         console.error(err);
-        ElMessage.error('复制 Mod 包失败');
+        ElMessage.error(typeof err === 'string' ? err : '复制 Mod 包失败');
+    } finally {
+        loadingInstance?.close(); // 关闭加载动画
     }
 }
 
@@ -98,6 +137,7 @@ async function fetchModList() {
             author: '',
             version: '',
         }));
+        console.log('刷新后 Mod 列表：', ModData.modList);
     } catch (e) {
         console.error('fetchModList error', e);
     }
@@ -137,12 +177,60 @@ async function startGame() {
     }
 }
 
+const loadSelectedMods = async () => {
+    if (selectedMods.value.length === 0) {
+        ElMessage.warning('请先选择要加载的 MOD');
+        return;
+    }
+
+    console.log('要发送的 MOD 文件:', selectedMods.value);
+    selectedMods.value.forEach((mod) => {
+        console.log(typeof mod, mod);
+    });
+
+    loadingInstance = ElLoading.service({
+        lock: true,
+        text: '正在应用 MOD...',
+        background: 'rgba(0, 0, 0, 0.4)',
+    });
+
+    try {
+        await invoke('apply_mods', { mods: selectedMods.value });
+        ElMessage.success('MOD 已成功应用到游戏目录');
+    } catch (err: any) {
+        console.error('加载 MOD 出错：', err);
+        ElMessage.error(err.message || 'MOD 加载失败，请检查路径或日志');
+    } finally {
+        loadingInstance?.close();
+    }
+};
+
 onMounted(() => {
     fetchModList();
 });
 </script>
 
 <style scoped>
+/* 让 checkbox 整行铺满，label 部分可收缩截断 */
+.mod-checkbox {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+/* 调整 checkbox 输入框与文字的间距 */
+.mod-checkbox .el-checkbox__input {
+    margin-right: 8px;
+}
+
+/* 使 label 部分 flex 收缩，超出截断 */
+:deep(.mod-checkbox .el-checkbox__label) {
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
 .HomePage {
     min-height: 100vh;
     display: flex;
@@ -281,7 +369,7 @@ onMounted(() => {
     /* 鼠标悬停在滑块上时的颜色 */
 }
 
-/* 列表项样式 */
+/* mod列表项样式 */
 .mod-list-item {
     min-height: 96px;
     display: flex;
@@ -291,6 +379,14 @@ onMounted(() => {
     border-radius: 8px;
     margin-bottom: 20px;
     padding: 0 20px;
+}
+
+.mod-list-item span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+    display: inline-block;
 }
 
 .mod-title {
