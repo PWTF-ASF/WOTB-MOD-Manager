@@ -4,7 +4,8 @@
         <div class="top-card">
             <el-button type="success" :icon="Plus" class="add-mod-btn" style="height: 48px" @click="selectModFolder">
             </el-button>
-            <el-input :prefix-icon="Search" clearable style="width: 160px" class="search-box" />
+            <el-input v-model="searchQuery" :prefix-icon="Search" clearable style="width: 160px" class="search-box"
+                @input="handleSearch" />
         </div>
         <!-- 展示mod文件卡片 -->
         <div class="mod-card">
@@ -23,8 +24,7 @@
                 <el-checkbox-group v-model="selectedMods">
                     <!-- 列表项 -->
                     <div class="mod-list-item" v-for="(mod, index) in filteredModList" :key="index">
-                        <el-checkbox :label="mod.name" v-model="selectedMods" style="margin-bottom: 8px"
-                            class="mod-checkbox" />
+                        <el-checkbox :label="mod.name" style="margin-bottom: 8px" class="mod-checkbox" />
                         <div class="mod-title">
                             <!-- <span>{{ mod.name }}</span> -->
                             <span>{{ mod.type }}</span>
@@ -40,6 +40,7 @@
         <!-- 底部卡片 -->
         <div class="bottom-card">
             <el-button type="primary" class="bottom-card-btn" @click="loadSelectedMods">加载MOD</el-button>
+            <el-button type="danger" class="bottom-card-btn" @click="deleteSelectedMods">删除</el-button>
             <el-button type="success" class="bottom-card-btn" @click="startGame">启动WOTB</el-button>
         </div>
     </div>
@@ -55,6 +56,7 @@ import { ElMessage, ElLoading } from 'element-plus'
 const activeTap = ref('全部'); // 默认为全部
 let loadingInstance: ReturnType<typeof ElLoading.service> | null = null;
 const selectedMods = ref<string[]>([]);
+const searchQuery = ref('');
 
 // 全选勾选状态
 const checkAll = ref(false);
@@ -130,14 +132,22 @@ const selectModFolder = async () => {
 // 拉取 mods 目录下所有 ZIP 文件
 async function fetchModList() {
     try {
-        const files = (await invoke('list_mods')) as string[];
-        ModData.modList = files.map((f) => ({
-            name: f,
-            type: '其他', // 可改为按文件名解析类型
-            author: '',
-            version: '',
+        const mods = await invoke('get_mod_status') as Array<{
+            name: string;
+            type: string;
+            author: string;
+            version: string;
+            applied: boolean;
+        }>;
+        ModData.modList = mods.map(mod => ({
+            name: mod.name,
+            type: mod.type,
+            author: mod.author,
+            version: mod.version,
         }));
+        selectedMods.value = mods.filter(mod => mod.applied).map(mod => mod.name);
         console.log('刷新后 Mod 列表：', ModData.modList);
+        console.log('已选中：', selectedMods.value);
     } catch (e) {
         console.error('fetchModList error', e);
     }
@@ -177,6 +187,7 @@ async function startGame() {
     }
 }
 
+// 加载选中的 MOD
 const loadSelectedMods = async () => {
     if (selectedMods.value.length === 0) {
         ElMessage.warning('请先选择要加载的 MOD');
@@ -205,8 +216,69 @@ const loadSelectedMods = async () => {
     }
 };
 
-onMounted(() => {
-    fetchModList();
+// 删除选中的mod并恢复原文件
+const deleteSelectedMods = async () => {
+    if (selectedMods.value.length === 0) {
+        ElMessage.warning('请先选择要删除的 MOD');
+        return;
+    }
+
+    const confirm = window.confirm(`将恢复原文件并删除以下 MOD：\n${selectedMods.value.join('\n')}`);
+    if (!confirm) return;
+
+    loadingInstance = ElLoading.service({
+        lock: true,
+        text: '正在恢复并删除 MOD...',
+        background: 'rgba(0, 0, 0, 0.4)',
+    });
+
+    try {
+        await invoke('restore_and_delete_mods', { mods: selectedMods.value });
+        ElMessage.success('MOD 已恢复并删除');
+        await fetchModList();
+        selectedMods.value = [];
+    } catch (err: any) {
+        console.error('恢复并删除 MOD 出错：', err);
+        ElMessage.error(err.message || '操作失败，请检查路径或日志');
+    } finally {
+        loadingInstance?.close();
+    }
+};
+
+async function handleSearch() {
+    try {
+        if (!searchQuery.value) {
+            // 如果搜索框为空，就重新加载所有mods
+            const allMods = await invoke<string[]>('list_mods');
+            ModData.modList = allMods.map(name => ({
+                name,
+                type: '其他',    // 这里可以以后扩展成后端解析的type
+                author: '',
+                version: ''
+            }));
+            return;
+        }
+
+        const results = await invoke<string[]>('search_mods', { query: searchQuery.value });
+        ModData.modList = results.map(name => ({
+            name,
+            type: '其他',
+            author: '',
+            version: ''
+        }));
+    } catch (err) {
+        ElMessage.error('搜索失败: ' + err);
+    }
+}
+
+onMounted(async () => {
+    const allMods = await invoke<string[]>('list_mods');
+    ModData.modList = allMods.map(name => ({
+        name,
+        type: '其他',
+        author: '',
+        version: ''
+    }));
 });
 </script>
 
@@ -408,7 +480,7 @@ onMounted(() => {
 .bottom-card {
     position: fixed;
     bottom: 0;
-    width: 80%;
+    width: 100%;
     height: 64px;
     display: flex;
     align-items: center;
@@ -417,7 +489,7 @@ onMounted(() => {
 }
 
 .bottom-card-btn {
-    width: 160px;
+    width: 120px;
     height: 48px;
     border-radius: 8px;
     background-color: rgb(46, 51, 60);
@@ -427,14 +499,14 @@ onMounted(() => {
 }
 
 /* "加载mod" 按钮的样式 */
-.bottom-card-btn:nth-of-type(1) {
+/* .bottom-card-btn:nth-of-type(1) {
     background-color: #2196f3;
     color: white;
-}
+} */
 
 /* "启动WOTB" 按钮的样式 */
-.bottom-card-btn:nth-of-type(2) {
+/* .bottom-card-btn:nth-of-type(2) {
     background-color: #4caf50;
     color: white;
-}
+} */
 </style>

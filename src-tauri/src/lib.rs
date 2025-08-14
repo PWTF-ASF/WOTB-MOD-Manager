@@ -12,6 +12,30 @@ const GAME_PATH_FILE: &str = "game_path.json";
 const MODS_DIR: &str = "mods";
 const BACKUP_DIR: &str = "mod_backups";
 
+#[derive(serde::Serialize)]
+struct ModStatus {
+    name: String,
+    type_: String,
+    author: String,
+    version: String,
+    applied: bool,
+}
+
+fn normalize_mod_path(_mod_name: &str, original_path: &PathBuf) -> PathBuf {
+    // 如果路径已经以 "Data" 开头，直接返回
+    if original_path.starts_with("Data") {
+        return original_path.clone();
+    }
+
+    // 如果路径以 "3d" 开头，说明是模型类文件
+    if original_path.starts_with("3d") {
+        return PathBuf::from("Data").join(original_path);
+    }
+
+    // 默认加上 "Data"
+    PathBuf::from("Data").join(original_path)
+}
+
 /// 简单示例命令
 #[command]
 fn greet(name: &str) -> String {
@@ -140,12 +164,15 @@ fn apply_mods(app: AppHandle, mods: Vec<String>) -> Result<(), String> {
 
         for i in 0..archive.len() {
             let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
-            let rel_path = entry
+            let raw_path = entry
                 .mangled_name()
                 .components()
                 .skip_while(|c| matches!(c, std::path::Component::CurDir))
                 .collect::<PathBuf>();
+
+            let rel_path = normalize_mod_path(&mod_name, &raw_path);
             let target = game_dir.join(&rel_path);
+
             println!("目标路径: {:?}", target);
 
             if entry.is_dir() {
@@ -175,6 +202,135 @@ fn apply_mods(app: AppHandle, mods: Vec<String>) -> Result<(), String> {
     Ok(())
 }
 
+#[command]
+fn restore_and_delete_mods(app: AppHandle, mods: Vec<String>) -> Result<(), String> {
+    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    let mods_dir = config_dir.join(MODS_DIR);
+    let backup_dir = config_dir.join(BACKUP_DIR);
+    let game_path = get_game_path(app.clone())?.ok_or("游戏路径未设置")?;
+    let game_dir = PathBuf::from(game_path);
+
+    let latest_backup = fs::read_dir(&backup_dir)
+        .map_err(|e| e.to_string())?
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.path().is_dir())
+        .max_by_key(|entry| entry.file_name().to_string_lossy().to_string())
+        .map(|entry| entry.path())
+        .ok_or("未找到备份目录")?;
+
+    for mod_name in mods {
+        let zip_path = mods_dir.join(&mod_name);
+        let file = File::open(&zip_path).map_err(|e| e.to_string())?;
+        let mut archive = ZipArchive::new(file).map_err(|e| e.to_string())?;
+
+        for i in 0..archive.len() {
+            let entry = archive.by_index(i).map_err(|e| e.to_string())?;
+            let raw_path = entry
+                .mangled_name()
+                .components()
+                .skip_while(|c| matches!(c, std::path::Component::CurDir))
+                .collect::<PathBuf>();
+
+            let rel_path = normalize_mod_path(&mod_name, &raw_path);
+
+            let backup_file = latest_backup.join(&rel_path);
+            let game_file = game_dir.join(&rel_path);
+
+            println!("尝试恢复文件: {:?}", game_file);
+            if backup_file.is_file() {
+                if let Some(p) = game_file.parent() {
+                    fs::create_dir_all(p).map_err(|e| e.to_string())?;
+                }
+                fs::copy(&backup_file, &game_file).map_err(|e| format!("恢复文件失败: {}", e))?;
+            } else {
+                println!("跳过目录: {:?}", backup_file);
+            }
+        }
+
+        // 删除 mods 中的 ZIP 文件
+        let mod_path = mods_dir.join(&mod_name);
+        if mod_path.exists() {
+            fs::remove_file(&mod_path).map_err(|e| format!("删除 MOD 文件失败: {}", e))?;
+        }
+    }
+
+    Ok(())
+}
+
+/// 获取当前应用的 MOD 状态：检查每个 ZIP 是否已应用到游戏目录
+#[command]
+fn get_mod_status(app: AppHandle) -> Result<Vec<ModStatus>, String> {
+    let game_path = get_game_path(app.clone())?.ok_or("游戏路径未设置")?;
+    let game_dir = PathBuf::from(game_path);
+    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    let mods_dir = config_dir.join(MODS_DIR);
+
+    let mut result = Vec::new();
+
+    for entry in fs::read_dir(&mods_dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        if path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map_or(false, |ext| ext.eq_ignore_ascii_case("zip"))
+        {
+            // let name = path.file_name().unwrap().to_string_lossy().to_string();
+            let name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "未知MOD".to_string());
+            let mut applied = true;
+
+            let file = File::open(&path).map_err(|e| e.to_string())?;
+            let mut archive = ZipArchive::new(file).map_err(|e| e.to_string())?;
+
+            for i in 0..archive.len() {
+                let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
+                let raw_path = entry
+                    .mangled_name()
+                    .components()
+                    .skip_while(|c| matches!(c, std::path::Component::CurDir))
+                    .collect::<PathBuf>();
+                let rel_path = normalize_mod_path(&name, &raw_path);
+                let target = game_dir.join(&rel_path);
+
+                if !target.exists() {
+                    applied = false;
+                    break;
+                }
+
+                // 可选：比较文件内容是否一致
+                // 如果不一致也认为未应用
+            }
+
+            result.push(ModStatus {
+                name,
+                applied,
+                author: String::new(),     // 或者你可以解析 ZIP 中的 metadata
+                type_: "其他".to_string(), // 可根据文件名或路径推断类型
+                version: String::new(),    // 暂时为空
+            });
+        }
+    }
+
+    Ok(result)
+}
+
+//搜索mod
+#[command]
+fn search_mods(app: AppHandle, query: String) -> Result<Vec<String>, String> {
+    let all_mods = list_mods(app)?;
+    let lower_query = query.to_lowercase();
+    let filtered: Vec<String> = all_mods
+        .into_iter()
+        .filter(|name| name.to_lowercase().contains(&lower_query))
+        .collect();
+    Ok(filtered)
+}
+
+
 /// 程序入口：注册命令并运行 Tauri
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -199,7 +355,10 @@ pub fn run() {
             launch_game,
             copy_mod_file,
             list_mods,
-            apply_mods
+            apply_mods,
+            restore_and_delete_mods,
+            get_mod_status,
+            search_mods
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
