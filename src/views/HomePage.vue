@@ -39,9 +39,11 @@
         </div>
         <!-- 底部卡片 -->
         <div class="bottom-card">
-            <el-button type="primary" class="bottom-card-btn" @click="loadSelectedMods">加载MOD</el-button>
-            <el-button type="danger" class="bottom-card-btn" @click="deleteSelectedMods">删除</el-button>
-            <el-button type="success" class="bottom-card-btn" @click="startGame">启动WOTB</el-button>
+            <el-button type="primary" @click="loadSelectedMods">加载MOD</el-button>
+            <el-button type="danger"  @click="deleteSelectedMods">删除</el-button>
+            <el-button type="success" @click="startGame">启动WOTB</el-button>
+            <el-button type="primary" @click="goToSettings">进入设置页</el-button>
+
         </div>
     </div>
 </template>
@@ -52,11 +54,17 @@ import { Plus, Search } from '@element-plus/icons-vue'
 import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core';
 import { ElMessage, ElLoading } from 'element-plus'
+import { useRouter } from 'vue-router';
 
 const activeTap = ref('全部'); // 默认为全部
 let loadingInstance: ReturnType<typeof ElLoading.service> | null = null;
 const selectedMods = ref<string[]>([]);
 const searchQuery = ref('');
+const router = useRouter();
+
+function goToSettings() {
+    router.push('/settings');
+}
 
 // 全选勾选状态
 const checkAll = ref(false);
@@ -271,8 +279,31 @@ async function handleSearch() {
     }
 }
 
+function applyBackground(settings: any) {
+    const homepage = document.querySelector('.HomePage') as HTMLElement;
+    if (!homepage) return;
+
+    if (settings.type === 'color') {
+        homepage.style.backgroundImage = '';
+        homepage.style.backgroundColor = settings.color;
+        homepage.style.backdropFilter = '';
+    } else if (settings.type === 'image') {
+        homepage.style.backgroundImage = `url("${settings.imagePath}")`;
+        homepage.style.backgroundSize = 'cover';
+        homepage.style.backgroundRepeat = 'no-repeat';
+        homepage.style.backgroundPosition = 'center';
+        homepage.style.backgroundColor = '';
+        homepage.style.backdropFilter = `blur(${settings.blur}px)`;
+    }
+}
+
 onMounted(async () => {
     await fetchModList();
+    const saved = localStorage.getItem('userSettings');
+    if (saved) {
+        const settings = JSON.parse(saved);
+        applyBackground(settings);
+    }
 });
 </script>
 
@@ -482,25 +513,5 @@ onMounted(async () => {
     margin-bottom: 20px;
 }
 
-.bottom-card-btn {
-    width: 120px;
-    height: 48px;
-    border-radius: 8px;
-    background-color: rgb(46, 51, 60);
-    color: white;
-    text-align: center;
-    line-height: 48px;
-}
 
-/* "加载mod" 按钮的样式 */
-/* .bottom-card-btn:nth-of-type(1) {
-    background-color: #2196f3;
-    color: white;
-} */
-
-/* "启动WOTB" 按钮的样式 */
-/* .bottom-card-btn:nth-of-type(2) {
-    background-color: #4caf50;
-    color: white;
-} */
 </style>
