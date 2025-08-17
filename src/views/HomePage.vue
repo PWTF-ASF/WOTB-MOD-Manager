@@ -272,13 +272,7 @@ async function handleSearch() {
 }
 
 onMounted(async () => {
-    const allMods = await invoke<string[]>('list_mods');
-    ModData.modList = allMods.map(name => ({
-        name,
-        type: '其他',
-        author: '',
-        version: ''
-    }));
+    await fetchModList();
 });
 </script>
 

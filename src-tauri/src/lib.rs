@@ -287,7 +287,7 @@ fn get_mod_status(app: AppHandle) -> Result<Vec<ModStatus>, String> {
             let mut archive = ZipArchive::new(file).map_err(|e| e.to_string())?;
 
             for i in 0..archive.len() {
-                let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
+                let entry = archive.by_index(i).map_err(|e| e.to_string())?;
                 let raw_path = entry
                     .mangled_name()
                     .components()
