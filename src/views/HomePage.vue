@@ -1,63 +1,53 @@
 <template>
+
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
     <div class="HomePage">
-        <!-- 顶部卡片 -->
-        <div class="top-card">
-            <el-button type="success" :icon="Plus" class="add-mod-btn" style="height: 48px" @click="selectModFolder">
-            </el-button>
-            <el-input v-model="searchQuery" :prefix-icon="Search" clearable style="width: 160px" class="search-box"
-                @input="handleSearch" />
-        </div>
-        <!-- 展示mod文件卡片 -->
-        <div class="mod-card">
-            <!-- 标签栏 -->
-            <div class="mod-tap-bar">
-                <div class="tap-bar-item" v-for="(tap, index) in ModData.tapList" :key="index"
-                    :class="{ active: activeTap === tap.type }" @click="activeTap = tap.type">
-                    {{ tap.name }}
-                </div>
-                <el-checkbox :indeterminate="isIndeterminate" v-model="checkAll" @change="handleCheckAllChange">
-                    全选
-                </el-checkbox>
+        <aside>
+            <div class="add-mod-btn" @click="selectModFolder">
+                添加MOD
+            </div>
+            <div class="setting-btn" @click="goToSettings">
+                设置
+            </div>
+        </aside>
+        <main>
+            <!-- 搜索框 -->
+            <div class="search-box">
+                <input type="text"></input>
             </div>
             <!-- mod列表 -->
-            <div class="mod-list">
-                <el-checkbox-group v-model="selectedMods">
-                    <!-- 列表项 -->
-                    <div class="mod-list-item" v-for="(mod, index) in filteredModList" :key="index">
-                        <el-checkbox :label="mod.name" style="margin-bottom: 8px" class="mod-checkbox" />
-                        <div class="mod-title">
-                            <!-- <span>{{ mod.name }}</span> -->
-                            <span>{{ mod.type }}</span>
-                        </div>
-                        <div class="mod-overview">
-                            <span>{{ mod.author }}</span>
-                            <span>{{ mod.version }}</span>
-                        </div>
-                    </div>
-                </el-checkbox-group>
-            </div>
-        </div>
-        <!-- 底部卡片 -->
-        <div class="bottom-card">
-            <el-button type="primary" @click="loadSelectedMods">加载MOD</el-button>
-            <el-button type="danger"  @click="deleteSelectedMods">删除</el-button>
-            <el-button type="success" @click="startGame">启动WOTB</el-button>
-            <el-button type="primary" @click="goToSettings">进入设置页</el-button>
-
-        </div>
+            <section class="mod-list">
+                <article class="mod-item" v-for="mods in ModData.modList" :key="mods.name">
+                    <label class="mod-label">
+                        <input type="checkbox" class="mod-checkbox" :value="mods.name" v-model="selectedMods">
+                        <span class="mod">{{ mods.name }}</span>
+                    </label>
+                </article>
+            </section>
+            <footer>
+                <div class="load-mod-btn">
+                    加载MOD
+                </div>
+                <div class="delete-mod-btn">
+                    删除MOD
+                </div>
+                <div class="start-game-btn">
+                    启动游戏
+                </div>
+            </footer>
+        </main>
     </div>
 </template>
 
 <script setup lang="ts">
 import { reactive, computed, ref, onMounted, watch } from 'vue';
-import { Plus, Search } from '@element-plus/icons-vue'
 import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core';
-import { ElMessage, ElLoading } from 'element-plus'
 import { useRouter } from 'vue-router';
 
 const activeTap = ref('全部'); // 默认为全部
-let loadingInstance: ReturnType<typeof ElLoading.service> | null = null;
 const selectedMods = ref<string[]>([]);
 const searchQuery = ref('');
 const router = useRouter();
@@ -109,11 +99,6 @@ let ModData = reactive({
 // 选择mod压缩包
 const selectModFolder = async () => {
     // 开始加载动画
-    loadingInstance = ElLoading.service({
-        lock: true,
-        text: '正在添加 MOD...',
-        background: 'rgba(0, 0, 0, 0.4)',
-    });
     try {
         const selected = await open({
             title: '请选择 Mod 压缩包文件',
@@ -122,18 +107,14 @@ const selectModFolder = async () => {
         }) as string | null;
 
         if (!selected) {
-            ElMessage.info('未选择任何文件');
             return;
         }
 
         await invoke('copy_mod_file', { src: selected });
-        ElMessage.success('已复制 Mod 包到本地 mods 目录');
         await fetchModList();
     } catch (err) {
         console.error(err);
-        ElMessage.error(typeof err === 'string' ? err : '复制 Mod 包失败');
     } finally {
-        loadingInstance?.close(); // 关闭加载动画
     }
 }
 
@@ -182,7 +163,6 @@ async function startGame() {
         }) as string | null
 
         if (!selected) {
-            ElMessage.warning('未选择游戏目录，已取消启动')
             return
         }
 
@@ -191,14 +171,13 @@ async function startGame() {
     }
     catch (err: any) {
         console.error('启动游戏过程中发生错误：', err)
-        ElMessage.error(err.message || '启动游戏失败，请检查路径或日志')
     }
 }
 
 // 加载选中的 MOD
 const loadSelectedMods = async () => {
     if (selectedMods.value.length === 0) {
-        ElMessage.warning('请先选择要加载的 MOD');
+
         return;
     }
 
@@ -207,49 +186,31 @@ const loadSelectedMods = async () => {
         console.log(typeof mod, mod);
     });
 
-    loadingInstance = ElLoading.service({
-        lock: true,
-        text: '正在应用 MOD...',
-        background: 'rgba(0, 0, 0, 0.4)',
-    });
-
     try {
         await invoke('apply_mods', { mods: selectedMods.value });
-        ElMessage.success('MOD 已成功应用到游戏目录');
     } catch (err: any) {
         console.error('加载 MOD 出错：', err);
-        ElMessage.error(err.message || 'MOD 加载失败，请检查路径或日志');
     } finally {
-        loadingInstance?.close();
     }
 };
 
 // 删除选中的mod并恢复原文件
 const deleteSelectedMods = async () => {
     if (selectedMods.value.length === 0) {
-        ElMessage.warning('请先选择要删除的 MOD');
         return;
     }
 
     const confirm = window.confirm(`将恢复原文件并删除以下 MOD：\n${selectedMods.value.join('\n')}`);
     if (!confirm) return;
 
-    loadingInstance = ElLoading.service({
-        lock: true,
-        text: '正在恢复并删除 MOD...',
-        background: 'rgba(0, 0, 0, 0.4)',
-    });
 
     try {
         await invoke('restore_and_delete_mods', { mods: selectedMods.value });
-        ElMessage.success('MOD 已恢复并删除');
         await fetchModList();
         selectedMods.value = [];
     } catch (err: any) {
         console.error('恢复并删除 MOD 出错：', err);
-        ElMessage.error(err.message || '操作失败，请检查路径或日志');
     } finally {
-        loadingInstance?.close();
     }
 };
 
@@ -275,10 +236,10 @@ async function handleSearch() {
             version: ''
         }));
     } catch (err) {
-        ElMessage.error('搜索失败: ' + err);
     }
 }
 
+//更改背景色
 function applyBackground(settings: any) {
     const homepage = document.querySelector('.HomePage') as HTMLElement;
     if (!homepage) return;
@@ -299,219 +260,206 @@ function applyBackground(settings: any) {
 
 onMounted(async () => {
     await fetchModList();
-    const saved = localStorage.getItem('userSettings');
-    if (saved) {
-        const settings = JSON.parse(saved);
-        applyBackground(settings);
-    }
+    // const saved = localStorage.getItem('userSettings');
+    // if (saved) {
+    //     const settings = JSON.parse(saved);
+    //     applyBackground(settings);
+    // }
 });
 </script>
 
 <style scoped>
-/* 让 checkbox 整行铺满，label 部分可收缩截断 */
-.mod-checkbox {
-    display: flex;
-    align-items: center;
-    width: 100%;
+* {
+    box-sizing: border-box;
 }
 
-/* 调整 checkbox 输入框与文字的间距 */
-.mod-checkbox .el-checkbox__input {
-    margin-right: 8px;
-}
-
-/* 使 label 部分 flex 收缩，超出截断 */
-:deep(.mod-checkbox .el-checkbox__label) {
-    flex: 1;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+/* 清除input默认样式 */
+input {
+    all: unset;
 }
 
 .HomePage {
-    min-height: 100vh;
+    width: 800px;
+    height: 600px;
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px;
-    background-color: rgb(29, 32, 40);
+    overflow: hidden;
+    background-image: url("../assets/123517794_p0.jpg");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+
+.HomePage .el-button {
+    min-width: 130px;
+}
+
+.HomePage aside {
+    height: 100%;
+    width: 150px;
     box-sizing: border-box;
+    backdrop-filter: blur(10px);
+    background-color: rgba(255, 255, 255, 0.123);
+    position: relative;
+    padding: 20px 10px 10px 10px;
+    box-shadow: 10px 0 10px -5px rgba(0, 0, 0, 0.3);
 }
 
-/* 顶部卡片样式 */
-.top-card {
-    width: 80%;
-    height: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background-color: rgb(36, 41, 48);
-    border-radius: 8px;
-}
-
-/* 添加mod按钮样式 */
-.add-mod-btn {
-    border-radius: 8px;
-    margin-left: 10px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-/* 搜索框样式 */
-.search-box {
-    height: 48px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    margin-right: 20px;
-}
-
-/* 展示mod文件卡片样式 */
-.mod-card {
-    width: 80%;
-    display: flex;
-    flex-flow: column;
-    align-items: center;
-    margin-top: 20px;
-}
-
-/* 标签栏样式 */
-.mod-tap-bar {
-    max-width: 100%;
-    min-height: 32px;
-    display: flex;
-    align-items: center;
-    border-radius: 10px;
-    overflow-x: auto;
-    white-space: nowrap;
-
-}
-
-.tap-bar-item.active {
-    background-color: rgb(74, 81, 91);
-    color: #fff;
-}
-
-/* WebKit (Chrome, Safari) */
-.mod-tap-bar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-    background: transparent;
-}
-
-.mod-tap-bar::-webkit-scrollbar-thumb {
-    background-color: rgb(54, 61, 71);
-    /* 滚动条滑块的颜色 */
-    border-radius: 3px;
-    /* 滚动条滑块的圆角 */
-}
-
-.mod-tap-bar::-webkit-scrollbar-track {
-    background-color: transparent;
-    /* 滚动条轨道的颜色 */
-}
-
-.mod-tap-bar::-webkit-scrollbar-thumb:hover {
-    background-color: rgb(74, 81, 91);
-    /* 鼠标悬停在滑块上时的颜色 */
-}
-
-.tap-bar-item {
-    flex-shrink: 0;
-    /* 不让标签压缩 */
-    width: 80px;
-    /* 每个标签固定宽度，3个显示共240px */
-    min-height: 32px;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
+aside>div {
+    width: 130px;
+    height: 32px;
+    border: 2px solid #409EFF;
+    text-align: center;
     margin-bottom: 10px;
-}
-
-.tap-bar-item:hover {
-    background-color: rgb(46, 51, 60);
+    line-height: 30px;
     cursor: pointer;
+    transition: all 0.3s ease;
 }
 
-/* mod列表样式 */
+aside>.add-mod-btn:hover,
+aside>.setting-btn:hover {
+    background-color: #409EFF;
+    color: white;
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.setting-btn {
+    position: absolute;
+    bottom: 0px;
+}
+
+.HomePage main {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    flex: 1;
+}
+
+main>.search-box {
+    width: 100%;
+    height: 40px;
+    margin: 20px;
+}
+
+.search-box>input {
+    width: 600px;
+    height: 30px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    margin-right: 10px;
+}
+
+.search-box>input:focus {
+    border-color: #409EFF;
+    box-shadow: 0 0 5px rgba(64, 158, 255, 0.5);
+}
+
 .mod-list {
     width: 100%;
-    margin-top: 20px;
-    height: 480px;
-    overflow-y: auto;
-    display: flex;
-    flex-flow: column;
-    padding-right: 12px;
+    height: 400px;
+    padding: 0px 20px 10px 20px;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
 }
 
-/* 优化滚动条样式 */
+.mod-list::-webkit-scrollbar-button {
+    display: none;
+}
+
 .mod-list::-webkit-scrollbar {
     width: 8px;
-    background: transparent;
 }
 
 .mod-list::-webkit-scrollbar-thumb {
-    background-color: rgb(54, 61, 71);
+    background-color: #999;
     border-radius: 4px;
 }
 
-.mod-list::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.mod-list::-webkit-scrollbar-thumb:hover {
-    background-color: rgb(74, 81, 91);
-    /* 鼠标悬停在滑块上时的颜色 */
-}
-
-/* mod列表项样式 */
-.mod-list-item {
-    min-height: 96px;
+.mod-item {
+    width: 100%;
+    height: 40px;
+    backdrop-filter: blur(10px);
+    background-color: rgba(255, 255, 255, 0.123);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    border-radius: 5px;
     display: flex;
-    flex-flow: column;
-    justify-content: space-around;
-    border: 1px solid rgb(38, 43, 51);
-    border-radius: 8px;
-    margin-bottom: 20px;
-    padding: 0 20px;
+    align-items: center;
+    padding: 0 10px;
+    box-sizing: border-box;
 }
 
-.mod-list-item span {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 200px;
+.mod-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    color: black;
+    transition: all 0.3s ease;
+}
+
+.mod-label:hover {
+    background-color: #409EFF;
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    border-radius: 5px;
+    padding: 0 10px;
+}
+
+.mod-checkbox {
+    width: 18px;
+    height: 18px;
+    opacity: 1;
     display: inline-block;
+    appearance: checkbox;
+    -webkit-appearance: checkbox;
+    -moz-appearance: checkbox;
+    accent-color: #007BFF;
+    /* 可自定义勾选颜色 */
 }
 
-.mod-title {
+.mod {
+    flex: 1;
+    font-size: 16px;
+    line-height: 40px;
+}
+
+.HomePage footer {
+    height: 50px;
     width: 100%;
-    display: flex;
-    justify-content: space-between;
-}
-
-.mod-overview {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: rgb(150, 150, 150);
-    font-size: 14px;
-}
-
-/* 底部卡片样式 */
-.bottom-card {
-    position: fixed;
+    position: absolute;
     bottom: 0;
-    width: 100%;
-    height: 64px;
     display: flex;
     align-items: center;
-    justify-content: space-around;
-    margin-bottom: 20px;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 10px;
 }
 
+footer> :last-child {
+    margin-right: 10px;
+}
 
+footer>div {
+    width: 130px;
+    height: 32px;
+    border: 2px solid #409EFF;
+    text-align: center;
+    line-height: 30px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+footer>.load-mod-btn:hover,
+footer>.delete-mod-btn:hover,
+footer>.start-game-btn:hover {
+    background-color: #409EFF;
+    color: white;
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
 </style>

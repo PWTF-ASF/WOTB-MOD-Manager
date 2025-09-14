@@ -26,14 +26,13 @@
 
       </div>
 
-      <el-button type="primary" @click="saveSettings">保存设置</el-button>
+      <button @click="saveSettings">保存设置</button>
     </el-form>
   </div>
 </template>
 
 <script setup lang="ts">
 import { reactive, onMounted } from 'vue';
-import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
@@ -63,7 +62,6 @@ function handleImageUpload(uploadFile: any) {
   reader.readAsDataURL(file);
   
   if (!file.type.startsWith('image/')) {
-    ElMessage.error('请上传图片文件');
     return;
   }
 }
@@ -77,7 +75,6 @@ function saveSettings() {
   applyBackground();
 
   localStorage.setItem('userSettings', JSON.stringify(settings));
-  ElMessage.success('设置已保存');
 }
 
 function applyBackground() {
