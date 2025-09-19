@@ -75,7 +75,7 @@ fn launch_game(app: AppHandle) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        let exe = PathBuf::from(&game_path).join("wotblitz.exe");
+        let exe = PathBuf::from(&game_path).join("geek.exe");
         if !exe.exists() {
             return Err("游戏路径无效".into());
         }
@@ -275,7 +275,6 @@ fn get_mod_status(app: AppHandle) -> Result<Vec<ModStatus>, String> {
             .and_then(|ext| ext.to_str())
             .map_or(false, |ext| ext.eq_ignore_ascii_case("zip"))
         {
-            // let name = path.file_name().unwrap().to_string_lossy().to_string();
             let name = path
                 .file_name()
                 .and_then(|n| n.to_str())
@@ -300,9 +299,6 @@ fn get_mod_status(app: AppHandle) -> Result<Vec<ModStatus>, String> {
                     applied = false;
                     break;
                 }
-
-                // 可选：比较文件内容是否一致
-                // 如果不一致也认为未应用
             }
 
             result.push(ModStatus {

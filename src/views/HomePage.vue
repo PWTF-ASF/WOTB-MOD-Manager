@@ -1,465 +1,478 @@
 <template>
-
-    <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    </head>
-    <div class="HomePage">
-        <aside>
-            <div class="add-mod-btn" @click="selectModFolder">
-                添加MOD
-            </div>
-            <div class="setting-btn" @click="goToSettings">
-                设置
-            </div>
-        </aside>
-        <main>
-            <!-- 搜索框 -->
-            <div class="search-box">
-                <input type="text"></input>
-            </div>
-            <!-- mod列表 -->
-            <section class="mod-list">
-                <article class="mod-item" v-for="mods in ModData.modList" :key="mods.name">
-                    <label class="mod-label">
-                        <input type="checkbox" class="mod-checkbox" :value="mods.name" v-model="selectedMods">
-                        <span class="mod">{{ mods.name }}</span>
-                    </label>
-                </article>
-            </section>
-            <footer>
-                <div class="load-mod-btn">
-                    加载MOD
-                </div>
-                <div class="delete-mod-btn">
-                    删除MOD
-                </div>
-                <div class="start-game-btn">
-                    启动游戏
-                </div>
-            </footer>
-        </main>
+  <div class="HomePage">
+    <div class="background"></div>
+    <div class="content">
+      <aside>
+        <div class="add-mod-btn" @click="selectModFolder">添加MOD</div>
+        <div class="setting-btn" @click="goToSettings">设置</div>
+      </aside>
+      <main>
+        <!-- 搜索框 -->
+        <div class="search-box">
+          <input type="text" v-model="searchQuery" @input="handleSearch()" />
+        </div>
+        <!-- mod列表 -->
+        <section class="mod-list">
+          <article class="mod-item" v-for="mod in ModData.modList" :key="mod.name">
+            <label class="mod-label">
+              <input type="checkbox" class="mod-checkbox" :value="mod.name" v-model="selectedMods" />
+              <span class="mod">{{ mod.name }}</span>
+            </label>
+          </article>
+        </section>
+        <footer>
+          <div class="load-mod-btn">加载MOD</div>
+          <div class="delete-mod-btn">删除MOD</div>
+          <div class="start-game-btn" @click="startGame()">启动游戏</div>
+        </footer>
+      </main>
     </div>
+  </div>
+  <!-- <SettingsPage @update-background="applyBackground" /> -->
 </template>
 
 <script setup lang="ts">
-import { reactive, computed, ref, onMounted, watch } from 'vue';
+import { reactive, computed, ref, onMounted, watch } from 'vue'
 import { open } from '@tauri-apps/plugin-dialog'
-import { invoke } from '@tauri-apps/api/core';
-import { useRouter } from 'vue-router';
-
-const activeTap = ref('全部'); // 默认为全部
-const selectedMods = ref<string[]>([]);
-const searchQuery = ref('');
-const router = useRouter();
+import { invoke } from '@tauri-apps/api/core'
+import { useRouter } from 'vue-router'
+// import SettingsPage from './SettingsPage.vue'
+const activeTap = ref('全部') // 默认为全部
+const selectedMods = ref<string[]>([])
+const searchQuery = ref('')
+const router = useRouter()
 
 function goToSettings() {
-    router.push('/settings');
+  router.push('/settings')
 }
 
 // 全选勾选状态
-const checkAll = ref(false);
+const checkAll = ref(false)
 // 是否显示半选状态
 const isIndeterminate = computed(() => {
-    const len = selectedMods.value.length;
-    return len > 0 && len < filteredModList.value.length;
-});
+  const len = selectedMods.value.length
+  return len > 0 && len < filteredModList.value.length
+})
 
 // 当用户点“全选”时，同步更新 selectedMods
 function handleCheckAllChange(val: boolean) {
-    if (val) {
-        selectedMods.value = filteredModList.value.map(m => m.name);
-    } else {
-        selectedMods.value = [];
-    }
+  if (val) {
+    selectedMods.value = filteredModList.value.map(m => m.name)
+  } else {
+    selectedMods.value = []
+  }
 }
 
 // 当 selectedMods 变化时，更新 checkAll（全选框状态）
-watch(selectedMods, (newVal) => {
-    checkAll.value = newVal.length === filteredModList.value.length;
-});
+
+watch(selectedMods, newVal => {
+  checkAll.value = newVal.length === filteredModList.value.length
+})
 
 // 计算属性：根据选中的标签过滤 modList
 const filteredModList = computed(() => {
-    return activeTap.value === '全部'
-        ? ModData.modList
-        : ModData.modList.filter((mod) => mod.type === activeTap.value);
-});
+  return activeTap.value === '全部' ? ModData.modList : ModData.modList.filter(mod => mod.type === activeTap.value)
+})
 
 //mod数据
 let ModData = reactive({
-    modList: [] as Array<{ name: string; type: string; author: string; version: string }>,
-    tapList: [
-        { name: '全部', type: '全部' },
-        { name: '语音包', type: '语音包' },
-        { name: '坦克模型', type: '坦克模型' },
-        { name: '其他', type: '其他' },
-    ]
+  modList: [] as Array<{ name: string; type: string; author: string; version: string }>,
+  tapList: [
+    { name: '全部', type: '全部' },
+    { name: '语音包', type: '语音包' },
+    { name: '坦克模型', type: '坦克模型' },
+    { name: '其他', type: '其他' },
+  ],
 })
 
 // 选择mod压缩包
 const selectModFolder = async () => {
-    // 开始加载动画
-    try {
-        const selected = await open({
-            title: '请选择 Mod 压缩包文件',
-            multiple: false,
-            filters: [{ name: 'Mod 包', extensions: ['zip'] }],
-        }) as string | null;
+  try {
+    const selected = (await open({
+      title: '请选择 Mod 压缩包文件',
+      multiple: false,
+      filters: [{ name: 'Mod 包', extensions: ['zip'] }],
+    })) as string | null
 
-        if (!selected) {
-            return;
-        }
-
-        await invoke('copy_mod_file', { src: selected });
-        await fetchModList();
-    } catch (err) {
-        console.error(err);
-    } finally {
+    if (!selected) {
+      return
     }
+
+    await invoke('copy_mod_file', { src: selected })
+    await fetchModList()
+  } catch (err) {
+    console.error(err)
+  } finally {
+  }
 }
 
 // 拉取 mods 目录下所有 ZIP 文件
 async function fetchModList() {
-    try {
-        const mods = await invoke('get_mod_status') as Array<{
-            name: string;
-            type: string;
-            author: string;
-            version: string;
-            applied: boolean;
-        }>;
-        ModData.modList = mods.map(mod => ({
-            name: mod.name,
-            type: mod.type,
-            author: mod.author,
-            version: mod.version,
-        }));
-        selectedMods.value = mods.filter(mod => mod.applied).map(mod => mod.name);
-        console.log('刷新后 Mod 列表：', ModData.modList);
-        console.log('已选中：', selectedMods.value);
-    } catch (e) {
-        console.error('fetchModList error', e);
-    }
+  try {
+    const mods = (await invoke('get_mod_status')) as Array<{
+      name: string
+      type: string
+      author: string
+      version: string
+      applied: boolean
+    }>
+    ModData.modList = mods.map(mod => ({
+      name: mod.name,
+      type: mod.type,
+      author: mod.author,
+      version: mod.version,
+    }))
+    selectedMods.value = mods.filter(mod => mod.applied).map(mod => mod.name)
+    console.log('刷新后 Mod 列表：', ModData.modList)
+    console.log('已选中：', selectedMods.value)
+    console.log(mods)
+  } catch (e) {
+    console.error('fetchModList error', e)
+  }
 }
 
 //启动游戏
 async function startGame() {
-    try {
-        // 先读配置
-        const path: string | null = await invoke('get_game_path')
-        console.log('本地存储的游戏路径：', path)
+  try {
+    // 先读配置
+    const path: string | null = await invoke('get_game_path')
+    console.log('本地存储的游戏路径：', path)
 
-        // 如果配置里有路径，直接尝试启动
-        if (path) {
-            await invoke('launch_game')
-            return
-        }
-
-        // 否则让用户选目录、设路径、再启动
-        const selected = await open({
-            title: '请选择 WOTB 游戏目录',
-            directory: true,
-            multiple: false
-        }) as string | null
-
-        if (!selected) {
-            return
-        }
-
-        await invoke('set_game_path', { path: selected })
-        await invoke('launch_game')
+    // 如果配置里有路径，直接尝试启动
+    if (path) {
+      await invoke('launch_game')
+      return
     }
-    catch (err: any) {
-        console.error('启动游戏过程中发生错误：', err)
+
+    // 否则让用户选目录、设路径、再启动
+    const selected = (await open({
+      title: '请选择 WOTB 游戏目录',
+      directory: true,
+      multiple: false,
+    })) as string | null
+
+    if (!selected) {
+      return
     }
+
+    await invoke('set_game_path', { path: selected })
+    await invoke('launch_game')
+  } catch (err: any) {
+    console.error('启动游戏过程中发生错误：', err)
+  }
 }
 
 // 加载选中的 MOD
 const loadSelectedMods = async () => {
-    if (selectedMods.value.length === 0) {
+  if (selectedMods.value.length === 0) {
+    return
+  }
 
-        return;
-    }
+  console.log('要发送的 MOD 文件:', selectedMods.value)
+  selectedMods.value.forEach(mod => {
+    console.log(typeof mod, mod)
+  })
 
-    console.log('要发送的 MOD 文件:', selectedMods.value);
-    selectedMods.value.forEach((mod) => {
-        console.log(typeof mod, mod);
-    });
-
-    try {
-        await invoke('apply_mods', { mods: selectedMods.value });
-    } catch (err: any) {
-        console.error('加载 MOD 出错：', err);
-    } finally {
-    }
-};
+  try {
+    await invoke('apply_mods', { mods: selectedMods.value })
+  } catch (err: any) {
+    console.error('加载 MOD 出错：', err)
+  } finally {
+  }
+}
 
 // 删除选中的mod并恢复原文件
 const deleteSelectedMods = async () => {
-    if (selectedMods.value.length === 0) {
-        return;
-    }
+  if (selectedMods.value.length === 0) {
+    return
+  }
 
-    const confirm = window.confirm(`将恢复原文件并删除以下 MOD：\n${selectedMods.value.join('\n')}`);
-    if (!confirm) return;
+  const confirm = window.confirm(`将恢复原文件并删除以下 MOD：\n${selectedMods.value.join('\n')}`)
+  if (!confirm) return
 
-
-    try {
-        await invoke('restore_and_delete_mods', { mods: selectedMods.value });
-        await fetchModList();
-        selectedMods.value = [];
-    } catch (err: any) {
-        console.error('恢复并删除 MOD 出错：', err);
-    } finally {
-    }
-};
+  try {
+    await invoke('restore_and_delete_mods', { mods: selectedMods.value })
+    await fetchModList()
+    selectedMods.value = []
+  } catch (err: any) {
+    console.error('恢复并删除 MOD 出错：', err)
+  } finally {
+  }
+}
 
 async function handleSearch() {
-    try {
-        if (!searchQuery.value) {
-            // 如果搜索框为空，就重新加载所有mods
-            const allMods = await invoke<string[]>('list_mods');
-            ModData.modList = allMods.map(name => ({
-                name,
-                type: '其他',    // 这里可以以后扩展成后端解析的type
-                author: '',
-                version: ''
-            }));
-            return;
-        }
-
-        const results = await invoke<string[]>('search_mods', { query: searchQuery.value });
-        ModData.modList = results.map(name => ({
-            name,
-            type: '其他',
-            author: '',
-            version: ''
-        }));
-    } catch (err) {
+  try {
+    if (!searchQuery.value) {
+      // 如果搜索框为空，就重新加载所有mods
+      const allMods = await invoke<string[]>('list_mods')
+      ModData.modList = allMods.map(name => ({
+        name,
+        type: '其他', // 这里可以以后扩展成后端解析的type
+        author: '',
+        version: '',
+      }))
+      return
     }
+
+    const results = await invoke<string[]>('search_mods', { query: searchQuery.value })
+    ModData.modList = results.map(name => ({
+      name,
+      type: '其他',
+      author: '',
+      version: '',
+    }))
+  } catch (err) {}
 }
 
 //更改背景色
 function applyBackground(settings: any) {
-    const homepage = document.querySelector('.HomePage') as HTMLElement;
-    if (!homepage) return;
+  const background = document.querySelector('.background') as HTMLElement
+  if (!background) return
 
-    if (settings.type === 'color') {
-        homepage.style.backgroundImage = '';
-        homepage.style.backgroundColor = settings.color;
-        homepage.style.backdropFilter = '';
-    } else if (settings.type === 'image') {
-        homepage.style.backgroundImage = `url("${settings.imagePath}")`;
-        homepage.style.backgroundSize = 'cover';
-        homepage.style.backgroundRepeat = 'no-repeat';
-        homepage.style.backgroundPosition = 'center';
-        homepage.style.backgroundColor = '';
-        homepage.style.backdropFilter = `blur(${settings.blur}px)`;
-    }
+  if (settings.type === 'color') {
+    background.style.backgroundImage = ''
+    background.style.backgroundColor = settings.color
+    background.style.backdropFilter = ''
+  } else if (settings.type === 'image') {
+    background.style.backgroundImage = `url("${settings.imagePath}")`
+    background.style.backgroundSize = 'cover'
+    background.style.backgroundRepeat = 'no-repeat'
+    background.style.backgroundPosition = 'center'
+    background.style.backgroundColor = ''
+    background.style.filter = `blur(${settings.blur}px)`
+  }
 }
 
 onMounted(async () => {
-    await fetchModList();
-    // const saved = localStorage.getItem('userSettings');
-    // if (saved) {
-    //     const settings = JSON.parse(saved);
-    //     applyBackground(settings);
-    // }
-});
+  await fetchModList()
+  const saved = localStorage.getItem('userSettings')
+  if (saved) {
+    try {
+      const settings = JSON.parse(saved)
+      const background = document.querySelector('.background') as HTMLElement
+      if (!background) return
+      if (settings.type === 'gradient') {
+        background.style.backgroundImage = settings.gradient
+        background.style.backgroundColor = ''
+        background.style.backdropFilter = ''
+      }
+      applyBackground(settings)
+    } catch (e) {
+      console.error('背景设置解析失败', e)
+    }
+  }
+})
 </script>
 
 <style scoped>
 * {
-    box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 /* 清除input默认样式 */
 input {
-    all: unset;
+  all: unset;
 }
 
 .HomePage {
-    width: 800px;
-    height: 600px;
-    display: flex;
-    overflow: hidden;
-    background-image: url("../assets/123517794_p0.jpg");
-    background-position: center;
-    background-repeat: no-repeat;
-    background-size: cover;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
 }
 
-.HomePage .el-button {
-    min-width: 130px;
+.background {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  transition:
+    background 0.3s ease,
+    backdrop-filter 0.3s ease;
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  width: 800px;
+  height: 600px;
+  display: flex;
+  overflow: hidden;
 }
 
 .HomePage aside {
-    height: 100%;
-    width: 150px;
-    box-sizing: border-box;
-    backdrop-filter: blur(10px);
-    background-color: rgba(255, 255, 255, 0.123);
-    position: relative;
-    padding: 20px 10px 10px 10px;
-    box-shadow: 10px 0 10px -5px rgba(0, 0, 0, 0.3);
+  height: 100%;
+  width: 150px;
+  box-sizing: border-box;
+  backdrop-filter: blur(10px);
+  background-color: rgba(255, 255, 255, 0.123);
+  position: relative;
+  padding: 20px 10px 10px 10px;
+  box-shadow: 10px 0 10px -5px rgba(0, 0, 0, 0.3);
 }
 
-aside>div {
-    width: 130px;
-    height: 32px;
-    border: 2px solid #409EFF;
-    text-align: center;
-    margin-bottom: 10px;
-    line-height: 30px;
-    cursor: pointer;
-    transition: all 0.3s ease;
+aside > div {
+  width: 130px;
+  height: 32px;
+  border: 2px solid #409eff;
+  text-align: center;
+  margin-bottom: 10px;
+  line-height: 30px;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-aside>.add-mod-btn:hover,
-aside>.setting-btn:hover {
-    background-color: #409EFF;
-    color: white;
-    transform: scale(1.05);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+aside > .add-mod-btn:hover,
+aside > .setting-btn:hover {
+  background-color: #409eff;
+  color: white;
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .setting-btn {
-    position: absolute;
-    bottom: 0px;
+  position: absolute;
+  bottom: 0px;
 }
 
 .HomePage main {
-    width: 100%;
-    height: 100%;
-    position: relative;
-    flex: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  flex: 1;
 }
 
-main>.search-box {
-    width: 100%;
-    height: 40px;
-    margin: 20px;
+main > .search-box {
+  width: 100%;
+  height: 40px;
+  margin: 20px;
 }
 
-.search-box>input {
-    width: 600px;
-    height: 30px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
-    margin-right: 10px;
+.search-box > input {
+  width: 600px;
+  height: 30px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  margin-right: 10px;
+  padding-left: 10px;
 }
 
-.search-box>input:focus {
-    border-color: #409EFF;
-    box-shadow: 0 0 5px rgba(64, 158, 255, 0.5);
+.search-box > input:focus {
+  border-color: #409eff;
+  box-shadow: 0 0 5px rgba(64, 158, 255, 0.5);
 }
 
 .mod-list {
-    width: 100%;
-    height: 400px;
-    padding: 0px 20px 10px 20px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    overflow-y: auto;
+  width: 100%;
+  height: 400px;
+  padding: 0px 20px 10px 20px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
 }
 
 .mod-list::-webkit-scrollbar-button {
-    display: none;
+  display: none;
 }
 
 .mod-list::-webkit-scrollbar {
-    width: 8px;
+  width: 8px;
 }
 
 .mod-list::-webkit-scrollbar-thumb {
-    background-color: #999;
-    border-radius: 4px;
+  background-color: #999;
+  border-radius: 4px;
 }
 
 .mod-item {
-    width: 100%;
-    height: 40px;
-    backdrop-filter: blur(10px);
-    background-color: rgba(255, 255, 255, 0.123);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    border-radius: 5px;
-    display: flex;
-    align-items: center;
-    padding: 0 10px;
-    box-sizing: border-box;
+  width: 100%;
+  height: 40px;
+  backdrop-filter: blur(10px);
+  background-color: rgba(255, 255, 255, 0.123);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  box-sizing: border-box;
 }
 
 .mod-label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    height: 100%;
-    cursor: pointer;
-    color: black;
-    transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  color: black;
+  transition: all 0.3s ease;
 }
 
 .mod-label:hover {
-    background-color: #409EFF;
-    transform: scale(1.05);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    border-radius: 5px;
-    padding: 0 10px;
+  background-color: #409eff;
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  border-radius: 5px;
+  padding: 0 10px;
 }
 
 .mod-checkbox {
-    width: 18px;
-    height: 18px;
-    opacity: 1;
-    display: inline-block;
-    appearance: checkbox;
-    -webkit-appearance: checkbox;
-    -moz-appearance: checkbox;
-    accent-color: #007BFF;
-    /* 可自定义勾选颜色 */
+  width: 18px;
+  height: 18px;
+  opacity: 1;
+  display: inline-block;
+  appearance: checkbox;
+  -webkit-appearance: checkbox;
+  -moz-appearance: checkbox;
+  accent-color: #007bff;
+  /* 可自定义勾选颜色 */
 }
 
 .mod {
-    flex: 1;
-    font-size: 16px;
-    line-height: 40px;
+  flex: 1;
+  font-size: 16px;
+  line-height: 40px;
 }
 
 .HomePage footer {
-    height: 50px;
-    width: 100%;
-    position: absolute;
-    bottom: 0;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
-    padding: 10px;
+  height: 50px;
+  width: 100%;
+  position: absolute;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 10px;
 }
 
-footer> :last-child {
-    margin-right: 10px;
+footer > :last-child {
+  margin-right: 10px;
 }
 
-footer>div {
-    width: 130px;
-    height: 32px;
-    border: 2px solid #409EFF;
-    text-align: center;
-    line-height: 30px;
-    cursor: pointer;
-    transition: all 0.3s ease;
+footer > div {
+  width: 130px;
+  height: 32px;
+  border: 2px solid #409eff;
+  text-align: center;
+  line-height: 30px;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-footer>.load-mod-btn:hover,
-footer>.delete-mod-btn:hover,
-footer>.start-game-btn:hover {
-    background-color: #409EFF;
-    color: white;
-    transform: scale(1.05);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+footer > .load-mod-btn:hover,
+footer > .delete-mod-btn:hover,
+footer > .start-game-btn:hover {
+  background-color: #409eff;
+  color: white;
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 </style>

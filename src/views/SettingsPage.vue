@@ -1,122 +1,237 @@
 <template>
-  <div class="settings-page">
-    <el-page-header content="背景设置" @back="handleBack" />
+  <div class="settings-panel">
+    <h2>背景设置</h2>
 
-    <el-form label-position="top" class="settings-form">
-      <!-- 明暗模式 -->
-      <el-switch v-model="settings.mode" active-text="暗黑模式" inactive-text="明亮模式" />
+    <!-- 背景预览 -->
+    <div class="preview" :style="previewStyle">
+      <p>背景预览区域</p>
+    </div>
 
-      <!-- 背景类型选择 -->
-      <el-radio-group v-model="settings.type">
-        <el-radio label="color">纯色背景</el-radio>
-        <el-radio label="image">图片背景</el-radio>
-      </el-radio-group>
-
-      <!-- 纯色背景 -->
-      <el-color-picker v-if="settings.type === 'color'" v-model="settings.color" />
-
-      <!-- 图片背景 -->
-      <div v-if="settings.type === 'image'" class="image-settings">
-        <el-upload action="" :auto-upload="false" :show-file-list="false" :on-change="handleImageUpload">
-          <el-button>上传背景图片</el-button>
-        </el-upload>
-
-        <!-- 模糊度调节 -->
-        <el-slider v-model="settings.blur" :min="0" :max="20" show-input />
-
+    <div class="option-group">
+      <label>背景模板：</label>
+      <div class="template-buttons">
+        <button @click="applyTemplate('sunset')">日落</button>
+        <button @click="applyTemplate('forest')">森林</button>
+        <button @click="applyTemplate('galaxy')">星空</button>
       </div>
+    </div>
 
-      <button @click="saveSettings">保存设置</button>
-    </el-form>
+    <!-- 纯色选择 -->
+    <div class="option-group">
+      <label>选择纯色背景：</label>
+      <input type="color" v-model="color" @input="applyColor" />
+    </div>
+
+    <div class="option-group">
+      <label>渐变背景：</label>
+      <button @click="applyGradient">应用渐变</button>
+    </div>
+
+    <!-- 图片上传 -->
+    <div class="option-group">
+      <label>上传背景图片：</label>
+      <input type="file" accept="image/*" @change="handleImageUpload" />
+    </div>
+
+    <!-- 模糊度滑块 -->
+    <div class="option-group" v-if="imagePath">
+      <label>模糊度：{{ blur }}px</label>
+      <input type="range" min="0" max="20" v-model="blur" @input="applyImage" />
+    </div>
+
+    <!-- 明暗切换器 -->
+    <div class="option-group">
+      <label>暗黑模式：</label>
+      <input type="checkbox" v-model="darkMode" @change="toggleDarkMode" />
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="button-group">
+      <button @click="saveSettings">💾 保存</button>
+      <button @click="resetSettings">🔄 重置</button>
+      <button @click="goBack">🔙 返回</button>
+    </div>
+
+    <!-- 保存提示 -->
+    <p v-if="saved" class="save-tip">✅ 设置已保存！</p>
   </div>
 </template>
 
-<script setup lang="ts">
-import { reactive, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
-const router = useRouter();
+const router = useRouter()
+const emit = defineEmits(['update-background'])
 
-function handleBack() {
-  router.back(); // 或 router.push('/') 返回首页
+const color = ref('#ffffff')
+const imagePath = ref('')
+const blur = ref(0)
+const saved = ref(false)
+
+const darkMode = ref(false)
+
+const previewStyle = computed(() => {
+  return imagePath.value
+    ? {
+        backgroundImage: `url(${imagePath.value})`,
+        backdropFilter: `blur(${blur.value}px)`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundColor: '',
+      }
+    : {
+        backgroundColor: color.value,
+      }
+})
+
+function applyTemplate(name) {
+  const templates = {
+    sunset: {
+      type: 'image',
+      imagePath: 'https://img.pconline.com.cn/images/upload/upc/tx/wallpaper/1305/16/c4/20990657_1368686545122.jpg',
+      blur: 2,
+    },
+    forest: {
+      type: 'image',
+      imagePath: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb',
+      blur: 1,
+    },
+    galaxy: {
+      type: 'image',
+      imagePath: 'https://images.unsplash.com/photo-1581320540380-7f7c1f3c9a3c',
+      blur: 3,
+    },
+  }
+
+  const selected = templates[name]
+  imagePath.value = selected.imagePath
+  blur.value = selected.blur
+  emit('update-background', selected)
 }
 
-const settings = reactive({
-  mode: 'light',
-  type: 'color',
-  color: '#ffffff',
-  imagePath: '',
-  blur: 5,
-  crop: null,
-});
 
-function handleImageUpload(uploadFile: any) {
-  const file = uploadFile.raw;
-  const reader = new FileReader();
-  reader.onload = () => {
-    const base64 = reader.result as string;
-    console.log('读取到的 base64:', base64);
-    settings.imagePath = base64;
-    console.log('设置后的 imagePath:', settings.imagePath);
-  };
-  reader.readAsDataURL(file);
-  
-  if (!file.type.startsWith('image/')) {
-    return;
+function applyColor() {
+  emit('update-background', { type: 'color', color: color.value })
+}
+
+function applyImage() {
+  emit('update-background', {
+    type: 'image',
+    imagePath: imagePath.value,
+    blur: blur.value,
+  })
+}
+
+function applyGradient() {
+  emit('update-background', {
+    type: 'gradient',
+    gradient: 'linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%)',
+  })
+}
+
+function handleImageUpload(event) {
+  const file = event.target.files[0]
+  if (file) {
+    const reader = new FileReader()
+    reader.onload = () => {
+      imagePath.value = reader.result
+      applyImage()
+    }
+    reader.readAsDataURL(file)
   }
+}
+
+function toggleDarkMode() {
+  const root = document.documentElement
+  if (darkMode.value) {
+    root.classList.add('dark')
+  } else {
+    root.classList.remove('dark')
+  }
+  localStorage.setItem('darkMode', JSON.stringify(darkMode.value))
 }
 
 function saveSettings() {
-
-  // 保存到本地
-  localStorage.setItem('userSettings', JSON.stringify(settings));
-
-  // 应用背景
-  applyBackground();
-
-  localStorage.setItem('userSettings', JSON.stringify(settings));
-}
-
-function applyBackground() {
-  const body = document.body;
-  console.log('应用背景图：', settings.imagePath);
-  if (settings.type === 'color') {
-    body.style.backgroundImage = '';
-    body.style.backgroundColor = settings.color;
-    body.style.backdropFilter = '';
-  } else if (settings.type === 'image') {
-    if (!settings.imagePath) return;
-
-    document.body.style.backgroundImage = `url("${settings.imagePath}")`;
-    body.style.backgroundSize = 'cover';
-    body.style.backgroundRepeat = 'no-repeat';
-    body.style.backgroundPosition = 'center';
-    body.style.backgroundColor = '';
-    body.style.backdropFilter = `blur(${settings.blur}px)`;
+  const settings = {
+    type: imagePath.value ? 'image' : 'color',
+    color: color.value,
+    imagePath: imagePath.value,
+    blur: blur.value,
   }
+  localStorage.setItem('userSettings', JSON.stringify(settings))
+  emit('update-background', settings)
+  saved.value = true
+  setTimeout(() => (saved.value = false), 2000)
 }
 
-//页面加载时读取设置
-const saved = localStorage.getItem('userSettings');
-if (saved) {
-  Object.assign(settings, JSON.parse(saved));
+function resetSettings() {
+  color.value = '#ffffff'
+  imagePath.value = ''
+  blur.value = 0
+  applyColor()
+}
+function goBack() {
+  router.back()
 }
 
 onMounted(() => {
-  const saved = localStorage.getItem('userSettings');
-  if (saved) {
-    Object.assign(settings, JSON.parse(saved));
-    applyBackground(); // ✅ 自动应用背景
+  const savedDark = localStorage.getItem('darkMode')
+  if (savedDark) {
+    darkMode.value = JSON.parse(savedDark)
+    toggleDarkMode()
   }
-});
+})
 </script>
 
 <style scoped>
-.settings-page {
-  padding: 2rem;
+.settings-panel {
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  max-width: 400px;
+  margin: auto;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
-.image-settings {
+.preview {
+  height: 100px;
+  margin-bottom: 1rem;
+  border: 1px solid #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #333;
+  transition: all 0.5s ease;
+}
+
+.option-group {
+  margin-bottom: 1rem;
+  color: black;
+}
+
+.button-group {
+  display: flex;
+  gap: 1rem;
   margin-top: 1rem;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  border: none;
+  background-color: #4caf50;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+.save-tip {
+  margin-top: 1rem;
+  color: green;
 }
 </style>
