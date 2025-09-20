@@ -63,59 +63,73 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const emit = defineEmits(['update-background'])
-
+const currentType = ref('color');   // 默认是纯色
 const color = ref('#ffffff')
 const imagePath = ref('')
 const blur = ref(0)
+const gradient = ref('')
 const saved = ref(false)
-
 const darkMode = ref(false)
 
 const previewStyle = computed(() => {
-  return imagePath.value
-    ? {
-        backgroundImage: `url(${imagePath.value})`,
-        backdropFilter: `blur(${blur.value}px)`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundColor: '',
-      }
-    : {
-        backgroundColor: color.value,
-      }
+  if (imagePath.value) {
+    return {
+      backgroundImage: `url(${imagePath.value})`,
+      backdropFilter: `blur(${blur.value}px)`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundColor: '',
+    }
+  } else if (gradient.value) {
+    return {
+      backgroundImage: gradient.value,
+      backgroundColor: '',
+    }
+  } else {
+    return {
+      backgroundColor: color.value,
+    }
+  }
 })
 
 function applyTemplate(name) {
   const templates = {
     sunset: {
-      type: 'image',
       imagePath: 'https://img.pconline.com.cn/images/upload/upc/tx/wallpaper/1305/16/c4/20990657_1368686545122.jpg',
       blur: 2,
     },
     forest: {
-      type: 'image',
       imagePath: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb',
       blur: 1,
     },
     galaxy: {
-      type: 'image',
       imagePath: 'https://images.unsplash.com/photo-1581320540380-7f7c1f3c9a3c',
       blur: 3,
     },
   }
 
+  
   const selected = templates[name]
-  imagePath.value = selected.imagePath
-  blur.value = selected.blur
+   imagePath.value = selected.imagePath;
+  blur.value = selected.blur;
+  currentType.value = 'image'; // 模板属于图片类型
+  gradient.value = '';   // 切换模板时，清空渐变值
+  color.value = '';   // 切换模板时，清空渐变值
   emit('update-background', selected)
 }
 
-
 function applyColor() {
-  emit('update-background', { type: 'color', color: color.value })
+  // 1. 重置其他背景类型的状态（关键：清空图片和渐变的残留值）
+  imagePath.value = ''; // 清空图片路径
+  gradient.value = '';  // 清空渐变值
+  // 2. 更新当前背景类型为「纯色」
+  currentType.value = 'color';
+  // 3. 向父组件发送纯色设置事件
+  emit('update-background', { type: 'color', color: color.value });
 }
 
 function applyImage() {
+  currentType.value = 'image'
   emit('update-background', {
     type: 'image',
     imagePath: imagePath.value,
@@ -124,10 +138,16 @@ function applyImage() {
 }
 
 function applyGradient() {
+  const gradientValue = 'linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%)'
+  gradient.value = gradientValue
+
+  currentType.value = 'gradient'
+  imagePath.value = ''
   emit('update-background', {
     type: 'gradient',
-    gradient: 'linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%)',
+    gradient: gradientValue,
   })
+   console.log("子组件发送渐变设置：", gradientValue);
 }
 
 function handleImageUpload(event) {
@@ -136,6 +156,7 @@ function handleImageUpload(event) {
     const reader = new FileReader()
     reader.onload = () => {
       imagePath.value = reader.result
+      gradient.value = '';
       applyImage()
     }
     reader.readAsDataURL(file)
@@ -153,33 +174,55 @@ function toggleDarkMode() {
 }
 
 function saveSettings() {
+  // 根据当前类型构建对应的设置
   const settings = {
-    type: imagePath.value ? 'image' : 'color',
+    type: currentType.value, // 使用 currentType 明确类型
     color: color.value,
     imagePath: imagePath.value,
     blur: blur.value,
-  }
-  localStorage.setItem('userSettings', JSON.stringify(settings))
-  emit('update-background', settings)
-  saved.value = true
-  setTimeout(() => (saved.value = false), 2000)
+    gradient: gradient.value, // 新增：保存渐变值（如果之前定义了 gradient 变量）
+  };
+
+  localStorage.setItem('userSettings', JSON.stringify(settings));
+  emit('update-background', settings); // 发送完整的设置
+  saved.value = true;
+  setTimeout(() => (saved.value = false), 2000);
 }
 
 function resetSettings() {
   color.value = '#ffffff'
   imagePath.value = ''
   blur.value = 0
+  gradient.value = ''
   applyColor()
 }
+
 function goBack() {
   router.back()
 }
 
 onMounted(() => {
+  // 加载暗黑模式设置
   const savedDark = localStorage.getItem('darkMode')
   if (savedDark) {
     darkMode.value = JSON.parse(savedDark)
     toggleDarkMode()
+  }
+
+  // 新增：加载保存的背景设置
+  const savedSettings = localStorage.getItem('userSettings')
+  if (savedSettings) {
+    try {
+      const settings = JSON.parse(savedSettings)
+      // 恢复所有状态到最后保存时的值
+      currentType.value = settings.type || 'color'
+      color.value = settings.color || '#ffffff'
+      imagePath.value = settings.imagePath || ''
+      blur.value = settings.blur || 0
+      gradient.value = settings.gradient || ''
+    } catch (e) {
+      console.error('加载背景设置失败', e)
+    }
   }
 })
 </script>

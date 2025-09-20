@@ -28,7 +28,6 @@
       </main>
     </div>
   </div>
-  <!-- <SettingsPage @update-background="applyBackground" /> -->
 </template>
 
 <script setup lang="ts">
@@ -36,7 +35,7 @@ import { reactive, computed, ref, onMounted, watch } from 'vue'
 import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
 import { useRouter } from 'vue-router'
-// import SettingsPage from './SettingsPage.vue'
+
 const activeTap = ref('全部') // 默认为全部
 const selectedMods = ref<string[]>([])
 const searchQuery = ref('')
@@ -221,7 +220,7 @@ async function handleSearch() {
       author: '',
       version: '',
     }))
-  } catch (err) {}
+  } catch (err) { }
 }
 
 //更改背景色
@@ -229,36 +228,38 @@ function applyBackground(settings: any) {
   const background = document.querySelector('.background') as HTMLElement
   if (!background) return
 
-  if (settings.type === 'color') {
-    background.style.backgroundImage = ''
-    background.style.backgroundColor = settings.color
-    background.style.backdropFilter = ''
-  } else if (settings.type === 'image') {
-    background.style.backgroundImage = `url("${settings.imagePath}")`
-    background.style.backgroundSize = 'cover'
-    background.style.backgroundRepeat = 'no-repeat'
-    background.style.backgroundPosition = 'center'
-    background.style.backgroundColor = ''
-    background.style.filter = `blur(${settings.blur}px)`
+  switch (settings.type) {
+    case 'color':
+      background.style.backgroundImage = ''
+      background.style.backgroundColor = settings.color
+      background.style.backdropFilter = ''
+      break
+    case 'image':
+      background.style.backgroundImage = `url("${settings.imagePath}")`
+      background.style.backgroundSize = 'cover'
+      background.style.backgroundRepeat = 'no-repeat'
+      background.style.backgroundPosition = 'center'
+      background.style.backgroundColor = ''
+      background.style.filter = `blur(${settings.blur}px)`
+      break
+    case 'gradient':
+      background.style.backgroundImage = settings.gradient;
+      background.style.backgroundSize = 'cover';
+      background.style.backgroundColor = '';
+      background.style.filter = '';
+      break
   }
 }
 
 onMounted(async () => {
-  await fetchModList()
-  const saved = localStorage.getItem('userSettings')
+await fetchModList();
+  const saved = localStorage.getItem('userSettings');
   if (saved) {
     try {
-      const settings = JSON.parse(saved)
-      const background = document.querySelector('.background') as HTMLElement
-      if (!background) return
-      if (settings.type === 'gradient') {
-        background.style.backgroundImage = settings.gradient
-        background.style.backgroundColor = ''
-        background.style.backdropFilter = ''
-      }
-      applyBackground(settings)
+      const settings = JSON.parse(saved);
+      applyBackground(settings); // 直接调用处理所有类型的 applyBackground
     } catch (e) {
-      console.error('背景设置解析失败', e)
+      console.error('背景设置解析失败', e);
     }
   }
 })
@@ -309,14 +310,14 @@ input {
   height: 100%;
   width: 150px;
   box-sizing: border-box;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(20px);
   background-color: rgba(255, 255, 255, 0.123);
   position: relative;
   padding: 20px 10px 10px 10px;
   box-shadow: 10px 0 10px -5px rgba(0, 0, 0, 0.3);
 }
 
-aside > div {
+aside>div {
   width: 130px;
   height: 32px;
   border: 2px solid #409eff;
@@ -327,8 +328,8 @@ aside > div {
   transition: all 0.3s ease;
 }
 
-aside > .add-mod-btn:hover,
-aside > .setting-btn:hover {
+aside>.add-mod-btn:hover,
+aside>.setting-btn:hover {
   background-color: #409eff;
   color: white;
   transform: scale(1.05);
@@ -347,13 +348,13 @@ aside > .setting-btn:hover {
   flex: 1;
 }
 
-main > .search-box {
+main>.search-box {
   width: 100%;
   height: 40px;
   margin: 20px;
 }
 
-.search-box > input {
+.search-box>input {
   width: 600px;
   height: 30px;
   border-radius: 5px;
@@ -362,7 +363,7 @@ main > .search-box {
   padding-left: 10px;
 }
 
-.search-box > input:focus {
+.search-box>input:focus {
   border-color: #409eff;
   box-shadow: 0 0 5px rgba(64, 158, 255, 0.5);
 }
@@ -453,11 +454,11 @@ main > .search-box {
   padding: 10px;
 }
 
-footer > :last-child {
+footer> :last-child {
   margin-right: 10px;
 }
 
-footer > div {
+footer>div {
   width: 130px;
   height: 32px;
   border: 2px solid #409eff;
@@ -467,9 +468,9 @@ footer > div {
   transition: all 0.3s ease;
 }
 
-footer > .load-mod-btn:hover,
-footer > .delete-mod-btn:hover,
-footer > .start-game-btn:hover {
+footer>.load-mod-btn:hover,
+footer>.delete-mod-btn:hover,
+footer>.start-game-btn:hover {
   background-color: #409eff;
   color: white;
   transform: scale(1.05);

@@ -71,8 +71,7 @@ fn set_game_path(app: AppHandle, path: String) -> Result<(), String> {
 /// 启动游戏（仅 Windows）
 #[command]
 fn launch_game(app: AppHandle) -> Result<(), String> {
-    let game_path = get_game_path(app.clone())?.ok_or_else(|| "游戏路径未设置".to_string())?;
-
+    let _game_path = get_game_path(app.clone())?.ok_or_else(|| "游戏路径未设置".to_string())?;
     #[cfg(target_os = "windows")]
     {
         let exe = PathBuf::from(&game_path).join("geek.exe");
