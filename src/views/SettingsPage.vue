@@ -302,9 +302,11 @@ onMounted(() => {
 aside {
   width: 30%;
   height: 100%;
-  border-right: 1px solid #333;
   padding: 10px 20px;
   color: black;
+  box-shadow: 10px 0 10px -5px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(20px);
+  background-color: rgba(255, 255, 255, 0.123);
 }
 
 .aside-card-list {
@@ -370,8 +372,15 @@ aside {
 
 
 aside>.back-btn {
+  width: 130px;
+  height: 32px;
+  border: 2px solid #409eff;
+  text-align: center;
+  line-height: 30px;
+  transition: all 0.3s ease;
   position: absolute;
   bottom: 20px;
+  cursor: pointer;
 }
 
 aside>.back-btn:hover {
