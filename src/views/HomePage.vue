@@ -1,4 +1,5 @@
 <template>
+    <SettingsPage @update-background="applyBackground" />
     <div class="HomePage">
         <div class="background"></div>
         <div class="content">
@@ -225,29 +226,43 @@ async function handleSearch() {
 
 //更改背景色
 function applyBackground(settings: any) {
-    const background = document.querySelector('.background') as HTMLElement
-    if (!background) return
+    const background = document.querySelector('.background') as HTMLElement;
+    if (!background) return;
+
+    // 先清空所有背景相关样式
+    background.style.backgroundImage = '';
+    background.style.backgroundColor = '';
+    background.style.backdropFilter = '';
+    background.style.filter = '';
+    background.style.backgroundSize = '';
+    background.style.backgroundRepeat = '';
+    background.style.backgroundPosition = '';
 
     switch (settings.type) {
         case 'color':
-            background.style.backgroundImage = ''
-            background.style.backgroundColor = settings.color
-            background.style.backdropFilter = ''
-            break
+            // 兜底：如果子组件没传 color，默认用白色
+            background.style.backgroundColor = settings.color || '#ffffff';
+            break;
         case 'image':
-            background.style.backgroundImage = `url("${settings.imagePath}")`
-            background.style.backgroundSize = 'cover'
-            background.style.backgroundRepeat = 'no-repeat'
-            background.style.backgroundPosition = 'center'
-            background.style.backgroundColor = ''
-            background.style.filter = `blur(${settings.blur}px)`
-            break
+            // 兜底：避免图片路径为空导致报错
+            if (settings.imagePath) {
+                background.style.backgroundImage = `url("${settings.imagePath}")`;
+                background.style.backgroundSize = 'cover';
+                background.style.backgroundRepeat = 'no-repeat';
+                background.style.backgroundPosition = 'center';
+                // 兜底：blur 为负数时设为 0
+                background.style.filter = `blur(${Math.max(0, settings.blur || 0)}px)`;
+            }
+            break;
         case 'gradient':
-            background.style.backgroundImage = settings.gradient;
-            background.style.backgroundSize = 'cover';
-            background.style.backgroundColor = '';
-            background.style.filter = '';
-            break
+            if (settings.gradient) {
+                background.style.backgroundImage = settings.gradient;
+                background.style.backgroundSize = 'cover';
+            }
+            break;
+        // 兜底：默认切回白色背景
+        default:
+            background.style.backgroundColor = '#ffffff';
     }
 }
 
@@ -330,7 +345,7 @@ aside>div {
 
 aside>.add-mod-btn:hover,
 aside>.setting-btn:hover {
-    background-color: #409eff;
+    background-color: #66b1ff;
     color: white;
     transform: scale(1.05);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
@@ -417,7 +432,7 @@ main>.search-box {
 }
 
 .mod-label:hover {
-    background-color: #409eff;
+    background-color: #66b1ff;
     transform: scale(1.05);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     border-radius: 5px;
@@ -471,7 +486,7 @@ footer>div {
 footer>.load-mod-btn:hover,
 footer>.delete-mod-btn:hover,
 footer>.start-game-btn:hover {
-    background-color: #409eff;
+    background-color: #66b1ff;
     color: white;
     transform: scale(1.05);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
