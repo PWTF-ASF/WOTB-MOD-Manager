@@ -76,7 +76,7 @@
             </div>
             <div class="card-content">
               <div class="theme-switch-container">
-                <label class="square-switch" :aria-label="darkMode ? '切换到明模式' : '切换到暗模式'">
+                <label class="square-switch" >
                   <input type="checkbox" v-model="darkMode" class="sr-only" @change="toggleTheme">
                   <span class="slider"></span>
                 </label>
@@ -124,8 +124,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-
-
 
 
 // 定义背景设置的接口
@@ -291,21 +289,25 @@ function toggleDarkMode() {
   localStorage.setItem('darkMode', JSON.stringify(darkMode.value))
 }
 
-// 切换主题
-const toggleTheme = () => {
-  applyTheme();
-  localStorage.setItem('theme', darkMode.value ? 'dark' : 'light');
+// 统一的主题应用函数
+const applyTheme = () => {
+  const root = document.documentElement;
+  // 确保只存在当前主题的类名
+  if (darkMode.value) {
+    root.classList.add('dark');
+    root.classList.remove('light');
+  } else {
+    root.classList.add('light');
+    root.classList.remove('dark');
+  }
 };
 
-// 应用主题
-const applyTheme = () => {
-  if (darkMode.value) {
-    document.documentElement.classList.add('dark');
-    document.documentElement.classList.remove('light');
-  } else {
-    document.documentElement.classList.add('light');
-    document.documentElement.classList.remove('dark');
-  }
+// 统一的主题切换函数
+const toggleTheme = () => {
+  applyTheme();
+  // 只使用一个键存储主题设置，避免冲突
+  console.log(darkMode.value)
+  localStorage.setItem('darkMode', JSON.stringify(darkMode.value));
 };
 
 function saveSettings() {
@@ -351,28 +353,43 @@ function goBack() {
 }
 
 onMounted(() => {
-  // 加载暗黑模式设置
-  const savedDark = localStorage.getItem('darkMode')
-  if (savedDark) {
-    darkMode.value = JSON.parse(savedDark)
-    toggleDarkMode()
-  }
-
-  // 加载保存的背景设置
-  const savedSettings = localStorage.getItem('userSettings')
-  if (savedSettings) {
-    try {
-      const settings = JSON.parse(savedSettings) as BackgroundSettings
-      currentType.value = settings.type || 'color'
-      color.value = settings.color || '#ffffff'
-      imagePath.value = settings.imagePath || ''
-      blur.value = settings.blur || 0
-      gradient.value = settings.gradient || ''
-    } catch (e) {
-      console.error('加载背景设置失败', e)
+  // 初始化主题设置
+  const initTheme = () => {
+    const savedMode = localStorage.getItem('darkMode');
+    // 优先使用保存的设置，没有则根据系统偏好自动判断
+    if (savedMode !== null) {
+      darkMode.value = JSON.parse(savedMode);
+    } else {
+      // 自动检测系统主题偏好
+      darkMode.value = window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
-  }
-})
+    applyTheme();
+  };
+
+  // 初始化背景设置
+  const initBackground = () => {
+    const savedSettings = localStorage.getItem('userSettings');
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings) as BackgroundSettings;
+        currentType.value = settings.type || 'color';
+        color.value = settings.color || '#ffffff';
+        imagePath.value = settings.imagePath || '';
+        blur.value = settings.blur || 0;
+        gradient.value = settings.gradient || '';
+      } catch (e) {
+        console.error('加载背景设置失败', e);
+        // 可以在这里添加默认背景设置的恢复逻辑
+      }
+    }
+  };
+
+  // 执行初始化
+  initTheme();
+  initBackground();
+});
+
+// 监听主题变化并自动应用
 watch(darkMode, applyTheme);
 
 </script>
@@ -637,14 +654,17 @@ input:checked+.slider:before {
   font-size: 1rem;
   font-weight: 500;
   transition: color 0.3s ease;
+  /* 可添加默认颜色（可选，避免初始无样式） */
+  color: #1e293b; 
 }
 
-:global(.dark) .theme-label {
-  color: #f8fafc;
+/* 1. 明确根元素 + 全局类，提高优先级 */
+:global(html.dark) .theme-label {
+  color: #f8fafc !important; /* !important 临时用于测试（确认后可移除） */
 }
 
-:global(.light) .theme-label {
-  color: #1e293b;
+:global(html.light) .theme-label {
+  color: #1e293b !important;
 }
 
 /* 对话框整体样式 */

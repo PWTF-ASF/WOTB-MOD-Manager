@@ -1,5 +1,5 @@
 <template>
-    <SettingsPage @update-background="applyBackground" />
+    <!-- <SettingsPage @update-background="applyBackground" /> -->
     <div class="HomePage">
         <div class="background"></div>
         <div class="content">
