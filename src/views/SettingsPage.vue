@@ -1,5 +1,5 @@
 <template>
-  <div class="settingsPage">
+  <div class="settingsPage" :class="{ 'dark-theme': darkMode }">
     <div class="background"></div>
     <div class="content">
 
@@ -76,7 +76,7 @@
             </div>
             <div class="card-content">
               <div class="theme-switch-container">
-                <label class="square-switch" >
+                <label class="square-switch">
                   <input type="checkbox" v-model="darkMode" class="sr-only" @change="toggleTheme">
                   <span class="slider"></span>
                 </label>
@@ -395,12 +395,20 @@ watch(darkMode, applyTheme);
 </script>
 
 <style scoped>
+
+.dark-theme {
+  --bg-color: #1e1e1e;
+  --text-color: #f0f0f0;
+  --card-bg: #2a2a2a;
+}
+
 .settingsPage {
   width: 100%;
   height: 100vh;
   overflow: hidden;
   position: relative;
-  color: black;
+  background-color: white;
+  color: var(--text-color);
 }
 
 .background {
@@ -410,7 +418,7 @@ watch(darkMode, applyTheme);
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: RGB(240, 252, 255);
+  background-color: var(--bg-color);
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
@@ -533,6 +541,7 @@ main {
   margin-bottom: 10px;
   display: flex;
   gap: 10px;
+  /* color: var(--text-color); */
 }
 
 .card-content {
@@ -543,6 +552,7 @@ main {
   padding: 10px 20px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   border-radius: 5px;
+  background-color: var(--card-bg);
 }
 
 .preview {
@@ -655,12 +665,13 @@ input:checked+.slider:before {
   font-weight: 500;
   transition: color 0.3s ease;
   /* 可添加默认颜色（可选，避免初始无样式） */
-  color: #1e293b; 
+  color: #1e293b;
 }
 
 /* 1. 明确根元素 + 全局类，提高优先级 */
 :global(html.dark) .theme-label {
-  color: #f8fafc !important; /* !important 临时用于测试（确认后可移除） */
+  color: #f8fafc !important;
+  /* !important 临时用于测试（确认后可移除） */
 }
 
 :global(html.light) .theme-label {
@@ -688,7 +699,7 @@ dialog {
 
 /*  向右倾斜（右下抬起，左上下沉） */
 .tilt {
-  transform: translate(-50%, -50%) perspective(1500px) rotateY(6deg);
+  transform: translate(-50%, -50%) perspective(1500px) rotateY(10deg);
 }
 
 /* 对话框头部：控制 X 按钮位置 */
@@ -710,18 +721,17 @@ dialog {
 
 /* 右上角 X 关闭按钮（核心样式） */
 .close-btn {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   /* 取消内边距，确保圆形点击区 */
   border: none;
-  border-radius: 50%;
+  border-radius: 10px;
   /* 圆形按钮 */
   background-color: transparent;
   color: #6b7280;
-  font-size: 20px;
   /* X 符号大小 */
-  line-height: 1;
+  font-size: 20px;
   /* 垂直居中 */
   cursor: pointer;
   display: flex;
