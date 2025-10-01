@@ -1,5 +1,5 @@
 <template>
-    <div class="HomePage">
+    <div class="HomePage" :class="{ 'dark-theme': isDark, 'light-theme': !isDark }">
         <div class="background"></div>
         <div class="content">
             <aside>
@@ -40,6 +40,12 @@ const activeTap = ref('全部') // 默认为全部
 const selectedMods = ref<string[]>([])
 const searchQuery = ref('')
 const router = useRouter()
+const isDark = ref<boolean>(
+    (() => {
+        const savedMode = localStorage.getItem('darkMode');
+        return savedMode ? JSON.parse(savedMode) : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    })()
+);
 
 function goToSettings() {
     router.push('/settings')
@@ -267,6 +273,12 @@ function applyBackground(settings: any) {
 
 onMounted(async () => {
     await fetchModList();
+
+    // 新增：初始化样式（让页面加载时就应用正确的主题）
+    const root = document.documentElement;
+    root.classList.toggle('dark', isDark.value);
+    root.classList.toggle('light', !isDark.value);
+
     const saved = localStorage.getItem('userSettings');
     if (saved) {
         try {
@@ -277,11 +289,46 @@ onMounted(async () => {
         }
     }
 })
+
+watch(isDark, (newMode) => {
+    // 1. 同步根元素（html）的类（和Settings组件保持一致）
+    const root = document.documentElement;
+    root.classList.toggle('dark', newMode);
+    root.classList.toggle('light', !newMode);
+
+    // 2. 同步本地存储（确保刷新后状态不丢失）
+    localStorage.setItem('darkMode', JSON.stringify(newMode));
+});
 </script>
 
 <style scoped>
 * {
     box-sizing: border-box;
+}
+
+/* 暗色模式 */
+.dark-theme {
+    --aside-bg: rgba(30, 30, 30, 0.7);
+    /* 主色降低亮度、降饱和 */
+    --btn-text: oklch(65% 0.12 240);
+    /* ≈ #409eff 的暗色版 */
+    --btn-border: oklch(65% 0.12 240);
+    /* 悬停再亮一点，但不到刺眼 */
+    --btn-hover-bg: oklch(70% 0.13 240);
+    --btn-hover-text: #0d1117;
+    /* 近乎纯黑，保证对比 */
+    --btn-hover-shadow: 0 4px 12px hsl(220 40% 0% / 0.5);
+}
+
+/* 浅色模式 */
+.light-theme {
+    --aside-bg: rgba(255, 255, 255, 0.4);
+    --btn-bg: transparent;
+    --btn-text: #409eff;
+    --btn-border: #409eff;
+    --btn-hover-bg: #66b1ff;
+    --btn-hover-text: #ffffff;
+    --btn-hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* 清除input默认样式 */
@@ -318,6 +365,7 @@ input {
     height: 600px;
     display: flex;
     overflow: hidden;
+    color: var(--text-color);
 }
 
 .HomePage aside {
@@ -325,7 +373,7 @@ input {
     width: 150px;
     box-sizing: border-box;
     backdrop-filter: blur(20px);
-    background-color: rgba(255, 255, 255, 0.123);
+    background-color: var(--aside-bg);
     position: relative;
     padding: 20px 10px 10px 10px;
     box-shadow: 10px 0 10px -5px rgba(0, 0, 0, 0.3);
@@ -334,20 +382,23 @@ input {
 aside>div {
     width: 130px;
     height: 32px;
-    border: 2px solid #409eff;
+    border: 2px solid var(--btn-border);
+    background: var(--btn-bg);
+    color: var(--btn-text);
     text-align: center;
     margin-bottom: 10px;
     line-height: 30px;
     cursor: pointer;
     transition: all 0.3s ease;
+    border-radius: 4px;
 }
 
 aside>.add-mod-btn:hover,
 aside>.setting-btn:hover {
-    background-color: #66b1ff;
-    color: white;
+    background: var(--btn-hover-bg);
+    color: var(--btn-hover-text);
     transform: scale(1.05);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--btn-hover-shadow);
 }
 
 .setting-btn {
@@ -475,19 +526,23 @@ footer> :last-child {
 footer>div {
     width: 130px;
     height: 32px;
-    border: 2px solid #409eff;
+    border: 2px solid var(--btn-border);
+    background: var(--btn-bg);
+    color: var(--btn-text);
     text-align: center;
+    margin-bottom: 10px;
     line-height: 30px;
     cursor: pointer;
     transition: all 0.3s ease;
+    border-radius: 4px;
 }
 
 footer>.load-mod-btn:hover,
 footer>.delete-mod-btn:hover,
 footer>.start-game-btn:hover {
-    background-color: #66b1ff;
-    color: white;
+    background: var(--btn-hover-bg);
+    color: var(--btn-hover-text);
     transform: scale(1.05);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--btn-hover-shadow);
 }
 </style>

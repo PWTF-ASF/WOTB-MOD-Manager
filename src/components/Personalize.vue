@@ -81,7 +81,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch , computed} from 'vue'
+import { ref, onMounted, watch } from 'vue'
 
 // 1. 定义接口（严格类型约束）
 interface BackgroundSettings {
@@ -92,16 +92,12 @@ interface BackgroundSettings {
   gradient?: string
 }
 
-interface Template {
-  imagePath: string
-  blur: number
-}
-
 // 2. 定义Emits（保持与父组件通信一致）
 const emit = defineEmits<{
   (e: 'update-background', settings: BackgroundSettings): void
   (e: 'update:darkMode', darkMode: boolean): void
   (e: 'save-success', settings: BackgroundSettings): void 
+  (e: 'reset-success', settings: BackgroundSettings): void 
 }>()
 
 // 3. 响应式状态（初始化更合理的默认值）
@@ -237,6 +233,8 @@ const resetSettings = () => {
 
   // 通知父组件应用默认背景
   emit('update-background', defaultSettings)
+  emit('reset-success', defaultSettings)
+
 }
 const confirmReset = () => {
   resetSettings()
@@ -288,7 +286,7 @@ watch(darkMode, applyTheme)
 
 .settings-panel-card {
   height: auto;
-  margin: 10px 20px;
+  margin: 10px 20px 40px 20px;
 }
 
 .card-title {

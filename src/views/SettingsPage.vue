@@ -29,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router'
 
 import personalizeDarkIcon from '../assets/279皮肤、个性化、主题-线性 (1).svg';
@@ -149,6 +149,15 @@ onMounted(async () => {
   --aside-item-hover-bg: rgba(45, 55, 72, 0.6);
   --aside-item-hover-color: #f8fafc;
   --indicator-bg: #3b82f6;
+  /* 主色降低亮度、降饱和 */
+  --btn-text: oklch(65% 0.12 240);
+  /* ≈ #409eff 的暗色版 */
+  --btn-border: oklch(65% 0.12 240);
+  /* 悬停再亮一点，但不到刺眼 */
+  --btn-hover-bg: oklch(70% 0.13 240);
+  --btn-hover-text: #0d1117;
+  /* 近乎纯黑，保证对比 */
+  --btn-hover-shadow: 0 4px 12px hsl(220 40% 0% / 0.5);
   --icon-filter: brightness(0.9);
   --icon-hover-filter: brightness(1);
   --icon-hover-drop-shadow: drop-shadow(0 0 10px rgba(221, 245, 255, 0.8))
@@ -166,6 +175,12 @@ onMounted(async () => {
   --aside-item-hover-bg: rgba(240, 242, 245, 0.7);
   --aside-item-hover-color: #333333;
   --indicator-bg: #1677ff;
+  --btn-bg: transparent;
+  --btn-text: #409eff;
+  --btn-border: #409eff;
+  --btn-hover-bg: #66b1ff;
+  --btn-hover-text: #ffffff;
+  --btn-hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   --icon-filter: brightness(0.7);
   --icon-hover-filter: brightness(0.6);
   --icon-hover-drop-shadow: drop-shadow(0 0 8px rgba(38, 41, 42, 0.8))
@@ -302,20 +317,24 @@ aside {
 aside>.back-btn {
   width: 130px;
   height: 32px;
-  border: 2px solid #409eff;
+  border: 2px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
   text-align: center;
+  margin-bottom: 10px;
   line-height: 30px;
+  cursor: pointer;
   transition: all 0.3s ease;
+  border-radius: 4px;
   position: absolute;
   bottom: 10px;
-  cursor: pointer;
 }
 
 aside>.back-btn:hover {
-  background-color: #66b1ff;
-  color: white;
+  background: var(--btn-hover-bg);
+  color: var(--btn-hover-text);
   transform: scale(1.05);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--btn-hover-shadow);
 }
 
 main {
