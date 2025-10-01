@@ -7,18 +7,11 @@
       <aside>
         <span>设置</span>
         <div class="aside-card-list">
-          <div class="aside-card-list-item" @click="activeItem = 'setting'"
-            :class="{ 'active': activeItem === 'setting' }">
+          <div class="aside-card-list-item" v-for="item in asideList" :key="item.activeItem"
+            @click="activeItem = item.activeItem" :class="{ 'active': activeItem === item.activeItem }">
             <span class="indicator"></span>
-            <img src="../assets/设置.svg" />
-            <span>基本设置</span>
-          </div>
-
-          <div class="aside-card-list-item" @click="activeItem = 'personalize'"
-            :class="{ 'active': activeItem === 'personalize' }">
-            <span class="indicator"></span>
-            <img src="../assets/279皮肤、个性化、主题-线性.svg" alt="个性化图标">
-            <span>个性化</span>
+            <img :src="getItemIcon(item)" />
+            <span>{{ item.name }}</span>
           </div>
         </div>
 
@@ -28,9 +21,7 @@
 
       <main>
         <div class="settings-panel" v-if="activeItem === 'personalize'">
-          <personalize 
-          @update:darkMode="handleDarkModeUpdate" 
-          @save-success="applyBackground" />
+          <personalize @update:darkMode="handleDarkModeUpdate" @save-success="applyBackground" />
         </div>
       </main>
     </div>
@@ -38,8 +29,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router'
+
+import personalizeDarkIcon from '../assets/279皮肤、个性化、主题-线性 (1).svg';
+import personalizeLightIcon from '../assets/279皮肤、个性化、主题-线性.svg';
+import settingLightIcon from '../assets/设置.svg'
+import settingDarkIcon from '../assets/设置 (1).svg'
+
+//定义asidelist的接口
+interface asideList {
+  name: string;
+  activeItem: string;
+  lightIcon: string;
+  darkIcon: string;
+}
 
 const activeItem = ref('setting') //默认选择基本设置页
 const router = useRouter() //路由
@@ -47,6 +51,29 @@ const isDark = ref(false);  // 父组件的主题状态：初始值可设为 fal
 const handleDarkModeUpdate = (childDarkMode: boolean) => {  // 2. 接收子组件传递的 darkMode：更新父组件的 isDark
   isDark.value = childDarkMode; // 子组件的darkMode同步到父组件
 };
+
+//动态切换明暗模式下的图标
+const getItemIcon = (item: asideList) => {
+  return isDark.value
+    ? item.darkIcon  // 暗色主题用深色图标
+    : item.lightIcon;  // 亮色主题用浅色图标
+};
+
+//侧边栏数组
+const asideList = [
+  {
+    name: '基本设置',
+    activeItem: 'setting',
+    lightIcon: settingLightIcon,
+    darkIcon: settingDarkIcon
+  },
+  {
+    name: '个性化',
+    activeItem: 'personalize',
+    lightIcon: personalizeLightIcon,
+    darkIcon: personalizeDarkIcon
+  },
+]
 
 //返回到首页
 function goBack() {
@@ -115,30 +142,33 @@ onMounted(async () => {
   --bg-color: #1e1e1e;
   --text-color: #f0f0f0;
   --card-bg: #2a2a2a;
-  --aside-item-acitve-bg: #1e293b;
-  --aside-item-acitve-color: #e2e8f0;
-  --aside-item-hover-bg: #2d3748;
+  --aside-bg: rgba(30, 30, 30, 0.7);
+  /* 半透明背景增强毛玻璃效果 */
+  --aside-item-active-bg: rgba(30, 41, 59, 0.8);
+  --aside-item-active-color: #e2e8f0;
+  --aside-item-hover-bg: rgba(45, 55, 72, 0.6);
   --aside-item-hover-color: #f8fafc;
   --indicator-bg: #3b82f6;
+  --icon-filter: brightness(0.9);
+  --icon-hover-filter: brightness(1);
+  --icon-hover-drop-shadow: drop-shadow(0 0 10px rgba(221, 245, 255, 0.8))
 }
 
 /* 浅色模式 */
 .light-theme {
   --bg-color: #ffffff;
-  /* 白色背景 */
   --text-color: #333333;
-  /* 深灰色文字 */
   --card-bg: #f5f5f5;
-  /* 卡片浅灰背景 */
-  --aside-item-acitve-bg: #e6f0fa;
+  --aside-bg: rgba(255, 255, 255, 0.4);
+  /* 更透明的背景增强毛玻璃效果 */
+  --aside-item-active-bg: rgba(230, 240, 250, 0.85);
   --aside-item-active-color: #333333;
-  /* 侧边项激活状态文字 */
-  --aside-item-hover-bg: #f0f2f5;
-  /* 侧边项悬停背景 */
+  --aside-item-hover-bg: rgba(240, 242, 245, 0.7);
   --aside-item-hover-color: #333333;
-  /* 侧边项悬停文字 */
   --indicator-bg: #1677ff;
-  /* 指示器蓝色 */
+  --icon-filter: brightness(0.7);
+  --icon-hover-filter: brightness(0.6);
+  --icon-hover-drop-shadow: drop-shadow(0 0 8px rgba(38, 41, 42, 0.8))
 }
 
 .settingsPage {
@@ -179,41 +209,59 @@ aside {
   width: 30%;
   height: 100%;
   padding: 10px 20px;
-  color: black;
-  box-shadow: 10px 0 10px -5px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(20px);
-  background-color: rgba(255, 255, 255, 0.123);
+  color: var(--text-color);
+  box-shadow: 10px 0 20px -10px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  /* 兼容Safari */
+  background-color: var(--aside-bg);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  /* 增加细微边框增强层次感 */
+  transition: all 0.3s ease;
+  /* 平滑过渡效果 */
 }
 
 .aside-card-list {
   margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* 增加项目间距，提升可读性 */
 }
 
 .aside-card-list-item {
   display: flex;
   width: 100%;
-  height: 32px;
+  height: 36px;
+  /* 略微增加高度提升点击体验 */
   align-items: center;
-  gap: 5px;
-  transition: all 0.2s ease;
+  gap: 10px;
+  /* 增加图标与文字间距 */
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  /* 更自然的过渡曲线 */
   cursor: pointer;
   position: relative;
+  padding: 0 8px;
+  /* 增加内边距 */
+  border-radius: 6px;
+  /* 圆角 */
 }
 
 .aside-card-list-item:hover {
-  border-radius: 5px;
   padding-left: 10px;
   background-color: var(--aside-item-hover-bg);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 10;
   color: var(--aside-item-hover-color);
+  transform: translateX(2px);
+  /* 微小位移增强交互感 */
 }
 
 .aside-card-list-item>img {
   width: 24px;
   height: 24px;
-  padding-left: 5px;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, filter 0.2s ease;
+  filter: var(--icon-filter);
 }
 
 /* 激活状态指示器 */
@@ -223,29 +271,33 @@ aside {
   background-color: var(--indicator-bg);
   border-radius: 2px;
   opacity: 0;
-  /* 默认隐藏 */
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  transform: scaleY(0.8);
+  /* 初始略小 */
 }
 
 /* 激活状态样式 */
 .aside-card-list-item.active .indicator {
   opacity: 1;
+  transform: scaleY(1);
+  /* 激活时恢复正常大小 */
 }
 
 .aside-card-list-item.active {
-  border-radius: 5px;
   padding-left: 10px;
-  background-color: var(--aside-item-acitve-bg);
-  color: var(--aside-item-acitve-color);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  background-color: var(--aside-item-active-bg);
+  color: var(--aside-item-active-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 10;
   font-weight: 500;
 }
 
 .aside-card-list-item:hover>img {
-  transform: scale(1.05);
+  transform: scale(1.1);
+  filter: var(--icon-hover-filter);
+  /* 悬停时图标效果变化 */
+  filter: var(--icon-hover-drop-shadow);
 }
-
 
 aside>.back-btn {
   width: 130px;

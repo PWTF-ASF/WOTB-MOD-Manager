@@ -1,16 +1,5 @@
 <template>
   <div class="settings-panel-card">
-    <div class="card-title">
-      <span>背景模板：</span>
-    </div>
-    <div class="card-content">
-      <button @click="applyTemplate('sunset')">日落</button>
-      <button @click="applyTemplate('forest')">森林</button>
-      <button @click="applyTemplate('galaxy')">星空</button>
-    </div>
-  </div>
-
-  <div class="settings-panel-card">
     <div class="card-title">选择纯色背景：</div>
     <div class="card-content">
       <input type="color" v-model="color" @input="applyColor" />
@@ -92,7 +81,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch , computed} from 'vue'
 
 // 1. 定义接口（严格类型约束）
 interface BackgroundSettings {
@@ -138,35 +127,7 @@ const closeDialog = () => {
   isTilting.value = false // 关闭时重置倾斜状态
 }
 
-// 5. 背景模板逻辑（优化类型，移除冗余断言）
-const applyTemplate = (name: 'sunset' | 'forest' | 'galaxy') => {
-  const templates: Record<'sunset' | 'forest' | 'galaxy', Template> = {
-    sunset: {
-      imagePath: 'https://img.pconline.com.cn/images/upload/upc/tx/wallpaper/1305/16/c4/20990657_1368686545122.jpg',
-      blur: 1
-    },
-    forest: {
-      imagePath: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb',
-      blur: 0
-    },
-    galaxy: {
-      imagePath: 'https://images.unsplash.com/photo-1581320540380-7f7c1f3c9a3c',
-      blur: 2
-    }
-  }
-  const selected = templates[name]
-  imagePath.value = selected.imagePath
-  blur.value = selected.blur
-  currentType.value = 'image'
-  // 直接传递符合接口的参数，无需断言
-  emit('update-background', {
-    type: 'image',
-    imagePath: selected.imagePath,
-    blur: selected.blur
-  })
-}
-
-// 6. 纯色背景逻辑（增加即时预览）
+// 5. 纯色背景逻辑（增加即时预览）
 const applyColor = () => {
   imagePath.value = ''
   gradient.value = ''
@@ -177,7 +138,7 @@ const applyColor = () => {
   })
 }
 
-// 7. 渐变背景逻辑（支持用户自定义）
+// 6. 渐变背景逻辑（支持用户自定义）
 const updateGradient = () => {
   gradient.value = `linear-gradient(${gradientDirection.value}, ${gradientColor1.value}, ${gradientColor2.value})`
 }
@@ -190,7 +151,7 @@ const applyGradient = () => {
   })
 }
 
-// 8. 图片上传逻辑（优化异步处理）
+// 7. 图片上传逻辑（优化异步处理）
 const handleImageUpload = (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
@@ -220,7 +181,7 @@ const applyImage = () => {
   })
 }
 
-// 9. 暗黑模式逻辑（优化持久化时机：仅在保存时存储）
+// 8. 暗黑模式逻辑（优化持久化时机：仅在保存时存储）
 const applyTheme = (mode: boolean) => {
   const root = document.documentElement
   root.classList.toggle('dark', mode)
@@ -233,7 +194,7 @@ const handleThemeChange = () => {
   applyTheme(darkMode.value)
 }
 
-// 10. 保存逻辑（统一存储背景+主题）
+// 9. 保存逻辑（统一存储背景+主题）
 const saveSettings = () => {
   const settings: BackgroundSettings = {
     type: currentType.value,
@@ -252,7 +213,7 @@ const saveSettings = () => {
   saved.value = true
 }
 
-// 11. 重置逻辑（同步重置背景+主题）
+// 10. 重置逻辑（同步重置背景+主题）
 const resetSettings = () => {
   // 重置背景状态
   color.value = '#ffffff'
@@ -282,7 +243,7 @@ const confirmReset = () => {
   closeDialog()
 }
 
-// 12. 初始化逻辑（优化容错）
+// 11. 初始化逻辑（优化容错）
 onMounted(() => {
   // 初始化主题
   const initTheme = () => {
@@ -350,26 +311,15 @@ watch(darkMode, applyTheme)
   background-color: var(--card-bg);
 }
 
-.preview {
-  height: 100px;
-  margin-bottom: 1rem;
-  border: 1px solid #ccc;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #333;
-  transition: all 0.5s ease;
-}
-
-.option-group {
-  margin-bottom: 1rem;
-  color: black;
+.gradient-controls select{
+  color: #1f2937;
 }
 
 .button-group {
   display: flex;
   gap: 1rem;
   margin-top: 1rem;
+  margin-left: 20px;
 }
 
 button {
@@ -483,7 +433,6 @@ input:checked+.slider:before {
 
 .theme-label {
   color: var(--text-color);
-  /* !important 临时用于测试（确认后可移除） */
 }
 
 .primary-btn {
