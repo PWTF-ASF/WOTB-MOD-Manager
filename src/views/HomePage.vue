@@ -309,15 +309,18 @@ watch(isDark, (newMode) => {
 /* 暗色模式 */
 .dark-theme {
     --aside-bg: rgba(30, 30, 30, 0.7);
-    /* 主色降低亮度、降饱和 */
-    --btn-text: oklch(65% 0.12 240);
-    /* ≈ #409eff 的暗色版 */
-    --btn-border: oklch(65% 0.12 240);
-    /* 悬停再亮一点，但不到刺眼 */
+    --btn-bg: rgba(64, 158, 255, 0.08);
+    /* 透明主色背景，强化按钮边界 */
+    --btn-text: oklch(80% 0.12 240);
+    /* 高亮度文字，暗背景下清晰 */
+    --btn-border: oklch(70% 0.12 240);
+    /* 边框稍暗，区分文字与边框 */
     --btn-hover-bg: oklch(70% 0.13 240);
+    /*  hover 提亮，不刺眼 */
     --btn-hover-text: #0d1117;
-    /* 近乎纯黑，保证对比 */
-    --btn-hover-shadow: 0 4px 12px hsl(220 40% 0% / 0.5);
+    /* 纯黑文字，保证对比 */
+    --btn-hover-shadow: 0 4px 12px hsl(220 40% 0% / 0.6);
+    /* 深阴影，强化层次 */
 }
 
 /* 浅色模式 */
@@ -329,6 +332,7 @@ watch(isDark, (newMode) => {
     --btn-hover-bg: #66b1ff;
     --btn-hover-text: #ffffff;
     --btn-hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    /* 浅阴影，不厚重 */
 }
 
 /* 清除input默认样式 */
@@ -383,7 +387,7 @@ aside>div {
     width: 130px;
     height: 32px;
     border: 2px solid var(--btn-border);
-    background: var(--btn-bg);
+    background: linear-gradient(145deg, var(--btn-bg), rgba(64, 158, 255, 0.05));
     color: var(--btn-text);
     text-align: center;
     margin-bottom: 10px;
@@ -395,7 +399,7 @@ aside>div {
 
 aside>.add-mod-btn:hover,
 aside>.setting-btn:hover {
-    background: var(--btn-hover-bg);
+    background: linear-gradient(145deg, var(--btn-hover-bg), oklch(65% 0.13 240));
     color: var(--btn-hover-text);
     transform: scale(1.05);
     box-shadow: var(--btn-hover-shadow);
@@ -527,7 +531,7 @@ footer>div {
     width: 130px;
     height: 32px;
     border: 2px solid var(--btn-border);
-    background: var(--btn-bg);
+    background: linear-gradient(145deg, var(--btn-bg), rgba(64, 158, 255, 0.05));
     color: var(--btn-text);
     text-align: center;
     margin-bottom: 10px;
@@ -540,7 +544,7 @@ footer>div {
 footer>.load-mod-btn:hover,
 footer>.delete-mod-btn:hover,
 footer>.start-game-btn:hover {
-    background: var(--btn-hover-bg);
+    background: linear-gradient(145deg, var(--btn-hover-bg), oklch(65% 0.13 240));
     color: var(--btn-hover-text);
     transform: scale(1.05);
     box-shadow: var(--btn-hover-shadow);

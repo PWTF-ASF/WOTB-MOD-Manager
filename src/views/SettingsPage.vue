@@ -143,21 +143,20 @@ onMounted(async () => {
   --text-color: #f0f0f0;
   --card-bg: #2a2a2a;
   --aside-bg: rgba(30, 30, 30, 0.7);
-  /* 半透明背景增强毛玻璃效果 */
+   /* 侧边栏样式 */
   --aside-item-active-bg: rgba(30, 41, 59, 0.8);
   --aside-item-active-color: #e2e8f0;
   --aside-item-hover-bg: rgba(45, 55, 72, 0.6);
   --aside-item-hover-color: #f8fafc;
+  /* 指示器样式 */
   --indicator-bg: #3b82f6;
-  /* 主色降低亮度、降饱和 */
+  /* 按钮样式 */
   --btn-text: oklch(65% 0.12 240);
-  /* ≈ #409eff 的暗色版 */
   --btn-border: oklch(65% 0.12 240);
-  /* 悬停再亮一点，但不到刺眼 */
   --btn-hover-bg: oklch(70% 0.13 240);
   --btn-hover-text: #0d1117;
-  /* 近乎纯黑，保证对比 */
   --btn-hover-shadow: 0 4px 12px hsl(220 40% 0% / 0.5);
+  /* 图标样式 */
   --icon-filter: brightness(0.9);
   --icon-hover-filter: brightness(1);
   --icon-hover-drop-shadow: drop-shadow(0 0 10px rgba(221, 245, 255, 0.8))
@@ -169,18 +168,21 @@ onMounted(async () => {
   --text-color: #333333;
   --card-bg: #f5f5f5;
   --aside-bg: rgba(255, 255, 255, 0.4);
-  /* 更透明的背景增强毛玻璃效果 */
+  /* 侧边栏样式 */
   --aside-item-active-bg: rgba(230, 240, 250, 0.85);
   --aside-item-active-color: #333333;
   --aside-item-hover-bg: rgba(240, 242, 245, 0.7);
   --aside-item-hover-color: #333333;
+  /* 指示器样式 */
   --indicator-bg: #1677ff;
+  /* 按钮样式 */
   --btn-bg: transparent;
   --btn-text: #409eff;
   --btn-border: #409eff;
   --btn-hover-bg: #66b1ff;
   --btn-hover-text: #ffffff;
   --btn-hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  /* 图标样式 */
   --icon-filter: brightness(0.7);
   --icon-hover-filter: brightness(0.6);
   --icon-hover-drop-shadow: drop-shadow(0 0 8px rgba(38, 41, 42, 0.8))
@@ -318,7 +320,7 @@ aside>.back-btn {
   width: 130px;
   height: 32px;
   border: 2px solid var(--btn-border);
-  background: var(--btn-bg);
+  background: linear-gradient(145deg, var(--btn-bg), rgba(64, 158, 255, 0.05));
   color: var(--btn-text);
   text-align: center;
   margin-bottom: 10px;
@@ -331,7 +333,7 @@ aside>.back-btn {
 }
 
 aside>.back-btn:hover {
-  background: var(--btn-hover-bg);
+  background: linear-gradient(145deg, var(--btn-hover-bg), oklch(65% 0.13 240));
   color: var(--btn-hover-text);
   transform: scale(1.05);
   box-shadow: var(--btn-hover-shadow);
