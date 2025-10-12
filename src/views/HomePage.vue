@@ -308,7 +308,7 @@ watch(isDark, (newMode) => {
 
 /* 暗色模式 */
 .dark-theme {
-    --aside-bg: rgba(30, 30, 30, 0.7);
+    --aside-bg: rgba(30, 30, 30, 0.5);
     --btn-bg: rgba(64, 158, 255, 0.08);
     /* 透明主色背景，强化按钮边界 */
     --btn-text: oklch(80% 0.12 240);
@@ -325,7 +325,7 @@ watch(isDark, (newMode) => {
 
 /* 浅色模式 */
 .light-theme {
-    --aside-bg: rgba(255, 255, 255, 0.4);
+    --aside-bg: rgba(238, 238, 246, 0.5);
     --btn-bg: transparent;
     --btn-text: #409eff;
     --btn-border: #409eff;
@@ -374,13 +374,14 @@ input {
 
 .HomePage aside {
     height: 100%;
-    width: 150px;
+    width: 192px;
     box-sizing: border-box;
     backdrop-filter: blur(20px);
     background-color: var(--aside-bg);
     position: relative;
     padding: 20px 10px 10px 10px;
     box-shadow: 10px 0 10px -5px rgba(0, 0, 0, 0.3);
+    flex: 0 0 192px;
 }
 
 aside>div {
@@ -415,21 +416,24 @@ aside>.setting-btn:hover {
     height: 100%;
     position: relative;
     flex: 1;
+    padding: 20px;
+    box-sizing: border-box;
 }
 
 main>.search-box {
     width: 100%;
     height: 40px;
-    margin: 20px;
+    box-sizing: border-box;
+    margin-bottom: 20px;
 }
 
 .search-box>input {
-    width: 600px;
+    width: 100%;
     height: 30px;
     border-radius: 5px;
     border: 1px solid #ccc;
-    margin-right: 10px;
     padding-left: 10px;
+    box-sizing: border-box;
 }
 
 .search-box>input:focus {
@@ -462,7 +466,7 @@ main>.search-box {
 }
 
 .mod-item {
-    width: 100%;
+    width:100%;
     height: 40px;
     backdrop-filter: blur(10px);
     background-color: rgba(255, 255, 255, 0.123);
@@ -472,6 +476,7 @@ main>.search-box {
     align-items: center;
     padding: 0 10px;
     box-sizing: border-box;
+    transition: all 0.3s ease;
 }
 
 .mod-label {
@@ -482,15 +487,13 @@ main>.search-box {
     height: 100%;
     cursor: pointer;
     color: black;
-    transition: all 0.3s ease;
 }
 
-.mod-label:hover {
+.mod-item:hover {
     background-color: #66b1ff;
     transform: scale(1.05);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     border-radius: 5px;
-    padding: 0 10px;
     color: white;
 }
 

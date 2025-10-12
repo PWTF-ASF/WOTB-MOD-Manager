@@ -283,7 +283,6 @@ watch(darkMode, applyTheme)
 </script>
 
 <style scoped>
-
 .settings-panel-card {
   height: auto;
   margin: 10px 20px 40px 20px;
@@ -295,7 +294,6 @@ watch(darkMode, applyTheme)
   margin-bottom: 10px;
   display: flex;
   gap: 10px;
-  /* color: var(--text-color); */
 }
 
 .card-content {
@@ -445,7 +443,7 @@ input:checked+.slider:before {
 .secondary-btn {
   padding: 8px 16px;
   background: #f5f5f5;
-  color: #333;;
+  color: #333;
   border-radius: 4px;
   cursor: pointer;
 }

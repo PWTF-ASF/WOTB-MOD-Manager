@@ -142,8 +142,8 @@ onMounted(async () => {
   --bg-color: #1e1e1e;
   --text-color: #f0f0f0;
   --card-bg: #2a2a2a;
-  --aside-bg: rgba(30, 30, 30, 0.7);
-   /* 侧边栏样式 */
+  --aside-bg: rgba(30, 30, 30, 0.5);
+  /* 侧边栏样式 */
   --aside-item-active-bg: rgba(30, 41, 59, 0.8);
   --aside-item-active-color: #e2e8f0;
   --aside-item-hover-bg: rgba(45, 55, 72, 0.6);
@@ -167,7 +167,7 @@ onMounted(async () => {
   --bg-color: #ffffff;
   --text-color: #333333;
   --card-bg: #f5f5f5;
-  --aside-bg: rgba(255, 255, 255, 0.4);
+  --aside-bg: rgba(238, 238, 246, 0.5);
   /* 侧边栏样式 */
   --aside-item-active-bg: rgba(230, 240, 250, 0.85);
   --aside-item-active-color: #333333;

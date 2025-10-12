@@ -13,5 +13,6 @@ declare module 'vue' {
     Personalize: typeof import('./src/components/Personalize.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SettingItem: typeof import('./src/components/SettingItem.vue')['default']
   }
 }
