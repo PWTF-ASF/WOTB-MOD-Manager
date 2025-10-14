@@ -23,6 +23,9 @@
         <div class="settings-panel" v-if="activeItem === 'personalize'">
           <personalize @update:darkMode="handleDarkModeUpdate" @save-success="applyBackground" />
         </div>
+        <div class="settings-panel" v-else>
+          <setting-item />
+        </div>
       </main>
     </div>
   </div>
@@ -143,6 +146,7 @@ onMounted(async () => {
   --text-color: #f0f0f0;
   --card-bg: #2a2a2a;
   --aside-bg: rgba(30, 30, 30, 0.5);
+  --panel-bg: rgba(30, 30, 30, 0.9);
   /* 侧边栏样式 */
   --aside-item-active-bg: rgba(30, 41, 59, 0.8);
   --aside-item-active-color: #e2e8f0;
@@ -159,7 +163,15 @@ onMounted(async () => {
   /* 图标样式 */
   --icon-filter: brightness(0.9);
   --icon-hover-filter: brightness(1);
-  --icon-hover-drop-shadow: drop-shadow(0 0 10px rgba(221, 245, 255, 0.8))
+  --icon-hover-drop-shadow: drop-shadow(0 0 10px rgba(221, 245, 255, 0.8));
+  /* 下拉框样式 */
+  --select-border: 1px solid #cbd5e1;
+  --select-box-shadow: 0 0 0 1px rgba(203, 213, 225, 0.3);
+  --select-focus-boder: #94a3b8;
+  --select-focus-box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.2);
+  /* 卡片样式 */
+  --card-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+  --card-glow: 0 0 5px rgba(255, 255, 255, 0.3);
 }
 
 /* 浅色模式 */
@@ -168,6 +180,7 @@ onMounted(async () => {
   --text-color: #333333;
   --card-bg: #f5f5f5;
   --aside-bg: rgba(238, 238, 246, 0.5);
+  --panel-bg: rgba(238, 238, 238, 0.8);
   /* 侧边栏样式 */
   --aside-item-active-bg: rgba(230, 240, 250, 0.85);
   --aside-item-active-color: #333333;
@@ -185,7 +198,15 @@ onMounted(async () => {
   /* 图标样式 */
   --icon-filter: brightness(0.7);
   --icon-hover-filter: brightness(0.6);
-  --icon-hover-drop-shadow: drop-shadow(0 0 8px rgba(38, 41, 42, 0.8))
+  --icon-hover-drop-shadow: drop-shadow(0 0 8px rgba(38, 41, 42, 0.8));
+  /* 下拉框样式 */
+  --select-border: 1px solid #334155;
+  --select-box-shadow: 0 0 0 1px rgba(51, 65, 85, 0.3);
+  --select-focus-boder: #64748b;
+  --select-focus-box-shadow: #0 0 0 2px rgba(100, 116, 139, 0.2);
+  /* 卡片样式 */
+  --card-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  --card-glow: 0 0 3px rgba(255, 255, 255, 0.5);
 }
 
 .settingsPage {
@@ -228,8 +249,8 @@ aside {
   padding: 10px 20px;
   color: var(--text-color);
   box-shadow: 10px 0 20px -10px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   /* 兼容Safari */
   background-color: var(--aside-bg);
   border-right: 1px solid rgba(255, 255, 255, 0.05);

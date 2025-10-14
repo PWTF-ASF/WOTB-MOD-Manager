@@ -1,55 +1,78 @@
 <template>
-  <div class="settings-panel-card">
-    <div class="card-title">选择纯色背景：</div>
-    <div class="card-content">
-      <input type="color" v-model="color" @input="applyColor" />
-      <!-- 预览当前颜色 -->
-      <div class="color-preview" :style="{ backgroundColor: color }"></div>
-    </div>
-  </div>
-
-  <div class="settings-panel-card">
-    <div class="card-title">渐变背景：</div>
-    <div class="card-content">
-      <!-- 优化：让用户选择渐变方向和颜色 -->
-      <div class="gradient-controls">
-        <select v-model="gradientDirection" @change="updateGradient">
-          <option value="to right">从左到右</option>
-          <option value="to bottom">从上到下</option>
-          <option value="135deg">对角线（135°）</option>
-        </select>
-        <input type="color" v-model="gradientColor1" @input="updateGradient" placeholder="颜色1" />
-        <input type="color" v-model="gradientColor2" @input="updateGradient" placeholder="颜色2" />
-      </div>
-      <button @click="applyGradient" class="mt-2">应用渐变</button>
-      <!-- 渐变预览 -->
-      <div class="gradient-preview" :style="{ backgroundImage: gradient }"></div>
-    </div>
-  </div>
-
-  <div class="settings-panel-card">
-    <div class="card-title">
-      <div class="row1">上传背景图片</div>
-      <div class="row2" v-if="imagePath">模糊度：{{ blur }}px</div>
-    </div>
-    <div class="card-content">
-      <input type="file" accept="image/*" @change="handleImageUpload" />
-      <!-- 优化：用v-show避免DOM频繁销毁/创建，初始隐藏 -->
-      <input v-show="imagePath" type="range" min="0" max="20" v-model="blur" @input="applyImage" />
-    </div>
-  </div>
-
-  <div class="settings-panel-card">
-    <div class="card-title">暗黑模式：</div>
-    <div class="card-content">
-      <div class="theme-switch-container">
-        <label class="square-switch">
-          <input type="checkbox" v-model="darkMode" class="sr-only" @change="handleThemeChange" />
-          <span class="slider"></span>
-        </label>
-        <span class="theme-label">{{ darkMode ? '暗模式' : '明模式' }}</span>
+  <div class="settings-panel">
+    <div class="settings-panel-card">
+      <div class="card-title">选择纯色背景：</div>
+      <div class="card-content">
+        <input type="color" v-model="color" @input="applyColor" />
+        <!-- 预览当前颜色 -->
+        <div class="color-preview" :style="{ backgroundColor: color }"></div>
       </div>
     </div>
+
+    <div class="settings-panel-card">
+      <div class="card-title">渐变背景：</div>
+      <div class="card-content">
+        <!-- 优化：让用户选择渐变方向和颜色 -->
+        <div class="gradient-controls">
+          <select v-model="gradientDirection" @change="updateGradient">
+            <option value="to right">从左到右</option>
+            <option value="to bottom">从上到下</option>
+            <option value="135deg">对角线（135°）</option>
+          </select>
+          <input type="color" v-model="gradientColor1" @input="updateGradient" placeholder="颜色1" />
+          <input type="color" v-model="gradientColor2" @input="updateGradient" placeholder="颜色2" />
+        </div>
+        <button @click="applyGradient" class="mt-2">应用渐变</button>
+        <!-- 渐变预览 -->
+        <div class="gradient-preview" :style="{ backgroundImage: gradient }"></div>
+      </div>
+    </div>
+
+    <div class="settings-panel-card">
+      <div class="card-title">
+        <div class="row1">上传背景图片</div>
+        <div class="row2" v-if="imagePath">模糊度：{{ blur }}px</div>
+      </div>
+      <div class="card-content">
+        <input type="file" accept="image/*" @change="handleImageUpload" />
+        <!-- 优化：用v-show避免DOM频繁销毁/创建，初始隐藏 -->
+        <input v-show="imagePath" type="range" min="0" max="20" v-model="blur" @input="applyImage" />
+      </div>
+    </div>
+
+    <div class="settings-panel-card">
+      <div class="card-title">暗黑模式：</div>
+      <div class="card-content">
+        <div class="theme-switch-container">
+          <label class="square-switch">
+            <input type="checkbox" v-model="darkMode" class="sr-only" @change="handleThemeChange" />
+            <span class="slider"></span>
+          </label>
+          <span class="theme-label">{{ darkMode ? '暗模式' : '明模式' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 保存提示：增加过渡动画 -->
+    <p v-if="saved" class="save-tip" @animationend="saved = false">✅ 设置已保存！</p>
+
+    <!-- 对话框：优化样式和可访问性 -->
+    <dialog ref="dialogRef" :class="{ 'tilt': isTilting }" aria-labelledby="dialogTitle">
+      <div class="dialog-header">
+        <h3 class="dialog-title" id="dialogTitle">确认重置</h3>
+        <button class="close-btn" @click="closeDialog" @mouseenter="isTilting = true" @mouseleave="isTilting = false"
+          aria-label="关闭对话框">
+          ×
+        </button>
+      </div>
+      <div class="dialog-content">
+        <p>确定要重置所有背景和主题设置吗？重置后将恢复为「白色背景+系统默认主题」。</p>
+      </div>
+      <div class="dialog-footer">
+        <button @click="closeDialog" class="secondary-btn">取消</button>
+        <button @click="confirmReset" class="primary-btn">确认重置</button>
+      </div>
+    </dialog>
   </div>
 
   <!-- 操作按钮：增加样式区分主要/次要按钮 -->
@@ -57,27 +80,6 @@
     <button @click="saveSettings" class="primary-btn">💾 保存</button>
     <button @click="openDialog" class="secondary-btn">🔄 重置</button>
   </div>
-
-  <!-- 保存提示：增加过渡动画 -->
-  <p v-if="saved" class="save-tip" @animationend="saved = false">✅ 设置已保存！</p>
-
-  <!-- 对话框：优化样式和可访问性 -->
-  <dialog ref="dialogRef" :class="{ 'tilt': isTilting }" aria-labelledby="dialogTitle">
-    <div class="dialog-header">
-      <h3 class="dialog-title" id="dialogTitle">确认重置</h3>
-      <button class="close-btn" @click="closeDialog" @mouseenter="isTilting = true" @mouseleave="isTilting = false"
-        aria-label="关闭对话框">
-        ×
-      </button>
-    </div>
-    <div class="dialog-content">
-      <p>确定要重置所有背景和主题设置吗？重置后将恢复为「白色背景+系统默认主题」。</p>
-    </div>
-    <div class="dialog-footer">
-      <button @click="closeDialog" class="secondary-btn">取消</button>
-      <button @click="confirmReset" class="primary-btn">确认重置</button>
-    </div>
-  </dialog>
 </template>
 
 <script setup lang="ts">
@@ -96,8 +98,8 @@ interface BackgroundSettings {
 const emit = defineEmits<{
   (e: 'update-background', settings: BackgroundSettings): void
   (e: 'update:darkMode', darkMode: boolean): void
-  (e: 'save-success', settings: BackgroundSettings): void 
-  (e: 'reset-success', settings: BackgroundSettings): void 
+  (e: 'save-success', settings: BackgroundSettings): void
+  (e: 'reset-success', settings: BackgroundSettings): void
 }>()
 
 // 3. 响应式状态（初始化更合理的默认值）
@@ -283,9 +285,18 @@ watch(darkMode, applyTheme)
 </script>
 
 <style scoped>
+.settings-panel {
+  padding: 10px 20px 20px 20px;
+  background-color: var(--panel-bg);
+  margin: 10px 20px 0px 20px;
+  border-radius: 15px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(12px);
+}
+
 .settings-panel-card {
   height: auto;
-  margin: 10px 20px 40px 20px;
+  margin-bottom: 20px;
 }
 
 .card-title {
@@ -302,13 +313,23 @@ watch(darkMode, applyTheme)
   max-height: 55px;
   gap: 1rem;
   padding: 10px 20px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--card-shadow), var(--card-glow);
   border-radius: 5px;
   background-color: var(--card-bg);
 }
 
-.gradient-controls select{
-  color: #1f2937;
+.gradient-controls select {
+  background-color: var(--card-bg);
+  color: var(--text-color);
+  border: var(--select-boder);
+  /* 主边框色 */
+  box-shadow: var(--select-box-shadow);
+}
+
+.gradient-controls select:focus {
+  border-color: var(--select-focus-border);
+  /* 聚焦时的边框色（略深） */
+  box-shadow: var(--select-focus-box-shadow);
 }
 
 .button-group {
@@ -356,10 +377,14 @@ button:hover {
   }
 }
 
+/* 按钮样式 */
 .theme-switch-container {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  /* 添加容器阴影增强整体层次 */
+  padding: 0.25rem;
+  border-radius: 8px;
 }
 
 .sr-only {
@@ -381,6 +406,12 @@ button:hover {
   width: 60px;
   height: 30px;
   cursor: pointer;
+  /* 添加轻微缩放效果增强交互感 */
+  transition: transform 0.15s ease;
+}
+
+.square-switch:hover {
+  transform: scale(1.02);
 }
 
 /* 方形滑块 */
@@ -390,8 +421,11 @@ button:hover {
   background-color: #ccc;
   transition: .4s;
   border-radius: 6px;
-  /* 小圆角实现方形效果 */
-  box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.2);
+  /* 多层次阴影增强立体感 */
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.2),
+    0 2px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 /* 方形按钮 */
@@ -403,31 +437,60 @@ button:hover {
   left: 4px;
   bottom: 4px;
   background-color: white;
-  transition: .4s;
+  transition: .4s cubic-bezier(0.34, 1.56, 0.64, 1);
   border-radius: 4px;
-  /* 按钮也是方形 */
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  /* 按钮立体效果 */
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.8);
+  /* 添加内发光增强层次 */
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.2) 100%);
 }
 
-/* 选中状态（暗模式） */
+/* 选中状态 */
 input:checked+.slider {
   background-color: #2c3e50;
+  /* 激活状态下的阴影变化 */
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.15),
+    0 2px 5px rgba(64, 158, 255, 0.25);
 }
 
 input:checked+.slider:before {
   transform: translateX(30px);
-  /* 方形开关的平移距离 */
+  /* 激活状态下按钮的细微变化 */
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.15),
+    inset 0 1px 1px rgba(255, 255, 255, 0.8);
 }
+
+/* 添加状态指示器增强层次感知 */
+.slider:after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 20px;
+  width: 4px;
+  height: 4px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 50%;
+  transform: translateY(-50%);
+  transition: all 0.3s ease;
+  opacity: 0;
+}
+
+input:checked+.slider:after {
+  left: 46px;
+  background-color: rgba(255, 255, 255, 0.6);
+  opacity: 1;
+}
+
 
 /* 主题标签 */
 .theme-label {
   font-size: 1rem;
   font-weight: 500;
   transition: color 0.3s ease;
-  color: var(--text-color);
-}
-
-.theme-label {
   color: var(--text-color);
 }
 
