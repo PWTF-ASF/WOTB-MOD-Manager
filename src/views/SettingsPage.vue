@@ -4,7 +4,7 @@
     <div class="content">
 
       <!-- 侧边栏 -->
-      <aside>
+      <aside :class="{ 'glass-effect': glassEffectEnabled }">
         <span>设置</span>
         <div class="aside-card-list">
           <div class="aside-card-list-item" v-for="item in asideList" :key="item.activeItem"
@@ -24,7 +24,7 @@
           <personalize @update:darkMode="handleDarkModeUpdate" @save-success="applyBackground" />
         </div>
         <div class="settings-panel" v-else>
-          <setting-item />
+          <setting-item @update-glasseffect="childglassEffectUpdate" />
         </div>
       </main>
     </div>
@@ -39,6 +39,8 @@ import personalizeDarkIcon from '../assets/279皮肤、个性化、主题-线性
 import personalizeLightIcon from '../assets/279皮肤、个性化、主题-线性.svg';
 import settingLightIcon from '../assets/设置.svg'
 import settingDarkIcon from '../assets/设置 (1).svg'
+import Personalize from '../components/Personalize.vue'
+import SettingItem from '../components/SettingItem.vue'
 
 //定义asidelist的接口
 interface asideList {
@@ -50,11 +52,14 @@ interface asideList {
 
 const activeItem = ref('setting') //默认选择基本设置页
 const router = useRouter() //路由
-const isDark = ref(false);  // 父组件的主题状态：初始值可设为 false（默认浅色），后续由子组件同步
+const isDark = ref(false);  // 父组件的主题状态，后续由子组件同步
 const handleDarkModeUpdate = (childDarkMode: boolean) => {  // 2. 接收子组件传递的 darkMode：更新父组件的 isDark
   isDark.value = childDarkMode; // 子组件的darkMode同步到父组件
 };
-
+const glassEffectEnabled = ref(false);   // 默认不启用毛玻璃效果
+const childglassEffectUpdate = (childGlassEffect: boolean) => {  // 接收子组件传递的 glassEffectEnabled：更新父组件的 glassEffectEnabled
+  glassEffectEnabled.value = childGlassEffect; // 子组件的glassEffectEnabled同步到父组件
+};
 //动态切换明暗模式下的图标
 const getItemIcon = (item: asideList) => {
   return isDark.value
@@ -135,6 +140,12 @@ onMounted(async () => {
       console.error('背景设置解析失败', e);
     }
   }
+
+  //初始化毛玻璃状态
+  const storedGlass = localStorage.getItem('glassEffectEnabled');
+  if (storedGlass) {
+    glassEffectEnabled.value = JSON.parse(storedGlass);
+  }
 })
 
 </script>
@@ -146,7 +157,9 @@ onMounted(async () => {
   --text-color: #f0f0f0;
   --card-bg: #2a2a2a;
   --aside-bg: rgba(30, 30, 30, 0.5);
+  --aside-bg-no-filter: rgb(30, 30, 30);
   --panel-bg: rgba(30, 30, 30, 0.9);
+  --panel-bg-no-filter: rgb(30, 30, 30);
   /* 侧边栏样式 */
   --aside-item-active-bg: rgba(30, 41, 59, 0.8);
   --aside-item-active-color: #e2e8f0;
@@ -180,7 +193,9 @@ onMounted(async () => {
   --text-color: #333333;
   --card-bg: #f5f5f5;
   --aside-bg: rgba(238, 238, 246, 0.5);
+  --aside-bg-no-filter: rgb(238, 238, 246);
   --panel-bg: rgba(238, 238, 238, 0.8);
+  --panel-bg-no-filter: rgb(238, 238, 238);
   /* 侧边栏样式 */
   --aside-item-active-bg: rgba(230, 240, 250, 0.85);
   --aside-item-active-color: #333333;
@@ -250,13 +265,16 @@ aside {
   color: var(--text-color);
   box-shadow: 10px 0 20px -10px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  /* 兼容Safari */
-  background-color: var(--aside-bg);
+  background-color: var(--aside-bg-no-filter);
   border-right: 1px solid rgba(255, 255, 255, 0.05);
   /* 增加细微边框增强层次感 */
   transition: all 0.3s ease;
   /* 平滑过渡效果 */
+}
+
+aside.glass-effect {
+  background-color: var(--aside-bg);
+  backdrop-filter: blur(12px);
 }
 
 .aside-card-list {

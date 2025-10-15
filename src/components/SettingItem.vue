@@ -1,11 +1,11 @@
 <template>
-    <div class="settings-item-panel">
+    <div class="settings-item-panel" :class="{ 'glass-effect': glassEffectEnabled }">
         <div class="settings-item-panel-card">
-            <div class="card-title">禁用毛玻璃效果</div>
+            <div class="card-title">启用毛玻璃效果</div>
             <div class="card-content">
                 <div class="theme-switch-container">
                     <label class="square-switch">
-                        <input type="checkbox" class="sr-only" />
+                        <input type="checkbox" class="sr-only" v-model="glassEffectEnabled" />
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -13,13 +13,50 @@
         </div>
     </div>
 </template>
+<script setup lang="ts">
+import { ref, watch, onMounted } from 'vue';
+
+const glassEffectEnabled = ref(false)  // 默认不启用毛玻璃效果
+const darkMode = ref(false)
+const emit = defineEmits<{
+    (e: 'update-glasseffect', glasseffect: boolean): void
+}>()
+
+function updateGlassEffect() {
+    const storedValue = localStorage.getItem('glassEffectEnabled');
+    if (storedValue !== null) {
+        glassEffectEnabled.value = JSON.parse(storedValue);
+    }
+}
+
+// 监听 glassEffectEnabled 的变化，并将其保存到 localStorage
+watch(glassEffectEnabled, (newValue) => {
+    localStorage.setItem('glassEffectEnabled', JSON.stringify(newValue));
+    emit('update-glasseffect', newValue); // 直接传最新值给父组件
+});
+onMounted(() => {
+    // 读取本地存储的深色模式设置
+    const savedMode = localStorage.getItem('darkMode')
+    const darkModeState = savedMode ? JSON.parse(savedMode) : window.matchMedia('(prefers-color-scheme: dark)').matches
+
+    if (darkModeState !== null) {
+        // 初始化时从 localStorage 获取 darkMode 状态
+        darkMode.value = darkModeState;
+    }
+    updateGlassEffect(); // 组件挂载时初始化毛玻璃状态
+});
+</script>
 <style scoped>
 .settings-item-panel {
     padding: 10px 20px 40px 20px;
-    background-color: var(--panel-bg);
+    background-color: var(--panel-bg-no-filter);
     margin: 10px 20px 0 20px;
     border-radius: 15px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.settings-item-panel.glass-effect {
+    background-color: var(--panel-bg);
     backdrop-filter: blur(12px);
 }
 
@@ -154,6 +191,3 @@ input:checked+.slider:after {
     opacity: 1;
 }
 </style>
-<script setup lang="ts">
-
-</script>
