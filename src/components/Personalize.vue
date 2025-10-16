@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-panel">
+  <div class="settings-panel" :class="{ 'glass-effect': glassEffect }">
     <div class="settings-panel-card">
       <div class="card-title">选择纯色背景：</div>
       <div class="card-content">
@@ -83,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch ,defineProps} from 'vue'
 
 // 1. 定义接口（严格类型约束）
 interface BackgroundSettings {
@@ -101,6 +101,10 @@ const emit = defineEmits<{
   (e: 'save-success', settings: BackgroundSettings): void
   (e: 'reset-success', settings: BackgroundSettings): void
 }>()
+
+const props = defineProps<{
+  glassEffect: boolean; // 新增：父组件传来的毛玻璃状态
+}>();
 
 // 3. 响应式状态（初始化更合理的默认值）
 const currentType = ref<BackgroundSettings['type']>('color')
@@ -287,10 +291,15 @@ watch(darkMode, applyTheme)
 <style scoped>
 .settings-panel {
   padding: 10px 20px 20px 20px;
-  background-color: var(--panel-bg);
+  background-color: var(--panel-bg-no-filter);
   margin: 10px 20px 0px 20px;
   border-radius: 15px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.settings-panel.glass-effect{
+  background-color: var(--panel-bg);
   backdrop-filter: blur(12px);
 }
 

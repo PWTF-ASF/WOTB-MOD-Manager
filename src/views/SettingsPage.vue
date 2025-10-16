@@ -21,10 +21,12 @@
 
       <main>
         <div class="settings-panel" v-if="activeItem === 'personalize'">
-          <personalize @update:darkMode="handleDarkModeUpdate" @save-success="applyBackground" />
+          <personalize @update:darkMode="handleDarkModeUpdate" @save-success="applyBackground"
+            :glass-effect="glassEffectEnabled" />
         </div>
         <div class="settings-panel" v-else>
-          <setting-item @update-glasseffect="childglassEffectUpdate" />
+          <setting-item @update-glasseffect="childglassEffectUpdate" @update:darkMode="handleDarkModeUpdate"
+            :glass-effect="glassEffectEnabled" />
         </div>
       </main>
     </div>

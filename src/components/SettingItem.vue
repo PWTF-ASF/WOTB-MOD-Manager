@@ -1,51 +1,65 @@
 <template>
-    <div class="settings-item-panel" :class="{ 'glass-effect': glassEffectEnabled }">
-        <div class="settings-item-panel-card">
-            <div class="card-title">启用毛玻璃效果</div>
-            <div class="card-content">
-                <div class="theme-switch-container">
-                    <label class="square-switch">
-                        <input type="checkbox" class="sr-only" v-model="glassEffectEnabled" />
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            </div>
+  <!-- 根元素类名：用 props.glassEffect 控制，而非本地 glassEffectEnabled -->
+  <div class="settings-item-panel" :class="{ 'glass-effect': glassEffect }">
+    <div class="settings-item-panel-card">
+      <div class="card-title">启用毛玻璃效果</div>
+      <div class="card-content">
+        <div class="theme-switch-container">
+          <label class="square-switch">
+            <!-- 复选框绑定本地状态，用于触发更新 -->
+            <input type="checkbox" class="sr-only" v-model="localGlassEffect" />
+            <span class="slider"></span>
+          </label>
         </div>
+      </div>
     </div>
+  </div>
 </template>
+
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, defineProps } from 'vue';
 
-const glassEffectEnabled = ref(false)  // 默认不启用毛玻璃效果
-const darkMode = ref(false)
+// 1. 定义 props：接收父组件的毛玻璃状态
+const props = defineProps<{
+  glassEffect: boolean; // 父组件传来的全局毛玻璃状态
+}>();
+
+// 2. 本地状态：仅用于绑定复选框，避免直接修改 props
+const localGlassEffect = ref(props.glassEffect);
+const darkMode = ref(false);
+
+// 3. 定义 emit：通知父组件更新全局状态
 const emit = defineEmits<{
-    (e: 'update-glasseffect', glasseffect: boolean): void
-}>()
+  (e: 'update-glasseffect', glasseffect: boolean): void;
+  (e: 'update:darkMode', darkMode: boolean): void;
+}>();
 
-function updateGlassEffect() {
-    const storedValue = localStorage.getItem('glassEffectEnabled');
-    if (storedValue !== null) {
-        glassEffectEnabled.value = JSON.parse(storedValue);
-    }
+// 4. 监听本地复选框变化：同步到父组件
+watch(localGlassEffect, (newValue) => {
+  emit('update-glasseffect', newValue); // 通知父组件更新全局状态
+  localStorage.setItem('glassEffectEnabled', JSON.stringify(newValue)); // 持久化
+});
+
+// 5. 监听 props 变化：父组件状态变了，本地复选框也同步
+watch(() => props.glassEffect, (newValue) => {
+  localGlassEffect.value = newValue;
+});
+
+// （原有 initDarkMode、updateGlassEffect 逻辑不变，仅修改状态来源）
+function initDarkMode() {
+  const savedMode = localStorage.getItem('darkMode');
+  const mode = savedMode ? JSON.parse(savedMode) : window.matchMedia('(prefers-color-scheme: dark)').matches;
+  darkMode.value = mode;
+  emit('update:darkMode', mode);
 }
 
-// 监听 glassEffectEnabled 的变化，并将其保存到 localStorage
-watch(glassEffectEnabled, (newValue) => {
-    localStorage.setItem('glassEffectEnabled', JSON.stringify(newValue));
-    emit('update-glasseffect', newValue); // 直接传最新值给父组件
-});
 onMounted(() => {
-    // 读取本地存储的深色模式设置
-    const savedMode = localStorage.getItem('darkMode')
-    const darkModeState = savedMode ? JSON.parse(savedMode) : window.matchMedia('(prefers-color-scheme: dark)').matches
-
-    if (darkModeState !== null) {
-        // 初始化时从 localStorage 获取 darkMode 状态
-        darkMode.value = darkModeState;
-    }
-    updateGlassEffect(); // 组件挂载时初始化毛玻璃状态
+  initDarkMode();
+  // 初始化本地复选框：用 props 的值（父组件已从 localStorage 读取）
+  localGlassEffect.value = props.glassEffect;
 });
 </script>
+
 <style scoped>
 .settings-item-panel {
     padding: 10px 20px 40px 20px;
