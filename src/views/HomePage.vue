@@ -308,32 +308,100 @@ watch(isDark, (newMode) => {
 
 /* 暗色模式 */
 .dark-theme {
-    --aside-bg: rgba(30, 30, 30, 0.5);
-    --btn-bg: rgba(64, 158, 255, 0.08);
-    /* 透明主色背景，强化按钮边界 */
-    --btn-text: oklch(80% 0.12 240);
-    /* 高亮度文字，暗背景下清晰 */
-    --btn-border: oklch(70% 0.12 240);
-    /* 边框稍暗，区分文字与边框 */
+    --bg-color: #1e1e1e;
+    --text-color: #f0f0f0;
+    --card-bg: #2a2a2a;
+    --aside-bg: rgba(30, 30, 30, 0.8);
+    --aside-bg-no-filter: #2a2a2a;
+    --panel-bg: rgba(30, 30, 30, 0.8);
+    --panel-bg-no-filter: #2a2a2a;
+    /* 侧边栏样式 */
+    --aside-item-active-bg: rgba(30, 41, 59, 0.8);
+    --aside-item-active-color: #e2e8f0;
+    --aside-item-hover-bg: rgba(45, 55, 72, 0.6);
+    --aside-item-hover-color: #f8fafc;
+    /* 指示器样式 */
+    --indicator-bg: #3b82f6;
+    /* 按钮样式 */
+    --btn-bg: rgba(64, 158, 255, 0.18);
+    /* 加深背景 */
+    --btn-text: oklch(65% 0.12 240);
+    --btn-border: oklch(65% 0.12 240);
     --btn-hover-bg: oklch(70% 0.13 240);
-    /*  hover 提亮，不刺眼 */
-    --btn-hover-text: #0d1117;
-    /* 纯黑文字，保证对比 */
-    --btn-hover-shadow: 0 4px 12px hsl(220 40% 0% / 0.6);
-    /* 深阴影，强化层次 */
+    --btn-hover-text: #ffffff;
+    --btn-hover-shadow: 0 4px 12px hsl(220 40% 0% / 0.5);
+    /* 危险操作变量 */
+    --danger-border: rgba(245, 108, 108, 0.4);
+    --danger-bg: rgba(245, 108, 108, 0.15);
+    --danger-text: oklch(80% 0.2 20);
+    --danger-hover-bg: oklch(70% 0.2 20);
+    --danger-hover-text: #fff;
+    /* 主要操作变量 */
+    --primary-color: #4096ff;
+    --primary-text: #fff;
+    --primary-hover: #3684e6;
+    /* 图标样式 */
+    --icon-filter: brightness(0.9);
+    --icon-hover-filter: brightness(1);
+    --icon-hover-drop-shadow: drop-shadow(0 0 10px rgba(221, 245, 255, 0.8));
+    /* 下拉框样式 */
+    --select-border: 1px solid #cbd5e1;
+    --select-box-shadow: 0 0 0 1px rgba(203, 213, 225, 0.3);
+    --select-focus-boder: #94a3b8;
+    --select-focus-box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.2);
+    /* 卡片样式 */
+    --card-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+    --card-glow: 0 0 5px rgba(255, 255, 255, 0.3);
 }
 
 /* 浅色模式 */
 .light-theme {
-    --aside-bg: rgba(238, 238, 246, 0.5);
-    --btn-bg: transparent;
+    --bg-color: #ffffff;
+    --text-color: #333333;
+    --card-bg: #f5f5f5;
+    --aside-bg: rgba(238, 238, 246, 0.8);
+    --aside-bg-no-filter: #f0f0f0;
+    --panel-bg: rgba(238, 238, 238, 0.8);
+    --panel-bg-no-filter: #f0f0f0;
+    /* 侧边栏样式 */
+    --aside-item-active-bg: rgba(230, 240, 250, 0.85);
+    --aside-item-active-color: #333333;
+    --aside-item-hover-bg: rgba(240, 242, 245, 0.7);
+    --aside-item-hover-color: #333333;
+    /* 指示器样式 */
+    --indicator-bg: #1677ff;
+    /* 按钮样式 */
+    --btn-bg: #e6f7ff;
+    /* 浅主色背景 */
     --btn-text: #409eff;
-    --btn-border: #409eff;
+    --btn-border: #b3d8ff;
     --btn-hover-bg: #66b1ff;
-    --btn-hover-text: #ffffff;
+    --btn-hover-text: #0d1117;
     --btn-hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    /* 浅阴影，不厚重 */
+    /* 危险操作变量 */
+    --danger-border: rgba(245, 108, 108, 0.3);
+    --danger-bg: #fff5f5;
+    --danger-text: #f56c6c;
+    --danger-hover-bg: #f56c6c;
+    --danger-hover-text: #fff;
+    /* 主要操作变量 */
+    --primary-color: #4096ff;
+    --primary-text: #fff;
+    --primary-hover: #3684e6;
+    /* 图标样式 */
+    --icon-filter: brightness(0.7);
+    --icon-hover-filter: brightness(0.6);
+    --icon-hover-drop-shadow: drop-shadow(0 0 8px rgba(38, 41, 42, 0.8));
+    /* 下拉框样式 */
+    --select-border: 1px solid #334155;
+    --select-box-shadow: 0 0 0 1px rgba(51, 65, 85, 0.3);
+    --select-focus-boder: #64748b;
+    --select-focus-box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.2);
+    /* 卡片样式 */
+    --card-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    --card-glow: 0 0 3px rgba(255, 255, 255, 0.5);
 }
+
 
 /* 清除input默认样式 */
 input {
@@ -382,28 +450,48 @@ input {
     padding: 20px 10px 10px 10px;
     box-shadow: 10px 0 10px -5px rgba(0, 0, 0, 0.3);
     flex: 0 0 192px;
+    display: flex;
+    justify-content: center;
 }
 
 aside>div {
     width: 130px;
-    height: 32px;
-    border: 2px solid var(--btn-border);
-    background: linear-gradient(145deg, var(--btn-bg), rgba(64, 158, 255, 0.05));
+    height: 36px;
+    border: 1px solid var(--btn-border);
+    background: var(--btn-bg);
     color: var(--btn-text);
     text-align: center;
-    margin-bottom: 10px;
-    line-height: 30px;
+    margin-bottom: 12px;
+    line-height: 36px;
     cursor: pointer;
-    transition: all 0.3s ease;
-    border-radius: 4px;
+    transition: all 0.25s ease;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    /* 基础阴影：主题自适应 */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
+/* 侧边栏按钮hover状态（阴影+发光） */
 aside>.add-mod-btn:hover,
 aside>.setting-btn:hover {
-    background: linear-gradient(145deg, var(--btn-hover-bg), oklch(65% 0.13 240));
+    background: var(--btn-hover-bg);
     color: var(--btn-hover-text);
-    transform: scale(1.05);
-    box-shadow: var(--btn-hover-shadow);
+    transform: translateY(-2px);
+    border-color: transparent;
+    /* 阴影+淡蓝色发光 */
+    box-shadow:
+        var(--btn-hover-shadow),
+        0 0 8px rgba(64, 158, 255, 0.4);
+}
+
+/* 侧边栏按钮active状态（阴影收缩+发光减弱） */
+aside>.add-mod-btn:active,
+aside>.setting-btn:active {
+    transform: translateY(0);
+    box-shadow:
+        0 2px 6px var(--dark-theme, rgba(0, 0, 0, 0.2)) var(--light-theme, rgba(0, 0, 0, 0.1)),
+        0 0 4px var(--dark-theme, rgba(100, 180, 255, 0.2)) var(--light-theme, rgba(64, 158, 255, 0.15));
 }
 
 .setting-btn {
@@ -466,7 +554,7 @@ main>.search-box {
 }
 
 .mod-item {
-    width:100%;
+    width: 100%;
     height: 40px;
     backdrop-filter: blur(10px);
     background-color: rgba(255, 255, 255, 0.123);
@@ -523,33 +611,99 @@ main>.search-box {
     align-items: center;
     justify-content: flex-end;
     gap: 10px;
-    padding: 10px;
+    padding: 20px;
 }
 
 footer> :last-child {
     margin-right: 10px;
 }
 
+/* 页脚按钮基础样式 */
 footer>div {
-    width: 130px;
-    height: 32px;
-    border: 2px solid var(--btn-border);
-    background: linear-gradient(145deg, var(--btn-bg), rgba(64, 158, 255, 0.05));
-    color: var(--btn-text);
+    min-width: 100px;
+    padding: 0 16px;
+    height: 36px;
+    line-height: 36px;
     text-align: center;
-    margin-bottom: 10px;
-    line-height: 30px;
     cursor: pointer;
-    transition: all 0.3s ease;
-    border-radius: 4px;
+    transition: all 0.25s ease;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    /* 基础阴影：主题自适应 */
+    box-shadow: 0 2px 4px var(--dark-theme, rgba(0, 0, 0, 0.2)) var(--light-theme, rgba(0, 0, 0, 0.08));
 }
 
-footer>.load-mod-btn:hover,
-footer>.delete-mod-btn:hover,
-footer>.start-game-btn:hover {
-    background: linear-gradient(145deg, var(--btn-hover-bg), oklch(65% 0.13 240));
+/* 1. 加载MOD（次要操作） */
+footer>.load-mod-btn {
+    border: 1px solid var(--btn-border);
+    background: var(--btn-bg);
+    color: var(--btn-text);
+}
+
+footer>.load-mod-btn:hover {
+    background: var(--btn-hover-bg);
     color: var(--btn-hover-text);
-    transform: scale(1.05);
-    box-shadow: var(--btn-hover-shadow);
+    transform: translateY(-2px);
+    border-color: transparent;
+    /* 阴影+淡蓝色发光 */
+    box-shadow:
+        var(--btn-hover-shadow),
+        0 0 8px var(--dark-theme, rgba(100, 180, 255, 0.4)) var(--light-theme, rgba(64, 158, 255, 0.3));
+}
+
+footer>.load-mod-btn:active {
+    transform: translateY(0);
+    box-shadow:
+        0 2px 6px var(--dark-theme, rgba(0, 0, 0, 0.2)) var(--light-theme, rgba(0, 0, 0, 0.1)),
+        0 0 4px var(--dark-theme, rgba(100, 180, 255, 0.2)) var(--light-theme, rgba(64, 158, 255, 0.15));
+}
+
+/* 2. 删除MOD（危险操作） */
+footer>.delete-mod-btn {
+    border: 1px solid var(--danger-border);
+    background: var(--danger-bg);
+    color: var(--danger-text);
+}
+
+footer>.delete-mod-btn:hover {
+    background: var(--danger-hover-bg);
+    color: var(--danger-hover-text);
+    transform: translateY(-2px);
+    border-color: transparent;
+    /* 阴影+红色发光 */
+    box-shadow:
+        0 4px 12px rgba(245, 108, 108, 0.2),
+        0 0 8px var(--dark-theme, rgba(255, 120, 120, 0.4)) var(--light-theme, rgba(245, 108, 108, 0.35));
+}
+
+footer>.delete-mod-btn:active {
+    transform: translateY(0);
+    box-shadow:
+        0 2px 6px rgba(0, 0, 0, 0.1),
+        0 0 4px var(--dark-theme, rgba(255, 120, 120, 0.2)) var(--light-theme, rgba(245, 108, 108, 0.2));
+}
+
+/* 3. 启动游戏（主要操作） */
+footer>.start-game-btn {
+    border: 1px solid transparent;
+    background: var(--primary-color);
+    color: var(--primary-text);
+}
+
+footer>.start-game-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-2px);
+    /* 阴影+强蓝色发光 */
+    box-shadow:
+        0 4px 12px rgba(64, 158, 255, 0.25),
+        0 0 10px var(--dark-theme, rgba(80, 170, 255, 0.5)) var(--light-theme, rgba(64, 158, 255, 0.4));
+}
+
+footer>.start-game-btn:active {
+    transform: translateY(0);
+    box-shadow:
+        0 2px 6px rgba(0, 0, 0, 0.1),
+        0 0 5px var(--dark-theme, rgba(80, 170, 255, 0.3)) var(--light-theme, rgba(64, 158, 255, 0.25));
 }
 </style>

@@ -158,10 +158,10 @@ onMounted(async () => {
   --bg-color: #1e1e1e;
   --text-color: #f0f0f0;
   --card-bg: #2a2a2a;
-  --aside-bg: rgba(30, 30, 30, 0.5);
-  --aside-bg-no-filter: rgb(30, 30, 30);
-  --panel-bg: rgba(30, 30, 30, 0.9);
-  --panel-bg-no-filter: rgb(30, 30, 30);
+  --aside-bg: rgba(30, 30, 30, 0.8);
+  --aside-bg-no-filter: #2a2a2a;
+  --panel-bg: rgba(30, 30, 30, 0.8);
+  --panel-bg-no-filter: #2a2a2a;
   /* 侧边栏样式 */
   --aside-item-active-bg: rgba(30, 41, 59, 0.8);
   --aside-item-active-color: #e2e8f0;
@@ -173,7 +173,7 @@ onMounted(async () => {
   --btn-text: oklch(65% 0.12 240);
   --btn-border: oklch(65% 0.12 240);
   --btn-hover-bg: oklch(70% 0.13 240);
-  --btn-hover-text: #0d1117;
+  --btn-hover-text: #ffffff;
   --btn-hover-shadow: 0 4px 12px hsl(220 40% 0% / 0.5);
   /* 图标样式 */
   --icon-filter: brightness(0.9);
@@ -194,10 +194,10 @@ onMounted(async () => {
   --bg-color: #ffffff;
   --text-color: #333333;
   --card-bg: #f5f5f5;
-  --aside-bg: rgba(238, 238, 246, 0.5);
-  --aside-bg-no-filter: rgb(238, 238, 246);
+  --aside-bg: rgba(238, 238, 246, 0.8);
+  --aside-bg-no-filter: #f0f0f0;
   --panel-bg: rgba(238, 238, 238, 0.8);
-  --panel-bg-no-filter: rgb(238, 238, 238);
+  --panel-bg-no-filter: #f0f0f0;
   /* 侧边栏样式 */
   --aside-item-active-bg: rgba(230, 240, 250, 0.85);
   --aside-item-active-color: #333333;
@@ -210,7 +210,7 @@ onMounted(async () => {
   --btn-text: #409eff;
   --btn-border: #409eff;
   --btn-hover-bg: #66b1ff;
-  --btn-hover-text: #ffffff;
+  --btn-hover-text: #0d1117;
   --btn-hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   /* 图标样式 */
   --icon-filter: brightness(0.7);
@@ -357,27 +357,69 @@ aside.glass-effect {
   filter: var(--icon-hover-drop-shadow);
 }
 
-aside>.back-btn {
+aside > .back-btn {
   width: 130px;
-  height: 32px;
-  border: 2px solid var(--btn-border);
-  background: linear-gradient(145deg, var(--btn-bg), rgba(64, 158, 255, 0.05));
+  height: 36px;
+  line-height: 36px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
   color: var(--btn-text);
   text-align: center;
-  margin-bottom: 10px;
-  line-height: 30px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  border-radius: 4px;
+  transition: all 0.3s ease; /* 延长过渡时间，让效果更明显 */
+  border-radius: 8px;
   position: absolute;
-  bottom: 10px;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
-aside>.back-btn:hover {
-  background: linear-gradient(145deg, var(--btn-hover-bg), oklch(65% 0.13 240));
+/* 暗色模式基础阴影强化 */
+.dark-theme aside > .back-btn {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3); /* 暗色下阴影更深，增强边界感 */
+}
+
+/* hover状态：强化阴影+明显发光效果 */
+aside > .back-btn:hover {
+  background: var(--btn-hover-bg);
   color: var(--btn-hover-text);
-  transform: scale(1.05);
-  box-shadow: var(--btn-hover-shadow);
+  transform: translateX(-50%) translateY(-2px) scale(1.03); /* 动效更明显 */
+  border-color: transparent;
+  /* 核心发光+阴影：根据主题调整颜色和强度 */
+}
+
+/* 暗色模式hover效果 */
+.dark-theme aside > .back-btn:hover {
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.4), /* 深色阴影增强立体感 */
+    0 0 8px rgba(100, 180, 255, 0.5); /* 蓝色发光，亮度提高 */
+}
+
+/* 浅色模式hover效果 */
+.light-theme aside > .back-btn:hover {
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.2), /* 浅色阴影 */
+    0 0 8px rgba(64, 158, 255, 0.4); /* 更明显的蓝色发光 */
+}
+
+/* 点击状态：发光减弱，阴影收缩，反馈清晰 */
+aside > .back-btn:active {
+  transform: translateX(-50%) scale(1.01);
+}
+
+.dark-theme aside > .back-btn:active {
+  box-shadow: 
+    0 2px 6px rgba(0, 0, 0, 0.3),
+    0 0 4px rgba(100, 180, 255, 0.3); /* 发光减弱 */
+}
+
+.light-theme aside > .back-btn:active {
+  box-shadow: 
+    0 2px 6px rgba(0, 0, 0, 0.15),
+    0 0 4px rgba(64, 158, 255, 0.2); /* 发光减弱 */
 }
 
 main {

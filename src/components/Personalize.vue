@@ -1,30 +1,15 @@
 <template>
   <div class="settings-panel" :class="{ 'glass-effect': glassEffect }">
     <div class="settings-panel-card">
-      <div class="card-title">选择纯色背景：</div>
+      <div class="card-title">选择背景：</div>
       <div class="card-content">
-        <input type="color" v-model="color" @input="applyColor" />
-        <!-- 预览当前颜色 -->
-        <div class="color-preview" :style="{ backgroundColor: color }"></div>
-      </div>
-    </div>
-
-    <div class="settings-panel-card">
-      <div class="card-title">渐变背景：</div>
-      <div class="card-content">
-        <!-- 优化：让用户选择渐变方向和颜色 -->
-        <div class="gradient-controls">
-          <select v-model="gradientDirection" @change="updateGradient">
-            <option value="to right">从左到右</option>
-            <option value="to bottom">从上到下</option>
-            <option value="135deg">对角线（135°）</option>
-          </select>
-          <input type="color" v-model="gradientColor1" @input="updateGradient" placeholder="颜色1" />
-          <input type="color" v-model="gradientColor2" @input="updateGradient" placeholder="颜色2" />
+        <!-- 预设主题色区域 -->
+        <div class="theme-colors">
+          <button v-for="(col, idx) in themeColors" :key="idx" :style="{ backgroundColor: col }"
+            :class="{ active: color === col }" @click="selectThemeColor(col)"></button>
         </div>
-        <button @click="applyGradient" class="mt-2">应用渐变</button>
-        <!-- 渐变预览 -->
-        <div class="gradient-preview" :style="{ backgroundImage: gradient }"></div>
+        <!-- 自定义颜色选择器 -->
+        <input type="color" v-model="color" @input="applyColor" />
       </div>
     </div>
 
@@ -73,17 +58,17 @@
         <button @click="confirmReset" class="primary-btn">确认重置</button>
       </div>
     </dialog>
-  </div>
 
-  <!-- 操作按钮：增加样式区分主要/次要按钮 -->
-  <div class="button-group">
-    <button @click="saveSettings" class="primary-btn">💾 保存</button>
-    <button @click="openDialog" class="secondary-btn">🔄 重置</button>
+    <!-- 操作按钮：增加样式区分主要/次要按钮 -->
+    <div class="button-group">
+      <button @click="saveSettings" class="primary-btn">💾 保存</button>
+      <button @click="openDialog" class="secondary-btn">🔄 重置</button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch ,defineProps} from 'vue'
+import { ref, onMounted, watch, defineProps } from 'vue'
 
 // 1. 定义接口（严格类型约束）
 interface BackgroundSettings {
@@ -111,16 +96,21 @@ const currentType = ref<BackgroundSettings['type']>('color')
 const color = ref('#ffffff') // 默认白色
 const imagePath = ref('')
 const blur = ref(0)
-const gradient = ref('linear-gradient(to right, #ff9a9e, #fad0c4)') // 默认渐变
-// 新增：渐变自定义状态
-const gradientDirection = ref('to right')
-const gradientColor1 = ref('#ff9a9e')
-const gradientColor2 = ref('#fad0c4')
-
 const darkMode = ref(false)
 const saved = ref(false)
 const dialogRef = ref<HTMLDialogElement | null>(null)
 const isTilting = ref(false)
+// 预设主题色列表（可根据设计图补充更多颜色）
+const themeColors = ref([
+  '#4CD964', // 绿色（示例）
+  '#5AC8FA', // 浅蓝（示例）
+  '#007AFF', // 蓝色（示例）
+  '#5856D6', // 紫蓝（示例）
+  '#AF52DE', // 紫色（示例）
+  '#FF2D55', // 红色（示例）
+  '#FF9500', // 橙色（示例）
+  '#FFCC00', // 黄色（示例）
+]);
 
 // 4. 对话框相关逻辑
 const openDialog = () => dialogRef.value?.showModal()
@@ -132,7 +122,6 @@ const closeDialog = () => {
 // 5. 纯色背景逻辑（增加即时预览）
 const applyColor = () => {
   imagePath.value = ''
-  gradient.value = ''
   currentType.value = 'color'
   emit('update-background', {
     type: 'color',
@@ -140,18 +129,11 @@ const applyColor = () => {
   })
 }
 
-// 6. 渐变背景逻辑（支持用户自定义）
-const updateGradient = () => {
-  gradient.value = `linear-gradient(${gradientDirection.value}, ${gradientColor1.value}, ${gradientColor2.value})`
-}
-const applyGradient = () => {
-  imagePath.value = ''
-  currentType.value = 'gradient'
-  emit('update-background', {
-    type: 'gradient',
-    gradient: gradient.value
-  })
-}
+// 点击预设主题色时的逻辑
+const selectThemeColor = (col: string) => {
+  color.value = col; // 更新选中颜色
+  applyColor(); // 触发背景更新
+};
 
 // 7. 图片上传逻辑（优化异步处理）
 const handleImageUpload = (event: Event) => {
@@ -163,7 +145,6 @@ const handleImageUpload = (event: Event) => {
   reader.onload = (e) => {
     const result = e.target?.result as string
     imagePath.value = result
-    gradient.value = ''
     applyImage()
   }
   reader.onerror = () => {
@@ -203,7 +184,6 @@ const saveSettings = () => {
     color: currentType.value === 'color' ? color.value : undefined,
     imagePath: currentType.value === 'image' ? imagePath.value : undefined,
     blur: currentType.value === 'image' ? blur.value : undefined,
-    gradient: currentType.value === 'gradient' ? gradient.value : undefined
   }
   // 同时保存背景和主题到localStorage
   localStorage.setItem('userSettings', JSON.stringify(settings))
@@ -221,10 +201,6 @@ const resetSettings = () => {
   color.value = '#ffffff'
   imagePath.value = ''
   blur.value = 0
-  gradient.value = 'linear-gradient(to right, #ff9a9e, #fad0c4)'
-  gradientDirection.value = 'to right'
-  gradientColor1.value = '#ff9a9e'
-  gradientColor2.value = '#fad0c4'
   currentType.value = 'color'
 
   // 重置主题状态（恢复为系统默认）
@@ -270,7 +246,6 @@ onMounted(() => {
         imagePath.value = settings.imagePath || ''
         blur.value = settings.blur || 0
       }
-      if (currentType.value === 'gradient') gradient.value = settings.gradient || 'linear-gradient(to right, #ff9a9e, #fad0c4)'
       // 初始化时通知父组件应用保存的背景
       emit('update-background', settings)
     } catch (e) {
@@ -298,7 +273,7 @@ watch(darkMode, applyTheme)
   backdrop-filter: blur(12px);
 }
 
-.settings-panel.glass-effect{
+.settings-panel.glass-effect {
   background-color: var(--panel-bg);
   backdrop-filter: blur(12px);
 }
@@ -319,12 +294,50 @@ watch(darkMode, applyTheme)
 .card-content {
   align-items: center;
   display: flex;
-  max-height: 55px;
   gap: 1rem;
   padding: 10px 20px;
   box-shadow: var(--card-shadow), var(--card-glow);
   border-radius: 5px;
   background-color: var(--card-bg);
+}
+
+/* 容器 */
+.theme-colors {
+  max-width: 250px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  min-height: 50px;
+}
+
+/* 按钮本体尺寸恒定 32×32 */
+.theme-colors button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  transition: transform .25s cubic-bezier(.4, 1.8, .6, 1),
+    outline-offset .25s ease;
+  outline: 2px solid transparent;
+  outline-offset: 0;
+}
+
+/* 选中态：仅内部放大 + 白框 */
+.theme-colors button.active {
+  outline-color: #fff;
+  outline-offset: 2px;
+  /* 白框与按钮留 2 px 空隙 */
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}
+
+/* 悬停微反馈 */
+.theme-colors button:hover {
+  transform: scale(1.06);
 }
 
 .gradient-controls select {
