@@ -3,8 +3,12 @@
         <div class="background"></div>
         <div class="content">
             <aside>
-                <div class="add-mod-btn" @click="selectModFolder">添加MOD</div>
-                <div class="setting-btn" @click="goToSettings">设置</div>
+                <div class="add-mod-btn" @click="selectModFolder">
+                    <img :src="isDark ? addModDarkIcon : addModLightIcon" alt="添加MOD图标"  />
+                </div>
+                <div class="setting-btn" @click="goToSettings">
+                    <img :src="isDark ? settingLightIcon : settingDarkIcon" alt="添加MOD图标"  />
+                </div>
             </aside>
             <main>
                 <!-- 搜索框 -->
@@ -35,6 +39,11 @@ import { reactive, computed, ref, onMounted, watch } from 'vue'
 import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
 import { useRouter } from 'vue-router'
+
+import addModLightIcon from '../assets/添加.svg'
+import addModDarkIcon from '../assets/添加 (1).svg'
+import settingLightIcon from '../assets/设置.svg'
+import settingDarkIcon from '../assets/设置 (1).svg'
 
 const activeTap = ref('全部') // 默认为全部
 const selectedMods = ref<string[]>([])
@@ -441,27 +450,25 @@ input {
 }
 
 .HomePage aside {
-    height: 100%;
-    width: 192px;
+    height: calc(100% - 40px);
+    width: 44px;
     box-sizing: border-box;
     backdrop-filter: blur(20px);
     background-color: var(--aside-bg);
     position: relative;
-    padding: 20px 10px 10px 10px;
     box-shadow: 10px 0 10px -5px rgba(0, 0, 0, 0.3);
-    flex: 0 0 192px;
+    margin:20px;
+    padding: 5px 0;
     display: flex;
     justify-content: center;
+    border-radius: 25px;
 }
 
 aside>div {
-    width: 130px;
+    width: 36px;
     height: 36px;
-    border: 1px solid var(--btn-border);
-    background: var(--btn-bg);
     color: var(--btn-text);
     text-align: center;
-    margin-bottom: 12px;
     line-height: 36px;
     cursor: pointer;
     transition: all 0.25s ease;
@@ -470,6 +477,7 @@ aside>div {
     font-weight: 500;
     /* 基础阴影：主题自适应 */
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    border-radius: 25px;
 }
 
 /* 侧边栏按钮hover状态（阴影+发光） */
@@ -496,7 +504,7 @@ aside>.setting-btn:active {
 
 .setting-btn {
     position: absolute;
-    bottom: 0px;
+    bottom: 5px;
 }
 
 .HomePage main {

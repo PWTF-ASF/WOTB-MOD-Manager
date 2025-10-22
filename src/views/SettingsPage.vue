@@ -276,7 +276,7 @@ aside {
 
 aside.glass-effect {
   background-color: var(--aside-bg);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(20px);
 }
 
 .aside-card-list {
