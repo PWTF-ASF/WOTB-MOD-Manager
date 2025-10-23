@@ -10,7 +10,7 @@
           <div class="aside-card-list-item" v-for="item in asideList" :key="item.activeItem"
             @click="activeItem = item.activeItem" :class="{ 'active': activeItem === item.activeItem }">
             <span class="indicator"></span>
-            <img :src="getItemIcon(item)" />
+            <img :src="asideItemIcon(item)" />
             <span>{{ item.name }}</span>
           </div>
         </div>
@@ -47,7 +47,6 @@ import SettingItem from '../components/SettingItem.vue'
 //定义asidelist的接口
 interface asideList {
   name: string;
-  activeItem: string;
   lightIcon: string;
   darkIcon: string;
 }
@@ -55,7 +54,7 @@ interface asideList {
 const activeItem = ref('setting') //默认选择基本设置页
 const router = useRouter() //路由
 const isDark = ref(false);  // 父组件的主题状态，后续由子组件同步
-const handleDarkModeUpdate = (childDarkMode: boolean) => {  // 2. 接收子组件传递的 darkMode：更新父组件的 isDark
+const handleDarkModeUpdate = (childDarkMode: boolean) => {  // 接收子组件传递的 darkMode：更新父组件的 isDark
   isDark.value = childDarkMode; // 子组件的darkMode同步到父组件
 };
 const glassEffectEnabled = ref(false);   // 默认不启用毛玻璃效果
@@ -63,7 +62,7 @@ const childglassEffectUpdate = (childGlassEffect: boolean) => {  // 接收子组
   glassEffectEnabled.value = childGlassEffect; // 子组件的glassEffectEnabled同步到父组件
 };
 //动态切换明暗模式下的图标
-const getItemIcon = (item: asideList) => {
+const asideItemIcon = (item: asideList) => {
   return isDark.value
     ? item.darkIcon  // 暗色主题用深色图标
     : item.lightIcon;  // 亮色主题用浅色图标
@@ -266,7 +265,7 @@ aside {
   padding: 10px 20px;
   color: var(--text-color);
   box-shadow: 10px 0 20px -10px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(15px);
   background-color: var(--aside-bg-no-filter);
   border-right: 1px solid rgba(255, 255, 255, 0.05);
   /* 增加细微边框增强层次感 */
@@ -388,7 +387,6 @@ aside > .back-btn:hover {
   color: var(--btn-hover-text);
   transform: translateX(-50%) translateY(-2px) scale(1.03); /* 动效更明显 */
   border-color: transparent;
-  /* 核心发光+阴影：根据主题调整颜色和强度 */
 }
 
 /* 暗色模式hover效果 */

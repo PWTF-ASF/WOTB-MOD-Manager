@@ -4,10 +4,12 @@
         <div class="content">
             <aside>
                 <div class="add-mod-btn" @click="selectModFolder">
-                    <img :src="isDark ? addModDarkIcon : addModLightIcon" alt="添加MOD图标"  />
+                    <img :src="AddModBtnIcon()">
+                    添加MOD
                 </div>
                 <div class="setting-btn" @click="goToSettings">
-                    <img :src="isDark ? settingLightIcon : settingDarkIcon" alt="添加MOD图标"  />
+                    <img :src="SettingBtnIcon()">
+                    设置
                 </div>
             </aside>
             <main>
@@ -40,15 +42,21 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
 import { useRouter } from 'vue-router'
 
-import addModLightIcon from '../assets/添加.svg'
-import addModDarkIcon from '../assets/添加 (1).svg'
 import settingLightIcon from '../assets/设置.svg'
 import settingDarkIcon from '../assets/设置 (1).svg'
+import addModLightIcon from '../assets/添加.svg'
+import addModDarkIcon from '../assets/添加 (1).svg'
 
 const activeTap = ref('全部') // 默认为全部
 const selectedMods = ref<string[]>([])
 const searchQuery = ref('')
 const router = useRouter()
+const SettingBtnIcon = () => {
+    return isDark.value ? settingDarkIcon : settingLightIcon;
+}
+const AddModBtnIcon = () => {
+    return isDark.value ? addModDarkIcon : addModLightIcon;
+}
 const isDark = ref<boolean>(
     (() => {
         const savedMode = localStorage.getItem('darkMode');
@@ -333,12 +341,13 @@ watch(isDark, (newMode) => {
     --indicator-bg: #3b82f6;
     /* 按钮样式 */
     --btn-bg: rgba(64, 158, 255, 0.18);
-    /* 加深背景 */
     --btn-text: oklch(65% 0.12 240);
     --btn-border: oklch(65% 0.12 240);
     --btn-hover-bg: oklch(70% 0.13 240);
     --btn-hover-text: #ffffff;
-    --btn-hover-shadow: 0 4px 12px hsl(220 40% 0% / 0.5);
+    --btn-hover-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    /* 暗色模式阴影 */
+    --btn-hover-glow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 12px rgba(255, 255, 255, 0.5);
     /* 危险操作变量 */
     --danger-border: rgba(245, 108, 108, 0.4);
     --danger-bg: rgba(245, 108, 108, 0.15);
@@ -349,15 +358,6 @@ watch(isDark, (newMode) => {
     --primary-color: #4096ff;
     --primary-text: #fff;
     --primary-hover: #3684e6;
-    /* 图标样式 */
-    --icon-filter: brightness(0.9);
-    --icon-hover-filter: brightness(1);
-    --icon-hover-drop-shadow: drop-shadow(0 0 10px rgba(221, 245, 255, 0.8));
-    /* 下拉框样式 */
-    --select-border: 1px solid #cbd5e1;
-    --select-box-shadow: 0 0 0 1px rgba(203, 213, 225, 0.3);
-    --select-focus-boder: #94a3b8;
-    --select-focus-box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.2);
     /* 卡片样式 */
     --card-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
     --card-glow: 0 0 5px rgba(255, 255, 255, 0.3);
@@ -382,11 +382,16 @@ watch(isDark, (newMode) => {
     /* 按钮样式 */
     --btn-bg: #e6f7ff;
     /* 浅主色背景 */
+    --btn-bg: #e6f7ff;
     --btn-text: #409eff;
     --btn-border: #b3d8ff;
     --btn-hover-bg: #66b1ff;
     --btn-hover-text: #0d1117;
-    --btn-hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    --btn-hover-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    /* 浅色模式阴影（加深） */
+    --btn-hover-glow: 0 0 8px rgba(64, 158, 255, 0.4);
+    /* 浅色模式弱发光 */
+
     /* 危险操作变量 */
     --danger-border: rgba(245, 108, 108, 0.3);
     --danger-bg: #fff5f5;
@@ -397,15 +402,6 @@ watch(isDark, (newMode) => {
     --primary-color: #4096ff;
     --primary-text: #fff;
     --primary-hover: #3684e6;
-    /* 图标样式 */
-    --icon-filter: brightness(0.7);
-    --icon-hover-filter: brightness(0.6);
-    --icon-hover-drop-shadow: drop-shadow(0 0 8px rgba(38, 41, 42, 0.8));
-    /* 下拉框样式 */
-    --select-border: 1px solid #334155;
-    --select-box-shadow: 0 0 0 1px rgba(51, 65, 85, 0.3);
-    --select-focus-boder: #64748b;
-    --select-focus-box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.2);
     /* 卡片样式 */
     --card-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     --card-glow: 0 0 3px rgba(255, 255, 255, 0.5);
@@ -450,34 +446,35 @@ input {
 }
 
 .HomePage aside {
-    height: calc(100% - 40px);
-    width: 44px;
+    height: 100%;
+    width: 192px;
     box-sizing: border-box;
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(15px);
     background-color: var(--aside-bg);
     position: relative;
+    padding: 20px 10px 10px 10px;
     box-shadow: 10px 0 10px -5px rgba(0, 0, 0, 0.3);
-    margin:20px;
-    padding: 5px 0;
+    flex: 0 0 192px;
     display: flex;
     justify-content: center;
-    border-radius: 25px;
 }
 
 aside>div {
-    width: 36px;
+    width: 130px;
     height: 36px;
+    border: 1px solid var(--btn-border);
+    background: var(--btn-bg);
     color: var(--btn-text);
     text-align: center;
+    margin-bottom: 12px;
     line-height: 36px;
     cursor: pointer;
     transition: all 0.25s ease;
     border-radius: 10px;
     font-size: 14px;
     font-weight: 500;
-    /* 基础阴影：主题自适应 */
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-    border-radius: 25px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    /* 默认基础阴影 */
 }
 
 /* 侧边栏按钮hover状态（阴影+发光） */
@@ -485,26 +482,56 @@ aside>.add-mod-btn:hover,
 aside>.setting-btn:hover {
     background: var(--btn-hover-bg);
     color: var(--btn-hover-text);
-    transform: translateY(-2px);
+    transform: translateY(-2px) scale(1.03);
     border-color: transparent;
-    /* 阴影+淡蓝色发光 */
-    box-shadow:
-        var(--btn-hover-shadow),
-        0 0 8px rgba(64, 158, 255, 0.4);
+    /* 悬停时去掉边框，突出阴影 */
+    box-shadow: var(--btn-hover-shadow), var(--btn-hover-glow);
+    /* 直接使用主题变量 */
 }
 
-/* 侧边栏按钮active状态（阴影收缩+发光减弱） */
-aside>.add-mod-btn:active,
-aside>.setting-btn:active {
+/* 侧边栏按钮active状态 */
+.dark-theme aside>.add-mod-btn:active,
+.dark-theme aside>.setting-btn:active {
     transform: translateY(0);
-    box-shadow:
-        0 2px 6px var(--dark-theme, rgba(0, 0, 0, 0.2)) var(--light-theme, rgba(0, 0, 0, 0.1)),
-        0 0 4px var(--dark-theme, rgba(100, 180, 255, 0.2)) var(--light-theme, rgba(64, 158, 255, 0.15));
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2), 0 0 4px rgba(100, 180, 255, 0.2);
+}
+
+.light-theme aside>.add-mod-btn:active,
+.light-theme aside>.setting-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1), 0 0 4px rgba(64, 158, 255, 0.15);
+}
+
+.add-mod-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.add-mod-btn img {
+    width: 24px;
+    height: 24px;
 }
 
 .setting-btn {
     position: absolute;
-    bottom: 5px;
+    bottom: 0px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.setting-btn img {
+    width: 24px;
+    height: 24px;
+    animation: rotate 2s linear infinite;
+    animation-play-state: paused;
+}
+
+.setting-btn img:hover {
+    animation-play-state: running;
 }
 
 .HomePage main {
@@ -512,7 +539,7 @@ aside>.setting-btn:active {
     height: 100%;
     position: relative;
     flex: 1;
-    padding: 20px;
+    padding: 20px 20px 20px 0;
     box-sizing: border-box;
 }
 
@@ -520,7 +547,8 @@ main>.search-box {
     width: 100%;
     height: 40px;
     box-sizing: border-box;
-    margin-bottom: 20px;
+    margin: 0 0 20px 20px;
+    padding-right: 20px;
 }
 
 .search-box>input {
@@ -540,7 +568,7 @@ main>.search-box {
 .mod-list {
     width: 100%;
     height: 400px;
-    padding: 0px 20px 10px 20px;
+    padding: 0px 0 0 20px;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -620,6 +648,10 @@ main>.search-box {
     justify-content: flex-end;
     gap: 10px;
     padding: 20px;
+    /* 顶部边框 */
+    border-top: 2px solid rgba(255, 255, 255);
+    /* 关键：内阴影只在顶部边框下方显示（y轴偏移为正，范围限制在小高度） */
+    box-shadow: inset 0 4px 4px -2px rgba(0, 0, 0, 0.3);
 }
 
 footer> :last-child {
@@ -639,7 +671,7 @@ footer>div {
     font-size: 14px;
     font-weight: 500;
     /* 基础阴影：主题自适应 */
-    box-shadow: 0 2px 4px var(--dark-theme, rgba(0, 0, 0, 0.2)) var(--light-theme, rgba(0, 0, 0, 0.08));
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 /* 1. 加载MOD（次要操作） */
@@ -713,5 +745,16 @@ footer>.start-game-btn:active {
     box-shadow:
         0 2px 6px rgba(0, 0, 0, 0.1),
         0 0 5px var(--dark-theme, rgba(80, 170, 255, 0.3)) var(--light-theme, rgba(64, 158, 255, 0.25));
+}
+
+/* 旋转动画定义 */
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 </style>
