@@ -7,9 +7,8 @@
         <div class="theme-colors">
           <button v-for="(col, idx) in themeColors" :key="idx" :style="{ backgroundColor: col }"
             :class="{ active: color === col }" @click="selectThemeColor(col)"></button>
+          <input class="applycolor" type="color" v-model="color" @input="applyColor" />
         </div>
-        <!-- 自定义颜色选择器 -->
-        <input type="color" v-model="color" @input="applyColor" />
       </div>
     </div>
 
@@ -20,7 +19,6 @@
       </div>
       <div class="card-content">
         <input type="file" accept="image/*" @change="handleImageUpload" />
-        <!-- 优化：用v-show避免DOM频繁销毁/创建，初始隐藏 -->
         <input v-show="imagePath" type="range" min="0" max="20" v-model="blur" @input="applyImage" />
       </div>
     </div>
@@ -327,17 +325,35 @@ watch(darkMode, applyTheme)
   outline-offset: 0;
 }
 
-/* 选中态：仅内部放大 + 白框 */
-.theme-colors button.active {
-  outline-color: #fff;
-  outline-offset: 2px;
-  /* 白框与按钮留 2 px 空隙 */
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
-}
-
 /* 悬停微反馈 */
 .theme-colors button:hover {
   transform: scale(1.06);
+}
+
+.theme-colors .applycolor {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  background-color: transparent;
+  background-image: url('../assets/调色板.svg');
+  background-size: cover;
+  transition: transform .25s cubic-bezier(.4, 1.8, .6, 1),
+    outline-offset .25s ease;
+}
+
+.theme-colors .applycolor:hover {
+  transform: scale(1.06);
+}
+
+.theme-colors .applycolor::-webkit-color-swatch {
+  border: none;
+  border-radius: 5px;
+  /* 与外层保持一致 */
+  background: transparent;
+  /* 完全透明，露出背景图 */
 }
 
 .gradient-controls select {
