@@ -186,6 +186,8 @@ onMounted(async () => {
   /* 卡片样式 */
   --card-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
   --card-glow: 0 0 5px rgba(255, 255, 255, 0.3);
+  /* 调色板背景 */
+  --applycolor-bg: url('../assets/调色板 (1).svg');
 }
 
 /* 浅色模式 */
@@ -223,6 +225,8 @@ onMounted(async () => {
   /* 卡片样式 */
   --card-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   --card-glow: 0 0 3px rgba(255, 255, 255, 0.5);
+  /* 调色板背景 */
+  --applycolor-bg: url('../assets/调色板.svg');
 }
 
 .settingsPage {

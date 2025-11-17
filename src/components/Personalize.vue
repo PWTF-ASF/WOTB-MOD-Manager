@@ -338,7 +338,7 @@ watch(darkMode, applyTheme)
   border-radius: 5px;
   cursor: pointer;
   background-color: transparent;
-  background-image: url('../assets/调色板.svg');
+  background-image: var(--applycolor-bg);
   background-size: cover;
   transition: transform .25s cubic-bezier(.4, 1.8, .6, 1),
     outline-offset .25s ease;
