@@ -1,10 +1,19 @@
 <template>
     <!-- 顶部信息栏 -->
     <header class="top-deck">
-        <div class="search-module">
-            <span class="search-icon"><img src="@/assets/vue.svg" /></span>
-            <input type="text" placeholder="搜索mod..." />
+        <div class="search-container">
+            <div class="search-module">
+                <span class="search-icon"><img src="@/assets/vue.svg" /></span>
+                <input type="text" />
+            </div>
         </div>
+
+        <!-- 布局切换按钮 -->
+        <button class="layout-toggle" @click="toggleLayout" :title="isGridLayout ? '切换为列表布局' : '切换为网格布局'">
+            <span class="layout-icon">{{ isGridLayout ? '☰' : '□' }}</span>
+            <span class="layout-text">{{ isGridLayout ? '列表' : '网格' }}</span>
+        </button>
+
         <div class="stats-module">
             <div class="stat-item">
                 <span class="stat-num">42</span>
@@ -18,7 +27,7 @@
     </header>
 
     <!-- 中间列表：卡片式流 -->
-    <section class="modules-grid">
+    <section class="modules-grid" :class="{ 'grid-layout': isGridLayout, 'list-layout': !isGridLayout }">
         <div class="mod-card active-card">
             <div class="status-indicator"></div>
             <div class="card-content">
@@ -54,7 +63,7 @@
         </div>
 
         <div class="mod-card" v-for="n in 6" :key="n">
-            <div class="status-indicator"></div>
+            <div class="status-indicator inactive"></div>
             <div class="card-content">
                 <div class="mod-header">
                     <span class="mod-title">通用前置库 Lib_{{ n }}</span>
@@ -90,23 +99,47 @@
     </footer>
 </template>
 
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { ref } from 'vue';
+
+// 控制布局切换的状态：true为网格布局（两列），false为列表布局（一列）
+const isGridLayout = ref(true);
+
+// 切换布局的方法
+const toggleLayout = () => {
+    isGridLayout.value = !isGridLayout.value;
+};
+</script>
 
 <style scoped>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    border: none;
+}
+
 /* --- 顶部栏 --- */
 .top-deck {
     height: 80px;
-    padding: 0 40px;
+    padding-left: 40px;
+    padding-right: 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    /* 防止被压缩 */
     flex-shrink: 0;
+}
+
+/* 搜索框和布局切换按钮容器 */
+.search-container {
+    display: flex;
+    align-items: center;
 }
 
 .search-module {
     position: relative;
     width: 400px;
+    display: block;
 }
 
 .search-icon {
@@ -117,6 +150,7 @@
     color: var(--text-dim);
     font-size: 18px;
     margin-left: 5px;
+    z-index: 2;
 }
 
 .search-icon img {
@@ -127,31 +161,85 @@
 .search-module input {
     width: 100%;
     height: 44px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
+    background: var(--def-col-fltr);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-radius: 25px;
     padding-left: 45px;
     color: var(--text-main);
     font-family: inherit;
     font-size: 16px;
     transition: all 0.3s;
+    box-shadow: 0 0 32px rgba(0, 0, 0, 0.15);
+}
+
+.search-module input:hover {
+    background: var(--def-col-fltr-hover);
+    backdrop-filter: blur(12px);
 }
 
 .search-module input:focus {
     border-radius: 5px;
+    background: rgb(242, 243, 244);
     border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(61, 90, 254, 0.2);
+    box-shadow: 0 0 12px var(--accent-glow);
 }
 
-.stats-module {
+/* 布局切换按钮样式 */
+.layout-toggle {
+    height: 44px;
+    padding: 0 16px;
+    background: var(--def-col-fltr);
+    backdrop-filter: blur(12px);
+    border-radius: 25px;
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
     display: flex;
-    gap: 30px;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s;
+    box-shadow: 0 0 32px rgba(0, 0, 0, 0.15);
+}
+
+.layout-toggle:hover {
+    background: var(--def-col-fltr-hover);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.layout-toggle:active {
+    transform: scale(0.96);
+}
+
+.layout-icon {
+    font-size: 18px;
+}
+
+.layout-text {
+    font-weight: 500;
+}
+
+/* 模组状态统计信息 */
+.stats-module {
+    width: 120px;
+    height: 44px;
+    display: flex;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px);
+    border-radius: 25px;
+    justify-content: space-around;
+    position: relative;
+    overflow: visible;
+    box-shadow: 0 0 32px rgba(0, 0, 0, 0.15);
 }
 
 .stat-item {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
+    align-items: center;
 }
 
 .stat-num {
@@ -176,12 +264,21 @@
     flex: 1;
     padding: 10px 40px 0;
     overflow-y: auto;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     grid-auto-rows: max-content;
     gap: 15px;
-    /* 底部留出 Control Deck 的高度 + 20px 边距 */
     padding-bottom: 110px;
+}
+
+/* 网格布局（两列） */
+.modules-grid.grid-layout {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+/* 列表布局（一列） */
+.modules-grid.list-layout {
+    display: grid;
+    grid-template-columns: 1fr;
 }
 
 .modules-grid::-webkit-scrollbar {
@@ -198,8 +295,6 @@
 }
 
 .mod-card {
-    /* background: var(--bg-card); */
-    /* border: 1px solid var(--border); */
     border-radius: 6px;
     padding: 15px;
     display: flex;
@@ -210,22 +305,30 @@
         box-shadow 0.2s;
     overflow: hidden;
     backdrop-filter: blur(12px);
+    box-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.25),
+        /* 主阴影 */
+        0 2px 6px rgba(0, 0, 0, 0.15);
+    /* 次阴影 */
+}
+
+/* 列表布局下的卡片样式优化 */
+.list-layout .mod-card {
+    padding: 20px;
 }
 
 .mod-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.5);
-    border-color: #444;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25),
+        /* 主阴影 */
+        0 2px 15px rgba(0, 0, 0, 0.15);
 }
 
 .active-card {
     border-left: 2px solid var(--success);
-    /* 仅左边框发光：水平偏移向左，垂直压缩光晕范围，限制模糊半径 */
     box-shadow:
         -3px 0 8px -1px rgba(0, 230, 118, 0.5),
-        /* 左侧核心发光（仅左右方向扩散） */
         0 0 0 0 transparent;
-    /* 其他方向无发光 */
     transition:
         box-shadow 0.3s ease,
         transform 0.2s ease;
@@ -235,9 +338,7 @@
     border-left: 2px solid var(--success);
     box-shadow:
         -4px 0 12px -1px rgba(0, 230, 118, 0.7),
-        /* 左边框发光增强 */
         0 0 0 0 transparent;
-    /* 保留卡片悬浮阴影，不影响左右发光 */
     transform: translateY(-2px);
 }
 
@@ -258,6 +359,23 @@
 .card-content {
     flex: 1;
     min-width: 0;
+}
+
+/* 列表布局下的内容样式优化 */
+.list-layout .card-content {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.list-layout .mod-header {
+    margin-bottom: 0;
+}
+
+.list-layout .mod-desc {
+    white-space: normal;
+    line-height: 1.4;
+    max-width: 600px;
 }
 
 .mod-header {
@@ -452,6 +570,28 @@ input:checked+.slider:before {
 
     100% {
         left: 100%;
+    }
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .search-container {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .search-module {
+        width: 100%;
+    }
+
+    .layout-toggle {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .modules-grid.grid-layout {
+        grid-template-columns: 1fr;
     }
 }
 </style>

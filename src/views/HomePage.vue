@@ -10,35 +10,26 @@
 
       <nav class="nav-links">
         <div class="nav-item" :class="{ active: NavLinksId === 1 }" @click="NavLinksId = 1">
-          <span class="icon"
-            ><img
-              :src="
-                DarkMode
-                  ? NavLinksId === 1
-                    ? HomeDarkActiveIcon
-                    : HomeDarkIcon
-                  : NavLinksId === 1
-                    ? HomeActiveIcon
-                    : HomeIcon
-              "
-              alt="模组库"
-          /></span>
+          <span class="icon"><img :src="DarkMode
+            ? NavLinksId === 1
+              ? HomeDarkActiveIcon
+              : HomeDarkIcon
+            : NavLinksId === 1
+              ? HomeActiveIcon
+              : HomeIcon
+            " alt="模组库" /></span>
           <span class="label">模组库</span>
         </div>
         <div class="nav-item" :class="{ active: NavLinksId === 2 }" @click="NavLinksId = 2">
           <span class="icon">
-            <img
-              :src="
-                DarkMode
-                  ? NavLinksId === 2
-                    ? SettingDarkActiveIcon
-                    : SettingDarkIcon
-                  : NavLinksId === 2
-                    ? SettingActiveIcon
-                    : SettingIcon
-              "
-              alt="设置"
-            />
+            <img :src="DarkMode
+              ? NavLinksId === 2
+                ? SettingDarkActiveIcon
+                : SettingDarkIcon
+              : NavLinksId === 2
+                ? SettingActiveIcon
+                : SettingIcon
+              " alt="设置" />
           </span>
           <span class="label">系统设置</span>
         </div>
@@ -89,15 +80,27 @@ const DarkMode = ref(false)
 @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap');
 
 :root {
-  --bg-deep: #0f1115;
-  --bg-panel: #161920;
-  --bg-card: #1c2029;
+  --aside-bg: #0f1115;
+  /* 侧边栏背景色 */
+  --def-col: rgb(239, 245, 255);
+  /* 默认颜色 */
+  --def-col-fltr: rgba(239, 245, 255, 0.03);
+  /* 默认模糊颜色 */
+  --def-col-hover: rgba(217, 215, 215, 1);
+  /* 默认hover状态颜色 */
+  --def-col-fltr-hover: rgba(217, 215, 215, 0.5);
+  /* 默认hover状态模糊颜色 */
   --accent: #3d5afe;
+  /* 主强调色（品牌色） */
   --accent-glow: rgba(61, 90, 254, 0.4);
+  /* 强调色光晕 */
   --text-main: #ffffff;
+  /* 主要文本色（正常可读性文本） */
   --text-dim: #6b7280;
+  /* 次要文本色（辅助说明、禁用状态文本） */
   --success: #00e676;
-  --border: #2a2f3a;
+  /* 成功状态色（如安装完成、操作成功） */
+  --border: #3a3d47;
 }
 
 html,
@@ -106,7 +109,7 @@ body {
   padding: 0;
   width: 100%;
   height: 100%;
-  background-color: var(--bg-deep);
+  background-color: var(--aside-bg);
   color: var(--text-main);
   font-family: 'Rajdhani', 'Segoe UI', sans-serif;
   overflow: hidden;
@@ -114,20 +117,20 @@ body {
 </style>
 
 <style scoped>
-/* 样式部分保持原样，未添加额外包裹层样式 */
 .command-center {
   display: flex;
   width: 100vw;
   height: 100vh;
 }
 
-.background{
+.background {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   background-image: url('@/assets/123517794_p0.jpg');
+  /* background-color: #444; */
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
@@ -137,7 +140,7 @@ body {
 /* ================= 侧边栏 ================= */
 .sidebar {
   width: 90px;
-  background-color: var(--bg-deep);
+  background-color: var(--aside-bg);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
