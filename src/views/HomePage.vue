@@ -44,11 +44,7 @@
     <main class="main-viewport">
       <ModLibrary v-if="NavLinksId === 1" />
       <!-- 3. 系统设置占位 (Settings) -->
-      <template v-if="NavLinksId === 2">
-        <div style="display: flex; justify-content: center; align-items: center; height: 100%; color: #666">
-          系统设置页面...
-        </div>
-      </template>
+      <Settings v-else-if="NavLinksId === 2" />
     </main>
   </div>
 </template>
@@ -69,6 +65,7 @@ import HomeDarkActiveIcon from '@/assets/首页Dark_HL.svg'
 
 // ================= 组件 =================
 import ModLibrary from '@/components/ModLibrary.vue'
+import Settings from '@/components/Settings.vue'
 
 // ================= 响应式数据 =================
 const NavLinksId = ref(1)
@@ -98,8 +95,6 @@ const DarkMode = ref(false)
   /* 主要文本色（正常可读性文本） */
   --text-dim: #6b7280;
   /* 次要文本色（辅助说明、禁用状态文本） */
-  --success: #00e676;
-  /* 成功状态色（如安装完成、操作成功） */
   --border: #3a3d47;
 }
 

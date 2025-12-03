@@ -20,11 +20,13 @@ tauri-plugin-prevent-default = "2.1"
 tauri-plugin-dialog          = "2.3.2"
 tauri-plugin-fs              = "2.4.1"
 
-zip       = "0.6"
+zip = "2.0"       # 处理 zip 解压
 chrono    = "0.4"
 
 serde     = { version = "1.0", features = ["derive"] }
 serde_json= "1.0"
+sha2 = "0.10"     # 计算文件哈希
+hex = "0.4"       # 将哈希转为字符串
 
 [profile.dev]
 incremental = true

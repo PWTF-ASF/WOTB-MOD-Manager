@@ -206,7 +206,6 @@ const toggleLayout = () => {
 .layout-toggle:hover {
     background: var(--def-col-fltr-hover);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .layout-toggle:active {
@@ -255,8 +254,8 @@ const toggleLayout = () => {
 }
 
 .active-stat .stat-num {
-    color: var(--success);
-    text-shadow: 0 0 10px rgba(0, 230, 118, 0.4);
+    color: var(--accent);
+    text-shadow: 0 0 10px rgba(61, 90, 254, 0.5);
 }
 
 /* --- Mod 卡片列表 --- */
@@ -325,9 +324,9 @@ const toggleLayout = () => {
 }
 
 .active-card {
-    border-left: 2px solid var(--success);
+    border-left: 2px solid var(--accent);
     box-shadow:
-        -3px 0 8px -1px rgba(0, 230, 118, 0.5),
+        -3px 0 8px -1px rgba(61, 90, 254, 0.5),
         0 0 0 0 transparent;
     transition:
         box-shadow 0.3s ease,
@@ -335,9 +334,9 @@ const toggleLayout = () => {
 }
 
 .active-card:hover {
-    border-left: 2px solid var(--success);
+    border-left: 2px solid var(--accent);
     box-shadow:
-        -4px 0 12px -1px rgba(0, 230, 118, 0.7),
+        -4px 0 12px -1px rgba(61, 90, 254, 0.5),
         0 0 0 0 transparent;
     transform: translateY(-2px);
 }
@@ -346,8 +345,8 @@ const toggleLayout = () => {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--success);
-    box-shadow: 0 0 8px var(--success);
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
     margin-right: 15px;
 }
 
@@ -412,8 +411,10 @@ const toggleLayout = () => {
 .switch {
     position: relative;
     display: inline-block;
-    width: 36px;
-    height: 20px;
+    width: 40px;
+    /* 稍微宽一点 */
+    height: 18px;
+    /* 稍微扁一点 */
 }
 
 .switch input {
@@ -422,6 +423,7 @@ const toggleLayout = () => {
     height: 0;
 }
 
+/* 滑块轨道背景 */
 .slider {
     position: absolute;
     cursor: pointer;
@@ -429,29 +431,57 @@ const toggleLayout = () => {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #333;
-    transition: 0.4s;
-    border-radius: 20px;
+    background-color: transparent;
+    /* 背景透明 */
+    border: 1px solid #555;
+    /* 只有边框 */
+    transition: 0.3s;
+    /* 关键：改为直角或极小圆角 */
+    border-radius: 2px;
 }
 
+/* 滑块方块 */
 .slider:before {
     position: absolute;
-    content: '';
-    height: 14px;
-    width: 14px;
+    content: "";
+    height: 10px;
+    width: 10px;
     left: 3px;
     bottom: 3px;
-    background-color: white;
-    transition: 0.4s;
-    border-radius: 50%;
+    background-color: var(--text-dim);
+    /* 默认灰色 */
+    transition: 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+    /* 机械感的运动曲线 */
+    border-radius: 1px;
+    /* 方形滑块 */
 }
 
+/* 选中状态：轨道 */
 input:checked+.slider {
-    background-color: var(--success);
+    background-color: rgba(61, 90, 254, 0.1);
+    /* 激活时微弱背景色 */
+    border-color: var(--accent);
+    /* 边框变亮 */
+    box-shadow: 0 0 8px var(--accent-glow);
+    /* 荧光效果 */
 }
 
+/* 选中状态：滑块 */
 input:checked+.slider:before {
-    transform: translateX(16px);
+    transform: translateX(22px);
+    background-color: var(--accent);
+    /* 滑块变亮色 */
+    box-shadow: 0 0 5px var(--accent);
+    /* 滑块荧光 */
+}
+
+/* 悬停效果 (增加交互感) */
+.switch:hover .slider {
+    border-color: #888;
+}
+
+input:checked:hover+.slider {
+    border-color: #536dfe;
 }
 
 /* ================= 底部控制台 (Deck) ================= */
