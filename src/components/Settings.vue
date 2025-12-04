@@ -6,13 +6,16 @@
       <!-- 设置组：外观 -->
       <section class="setting-group">
         <h3 class="group-title">外观 / VISUALS</h3>
+
+        <!-- 明暗模式开关已删除 -->
+
         <div class="setting-item">
           <div class="text-info">
             <span class="label">启用毛玻璃特效 (Acrylic Blur)</span>
             <span class="desc">开启后背景将呈现模糊透视效果，可能会轻微影响性能。</span>
           </div>
           <label class="switch">
-            <input type="checkbox" v-model="config.enableBlur">
+            <input type="checkbox" v-model="globalBlur">
             <span class="slider round"></span>
           </label>
         </div>
@@ -21,7 +24,7 @@
       <!-- 设置组：路径 -->
       <section class="setting-group">
         <h3 class="group-title">路径配置 / PATHS</h3>
-        
+
         <!-- 游戏路径 -->
         <div class="setting-item vertical">
           <div class="label-row">
@@ -52,36 +55,32 @@
         <button class="btn-reset" @click="resetToDefaults">
           <span class="icon">↺</span> 重置为默认设置
         </button>
-        <!-- 保存通常是自动的，或者可以加一个保存按钮 -->
-        <!-- <button class="btn-save">保存修改</button> -->
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, type Ref, inject } from 'vue'
+
+// 1. 注入全局毛玻璃状态
+// 这里的类型断言确保 TypeScript 知道这是一个 ref
+const globalBlur = inject('GlobalBlur') as Ref<boolean>
 
 // 模拟配置数据结构
 const config = reactive({
-  enableBlur: true,
   gamePath: 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\World of Tanks Blitz',
   modPath: 'D:\\WOTB_Mods\\Library'
 })
 
-// 模拟选择路径功能 (实际项目中需调用 Electron 的 dialog 或其他 API)
+// 模拟选择路径功能
 const selectPath = (type: 'game' | 'mod') => {
   console.log(`Open file dialog for: ${type}`)
-  // 模拟回调
-  if (type === 'game') {
-    // config.gamePath = ...
-  }
 }
 
 // 重置功能
 const resetToDefaults = () => {
-  if(confirm('确定要重置所有设置吗？此操作无法撤销。')) {
-    config.enableBlur = false
+  if (confirm('确定要重置所有设置吗？此操作无法撤销。')) {
     config.gamePath = ''
     config.modPath = ''
   }
@@ -89,23 +88,35 @@ const resetToDefaults = () => {
 </script>
 
 <style scoped>
-/* 继承全局变量，确保样式统一 */
+/* 组件样式 */
 .settings-container {
   width: 100%;
   height: 100%;
   padding: 40px;
   box-sizing: border-box;
   overflow-y: auto;
-  /* 使得内容浮在背景图之上，增加半透明深色底 */
-  background: rgba(15, 17, 21, 0.85); 
-  backdrop-filter: blur(10px); /* 如果全局背景没有模糊，这里可以加 */
+
+  /* 使用全局变量作为背景色 */
+  background: var(--bg-main);
+
+  /* 如果启用了毛玻璃，这里稍微调整透明度逻辑 */
+  backdrop-filter: blur(var(--global-blur));
+  -webkit-backdrop-filter: blur(var(--global-blur));
   color: var(--text-main);
+  transition: background 0.3s ease, color 0.3s ease;
   animation: fadeIn 0.3s ease-out;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .content-wrapper {
@@ -123,6 +134,7 @@ const resetToDefaults = () => {
   padding-bottom: 10px;
   margin-bottom: 30px;
   letter-spacing: 2px;
+  color: var(--text-main);
 }
 
 .sub-title {
@@ -143,24 +155,27 @@ const resetToDefaults = () => {
   margin-bottom: 15px;
   letter-spacing: 1px;
   font-weight: 700;
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
 /* 单个设置项卡片 */
 .setting-item {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-card);
   border: 1px solid var(--border);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+
   padding: 20px;
   margin-bottom: 15px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: border-color 0.3s, background 0.3s;
+  transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
 }
 
 .setting-item:hover {
-  border-color: rgba(61, 90, 254, 0.5);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--accent);
+  background: var(--bg-card-hover);
+  box-shadow: 0 0 15px var(--accent-glow);
 }
 
 .setting-item.vertical {
@@ -179,6 +194,7 @@ const resetToDefaults = () => {
   font-size: 16px;
   font-weight: 600;
   margin-bottom: 4px;
+  color: var(--text-main);
 }
 
 .desc {
@@ -207,9 +223,10 @@ const resetToDefaults = () => {
 
 input[type="text"] {
   flex: 1;
-  background: #000;
+  background: var(--bg-input);
   border: 1px solid var(--border);
   color: var(--text-main);
+
   padding: 10px 15px;
   font-family: 'Rajdhani', sans-serif;
   font-size: 14px;
@@ -241,7 +258,7 @@ input[type="text"]:focus {
   box-shadow: 0 0 15px var(--accent-glow);
 }
 
-/* 开关 (Switch) 样式 */
+/* Switch 及其旁边的 Label */
 .switch {
   position: relative;
   display: inline-block;
@@ -262,9 +279,9 @@ input[type="text"]:focus {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #2c2c2c;
+  background-color: var(--border);
   transition: .4s;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
 }
 
 .slider:before {
@@ -274,19 +291,29 @@ input[type="text"]:focus {
   width: 16px;
   left: 3px;
   bottom: 3px;
-  background-color: var(--text-dim);
+  background-color: var(--bg-main);
   transition: .4s;
 }
 
-input:checked + .slider {
-  background-color: rgba(61, 90, 254, 0.2);
+/* 选中状态 */
+input:checked+.slider {
+  background-color: var(--accent);
   border-color: var(--accent);
 }
 
-input:checked + .slider:before {
+input:checked+.slider:before {
   transform: translateX(26px);
-  background-color: var(--accent);
-  box-shadow: 0 0 10px var(--accent);
+  background-color: #fff;
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.2);
+}
+
+/* 圆角 */
+.slider.round {
+  border-radius: 24px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
 }
 
 /* 底部按钮 */
@@ -324,12 +351,16 @@ input:checked + .slider:before {
 .settings-container::-webkit-scrollbar {
   width: 6px;
 }
+
 .settings-container::-webkit-scrollbar-track {
-  background: rgba(0,0,0,0.3);
+  background: var(--scroll-track);
 }
+
 .settings-container::-webkit-scrollbar-thumb {
   background: var(--border);
+  border-radius: 3px;
 }
+
 .settings-container::-webkit-scrollbar-thumb:hover {
   background: var(--accent);
 }

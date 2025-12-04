@@ -303,7 +303,8 @@ const toggleLayout = () => {
         transform 0.2s,
         box-shadow 0.2s;
     overflow: hidden;
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(var(--global-blur));
+    -webkit-backdrop-filter: blur(var(--global-blur));
     box-shadow:
         0 4px 12px rgba(0, 0, 0, 0.25),
         /* 主阴影 */
@@ -487,8 +488,7 @@ input:checked:hover+.slider {
 /* ================= 底部控制台 (Deck) ================= */
 .control-deck {
     height: 90px;
-    background: rgba(22, 25, 32, 0.95);
-    backdrop-filter: blur(10px);
+    background: var(--deck-bg);
     border-top: 1px solid var(--border);
     display: flex;
     align-items: center;
@@ -519,9 +519,9 @@ input:checked:hover+.slider {
 }
 
 .deck-btn:hover {
-    border-color: #fff;
-    color: #fff;
-    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--accent);
+    color: var(--text-main);
+    background: var(--hover-bg);
 }
 
 .deck-btn.danger {
