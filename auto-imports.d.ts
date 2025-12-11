@@ -87,17 +87,3 @@ declare global {
   export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, ShallowRef, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
 }
-
-// for vue template auto import
-type UnwrapRefs<T> = {
-  [K in keyof T]: import('vue').UnwrapRef<T[K]>
-}
-namespace _ComponentCustomProperties {
-  const { EffectScope, computed, createApp, customRef, defineAsyncComponent, defineComponent, effectScope, getCurrentInstance, getCurrentScope, getCurrentWatcher, h, inject, isProxy, isReactive, isReadonly, isRef, isShallow, markRaw, nextTick, onActivated, onBeforeMount, onBeforeUnmount, onBeforeUpdate, onDeactivated, onErrorCaptured, onMounted, onRenderTracked, onRenderTriggered, onScopeDispose, onServerPrefetch, onUnmounted, onUpdated, onWatcherCleanup, provide, reactive, readonly, ref, resolveComponent, shallowReactive, shallowReadonly, shallowRef, toRaw, toRef, toRefs, toValue, triggerRef, unref, useAttrs, useCssModule, useCssVars, useId, useModel, useSlots, useTemplateRef, watch, watchEffect, watchPostEffect, watchSyncEffect }: typeof import('vue')
-  const { acceptHMRUpdate, createPinia, defineStore, getActivePinia, mapActions, mapGetters, mapState, mapStores, mapWritableState, setActivePinia, setMapStoreSuffix, storeToRefs }: typeof import('pinia')
-  const { onBeforeRouteLeave, onBeforeRouteUpdate, useLink, useRoute, useRouter }: typeof import('vue-router')
-  const { useStore }: typeof import('@/store')
-}
-declare module 'vue' {
-  interface ComponentCustomProperties extends UnwrapRefs<typeof _ComponentCustomProperties> {}
-}

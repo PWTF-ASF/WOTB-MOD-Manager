@@ -33,7 +33,7 @@ export default defineConfig({
         },
       ],
       dts: 'auto-imports.d.ts',
-      vueTemplate: true,
+      vueTemplate: false,
     }),
     Components({
       dts: 'components.d.ts',
