@@ -51,13 +51,13 @@
       <div class="card-content">
         <div class="mod-header">
           <span class="mod-title">通用前置库 Lib_{{ mods.modName }}</span>
-          <span class="tag">核心</span>
+          <span class="tag">{{ formatType(mods.type) }}</span>
         </div>
         <div class="mod-desc">必要的前置依赖文件</div>
       </div>
       <div class="card-action">
         <label class="switch">
-          <input type="checkbox" />
+          <input type="checkbox" v-model="mods.active" />
           <span class="slider"></span>
         </label>
       </div>
@@ -83,13 +83,13 @@
   </footer>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { ref, computed } from 'vue'
 
 // ================= 响应式数据 =================
 const isGridLayout = ref(true)
 const currentCategory = ref('all')
-const modlist = reactive([
+const modlist = ref([
   {
     id: 1,
     active: true,
@@ -131,17 +131,27 @@ const toggleLayout = () => {
 }
 const filtermodlist = computed(() => {
   if (currentCategory.value === 'all') {
-    return modlist
+    return modlist.value
   } else {
-    return modlist.filter(mods => mods.type === currentCategory.value)
+    return modlist.value.filter(mods => mods.type === currentCategory.value)
   }
 })
 const totalmods = computed(() => {
-  return modlist.length
+  return modlist.value.length
 })
 const activemods = computed(() => {
-  return modlist.filter(mods => mods.active).length
+  return modlist.value.filter(mods => mods.active).length
 })
+const TYPE_MAP = {
+  all: '全部',
+  model: '3d模型',
+  voice: '语音包',
+  ui: 'UI',
+  lightIcon: '点亮图标',
+}
+const formatType = type => {
+  return TYPE_MAP[type] || '未知类型'
+}
 </script>
 
 <style scoped>
@@ -421,10 +431,9 @@ const activemods = computed(() => {
 }
 
 .active-card:hover {
-  border-left: 2px solid var(--accent);
   box-shadow:
-    -4px 0 12px -1px rgba(61, 90, 254, 0.5),
-    0 0 0 0 transparent;
+    -4px 0 12px -1px var(--accent-glow),
+    0 2px 15px rgba(61, 90, 254, 0.15);
   transform: translateY(-2px);
 }
 

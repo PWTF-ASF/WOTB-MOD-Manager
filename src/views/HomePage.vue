@@ -107,9 +107,9 @@ watch(DarkMode, (isDark) => {
 
   --border: #3a3d47;
   /* 边框色 */
-  --accent: #3d5afe;
+  --accent: (61, 90, 254);
   /* 强调色 */
-  --accent-glow: rgba(61, 90, 254, 0.4);
+  --accent-glow: rgba(61, 90, 254, 0.5);
 
   --hover-bg: rgba(255, 255, 255, 0.05);
   /* 侧边栏悬停背景 */
