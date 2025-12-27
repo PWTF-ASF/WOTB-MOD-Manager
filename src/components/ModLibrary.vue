@@ -155,11 +155,23 @@ const formatType = type => {
 </script>
 
 <style scoped>
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
   border: none;
+  animation: fadeIn 0.3s ease-out;
 }
 
 /* --- 顶部栏 --- */
@@ -210,7 +222,7 @@ const formatType = type => {
   -webkit-backdrop-filter: blur(12px);
   border-radius: 25px;
   padding-left: 45px;
-  color: var(--text-main);
+  color: #2c3e50;
   font-family: inherit;
   font-size: 16px;
   transition: all 0.3s;
@@ -503,13 +515,13 @@ const formatType = type => {
   text-overflow: ellipsis;
 }
 
+/* 开关样式统一 */
 .switch {
   position: relative;
   display: inline-block;
   width: 40px;
-  /* 稍微宽一点 */
   height: 18px;
-  /* 稍微扁一点 */
+  flex-shrink: 0;
 }
 
 .switch input {
@@ -526,12 +538,9 @@ const formatType = type => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: transparent;
-  /* 背景透明 */
-  border: 1px solid #555;
-  /* 只有边框 */
-  transition: 0.3s;
-  /* 关键：改为直角或极小圆角 */
+  background-color: var(--switch-track);
+  border: 1px solid var(--switch-border);
+  transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 2px;
 }
 
@@ -543,40 +552,33 @@ const formatType = type => {
   width: 10px;
   left: 3px;
   bottom: 3px;
-  background-color: var(--text-dim);
-  /* 默认灰色 */
+  background-color: var(--switch-thumb);
   transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  /* 机械感的运动曲线 */
   border-radius: 1px;
-  /* 方形滑块 */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 /* 选中状态：轨道 */
 input:checked + .slider {
-  background-color: rgba(61, 90, 254, 0.1);
-  /* 激活时微弱背景色 */
-  border-color: var(--accent);
-  /* 边框变亮 */
-  box-shadow: 0 0 8px var(--accent-glow);
-  /* 荧光效果 */
+  background-color: var(--switch-track-checked);
+  border-color: var(--switch-border-checked);
 }
 
 /* 选中状态：滑块 */
 input:checked + .slider:before {
   transform: translateX(22px);
-  background-color: var(--accent);
-  /* 滑块变亮色 */
-  box-shadow: 0 0 5px var(--accent);
-  /* 滑块荧光 */
+  background-color: var(--switch-thumb-checked);
 }
 
-/* 悬停效果 (增加交互感) */
+/* 悬停效果 */
 .switch:hover .slider {
-  border-color: #888;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-glow);
 }
 
 input:checked:hover + .slider {
-  border-color: #536dfe;
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
 }
 
 /* ================= 底部控制台 (Deck) ================= */

@@ -107,12 +107,24 @@ watch(DarkMode, (isDark) => {
 
   --border: #3a3d47;
   /* 边框色 */
-  --accent: (61, 90, 254);
+  --accent: rgb(61, 90, 254);
   /* 强调色 */
   --accent-glow: rgba(61, 90, 254, 0.5);
 
   --hover-bg: rgba(255, 255, 255, 0.05);
   /* 侧边栏悬停背景 */
+
+    /* --- 开关相关变量 --- */
+  --switch-track: rgba(255, 255, 255, 0.1);  /* 未选中状态轨道 */
+  --switch-track-checked: rgba(61, 90, 254, 0.3);  /* 选中状态轨道 */
+  --switch-thumb: #ffffff;  /* 滑块颜色 */
+  --switch-thumb-checked: #ffffff;  /* 选中滑块颜色 */
+  --switch-border: rgba(255, 255, 255, 0.2);  /* 边框 */
+  --switch-border-checked: rgba(61, 90, 254, 0.8);  /* 选中边框 */
+  
+  --def-col-fltr: rgba(255, 255, 255, 0.05);
+  --def-col-fltr-hover: rgba(255, 255, 255, 0.08);
+  --scroll-track: rgba(255, 255, 255, 0.05);
 }
 
 /* --- 浅色模式覆盖 (Light Mode) --- */
@@ -137,6 +149,18 @@ watch(DarkMode, (isDark) => {
 
   --hover-bg: rgba(61, 90, 254, 0.05);
   /* 浅色模式下的悬停是淡淡的品牌色 */
+
+    /* --- 浅色模式开关变量 --- */
+  --switch-track: rgba(0, 0, 0, 0.1);
+  --switch-track-checked: rgba(61, 90, 254, 0.2);
+  --switch-thumb: #ffffff;
+  --switch-thumb-checked: #ffffff;
+  --switch-border: rgba(0, 0, 0, 0.2);
+  --switch-border-checked: rgba(61, 90, 254, 0.8);
+  
+  --def-col-fltr: rgba(255, 255, 255, 0.8);
+  --def-col-fltr-hover: rgba(255, 255, 255, 0.9);
+  --scroll-track: rgba(0, 0, 0, 0.05);
 }
 
 html,

@@ -264,6 +264,7 @@ input[type="text"]:focus {
   display: inline-block;
   width: 50px;
   height: 24px;
+  flex-shrink: 0;
 }
 
 .switch input {
@@ -279,9 +280,9 @@ input[type="text"]:focus {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--border);
+  background-color: var(--switch-track);
+  border: 1px solid var(--switch-border);
   transition: .4s;
-  border: 1px solid transparent;
 }
 
 .slider:before {
@@ -291,20 +292,21 @@ input[type="text"]:focus {
   width: 16px;
   left: 3px;
   bottom: 3px;
-  background-color: var(--bg-main);
+  background-color: var(--switch-thumb);
   transition: .4s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 /* 选中状态 */
-input:checked+.slider {
-  background-color: var(--accent);
-  border-color: var(--accent);
+input:checked + .slider {
+  background-color: var(--switch-track-checked);
+  border-color: var(--switch-border-checked);
 }
 
-input:checked+.slider:before {
+input:checked + .slider:before {
   transform: translateX(26px);
-  background-color: #fff;
-  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.2);
+  background-color: var(--switch-thumb-checked);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 /* 圆角 */
