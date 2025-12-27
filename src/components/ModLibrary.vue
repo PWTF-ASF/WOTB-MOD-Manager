@@ -9,20 +9,28 @@
       </div>
     </div>
 
-    <!-- 中间：新增分类导航 (嵌入式) -->
-    <nav class="category-nav">
-      <button
-        v-for="cat in categories"
-        :key="cat.type"
-        class="nav-item"
-        :class="{ active: currentCategory === cat.type }"
-        @click="currentCategory = cat.type"
+    <!-- 中间：响应式横向滚动导航 -->
+    <div class="category-wrapper">
+      <nav
+        class="category-nav"
+        ref="navRef"
+        @wheel="handleWheel"
+        @mousedown="handleMouseDown"
+        @mousemove="handleMouseMove"
+        @mouseup="handleMouseUp"
+        @mouseleave="handleMouseUp"
       >
-        {{ cat.name }}
-      </button>
-      <!-- 滑动的光标背景 (可选高级效果) -->
-      <div class="nav-glider"></div>
-    </nav>
+        <button
+          v-for="cat in categories"
+          :key="cat.type"
+          class="nav-item"
+          :class="{ active: currentCategory === cat.type }"
+          @click="selectCategory(cat.type)"
+        >
+          {{ cat.name }}
+        </button>
+      </nav>
+    </div>
 
     <!-- 右侧：原有工具组 -->
     <div class="right-group">
@@ -89,6 +97,7 @@ import { ref, computed } from 'vue'
 // ================= 响应式数据 =================
 const isGridLayout = ref(true)
 const currentCategory = ref('all')
+const navRef = ref(null)
 const modlist = ref([
   {
     id: 1,
@@ -116,6 +125,11 @@ const modlist = ref([
   },
 ])
 
+//鼠标拖拽逻辑
+let isDragging = false
+let startX = 0
+let scrollLeft = 0
+
 // ================= 常量 =================
 const categories = [
   { type: 'all', name: '全部' },
@@ -123,6 +137,8 @@ const categories = [
   { type: 'voice', name: '语音包' },
   { type: 'ui', name: 'UI' },
   { type: 'lightIcon', name: '点亮' },
+  { type: 'script', name: '扩展脚本' }, // 增加几个测试滚动
+  { type: 'map', name: '地图纹理' },
 ]
 
 // ================= 方法 =================
@@ -151,6 +167,37 @@ const TYPE_MAP = {
 }
 const formatType = type => {
   return TYPE_MAP[type] || '未知类型'
+}
+//滚轮重定向 (纵向转横向)
+const handleWheel = e => {
+  if (e.deltaY !== 0) {
+    e.preventDefault()
+    navRef.value.scrollLeft += e.deltaY
+  }
+}
+
+const handleMouseDown = e => {
+  isDragging = true
+  navRef.value.classList.add('grabbing')
+  startX = e.pageX - navRef.value.offsetLeft
+  scrollLeft = navRef.value.scrollLeft
+}
+
+const handleMouseMove = e => {
+  if (!isDragging) return
+  e.preventDefault()
+  const x = e.pageX - navRef.value.offsetLeft
+  const walk = (x - startX) * 1.5 // 1.5是滚动速度
+  navRef.value.scrollLeft = scrollLeft - walk
+}
+
+const handleMouseUp = () => {
+  isDragging = false
+  navRef.value.classList.remove('grabbing')
+}
+
+const selectCategory = type => {
+  currentCategory.value = type
 }
 </script>
 
@@ -247,50 +294,95 @@ const formatType = type => {
   gap: 15px;
 }
 
-/* 3. 中间分类导航样式 (核心) */
+/* 导航包装器：处理边缘渐隐遮罩 */
+.category-wrapper {
+  flex: 1;
+  min-width: 0; /* 允许收缩 */
+  position: relative;
+  /* 核心：两侧淡出效果提示可滚动 */
+  -webkit-mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+  mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+}
+
 .category-nav {
   display: flex;
-  background: var(--def-col-fltr);
-  padding: 4px;
-  border-radius: 8px; /* 稍微圆角 */
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  position: relative;
-  /* 玻璃拟态 */
-  backdrop-filter: blur(12px);
-  box-shadow: 0 0 32px rgba(0, 0, 0, 0.15);
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 10px 40px; /* 增加内边距配合遮罩 */
+  scrollbar-width: none; /* 隐藏火狐滚动条 */
+  cursor: grab;
+  scroll-behavior: smooth;
+  user-select: none; /* 防止拖拽时选中文字 */
+}
+
+/* 隐藏 Chrome/Safari 滚动条 */
+.category-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.category-nav.grabbing {
+  cursor: grabbing;
+  scroll-behavior: auto; /* 拖拽时关闭平滑滚动以免粘滞 */
 }
 
 .nav-item {
-  background: transparent;
-  border: none;
+  flex-shrink: 0; /* 防止按钮被挤压 */
+  background: var(--def-col-fltr);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   color: var(--text-dim);
-  padding: 6px 20px;
+  padding: 8px 22px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  border-radius: 6px;
-  transition: all 0.3s ease;
-  z-index: 1; /* 确保在滑块之上 */
+  border-radius: 20px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
 }
 
 .nav-item:hover {
+  background: rgba(255, 255, 255, 0.1);
   color: var(--text-main);
+  transform: translateY(-1px);
 }
 
 .nav-item.active {
+  background: var(--accent);
   color: #fff;
-  background: var(--accent); /* 选中背景色 */
-  box-shadow: 0 0 15px var(--accent-glow); /* 选中发光 */
+  border-color: var(--accent);
+  box-shadow: 0 0 15px var(--accent-glow);
   text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
 }
 
-/* 如果屏幕变窄，隐藏文字只留搜索和右侧，或者变成滚动 */
-@media (max-width: 1100px) {
+/* --- 响应式适配 --- */
+@media (max-width: 1000px) {
   .search-module {
-    width: 200px;
+    width: 180px;
   }
-  .nav-item {
-    padding: 6px 12px;
+}
+
+@media (max-width: 800px) {
+  .top-deck {
+    padding: 0 15px;
+  }
+  .search-module {
+    width: 44px; /* 窄屏只留图标效果 */
+    overflow: hidden;
+  }
+  .search-module input {
+    padding-left: 45px;
+    width: 44px;
+  }
+  .search-module input:focus {
+    width: 200px; /* 聚焦时展开 */
+    position: absolute;
+    z-index: 10;
+  }
+  .right-group .stat-label {
+    display: none; /* 隐藏已安装/运行中文字 */
+  }
+  .stats-module {
+    width: 80px;
   }
 }
 
