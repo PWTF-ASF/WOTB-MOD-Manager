@@ -298,12 +298,12 @@ input[type="text"]:focus {
 }
 
 /* 选中状态 */
-input:checked + .slider {
+input:checked+.slider {
   background-color: var(--switch-track-checked);
   border-color: var(--switch-border-checked);
 }
 
-input:checked + .slider:before {
+input:checked+.slider:before {
   transform: translateX(26px);
   background-color: var(--switch-thumb-checked);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
