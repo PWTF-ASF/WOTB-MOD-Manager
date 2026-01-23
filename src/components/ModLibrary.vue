@@ -77,6 +77,7 @@
     <div class="deck-left">
       <button class="deck-btn danger">卸载选中</button>
       <button class="deck-btn">加载mod</button>
+      <button class="deck-btn" @click="handleAddMod()">添加mod</button>
     </div>
 
     <div class="deck-right">
@@ -95,6 +96,7 @@
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog' // 引入选择框插件
+import { type } from 'os'
 
 // ================= 响应式数据 =================
 const isGridLayout = ref(true)
@@ -203,6 +205,46 @@ const handleMouseUp = () => {
 const selectCategory = type => {
   currentCategory.value = type
 }
+
+//添加mod
+const handleAddMod = async () => {
+  console.log('开始添加mod')
+  try {
+    //打开选择对话框
+    const selected = await open({
+      title: '请选择mod文件',
+      multiple: true,
+      directory: false,
+    })
+
+    //判断用户是否选择了文件
+    if (selected) {
+      //将seleected内容转化为数组赋值给files
+      const files = Array.isArray(selected) ? selected : [selected]
+
+      //如果选择了文件就创建新mod
+      if (files.length > 0) {
+        const newMod = {
+          id: modlist.value.length + 1,
+          modName: `a${modlist.value.length + 1}`,
+          active: false,
+          type: 'model',
+        }
+
+        //将新mod添加到数组
+        modlist.value.push(newMod)
+        alert('添加成功')
+        return
+      }
+    } else {
+      console.log('用户取消选择')
+    }
+  } catch (error) {
+    console.error('出错了:', error)
+    alert(`添加Mod时出错: ${error}`)
+  }
+}
+
 const handleLaunchGame = async () => {
   if (isLaunching.value) return
   isLaunching.value = true
@@ -260,14 +302,14 @@ const handleLaunchGame = async () => {
   position: sticky;
   top: 0;
   transition: all var(--animation-duration) var(--animation-timing);
-  box-shadow: 
+  box-shadow:
     0 2px 12px rgba(0, 0, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .top-deck:hover {
   background: var(--glass-effect-hover);
-  box-shadow: 
+  box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
@@ -305,7 +347,7 @@ const handleLaunchGame = async () => {
   width: 18px;
   height: 18px;
   filter: brightness(var(--icon-brightness, 0.8));
-  transition: 
+  transition:
     filter var(--animation-duration),
     transform var(--animation-duration);
 }
@@ -323,7 +365,7 @@ const handleLaunchGame = async () => {
   font-size: 14px;
   font-weight: 500;
   transition: all 0.35s var(--animation-timing);
-  box-shadow: 
+  box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.05),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   border: 1.5px solid var(--border);
@@ -339,7 +381,7 @@ const handleLaunchGame = async () => {
 .search-module input:hover {
   background: var(--bg-input-focus);
   border-color: var(--border);
-  box-shadow: 
+  box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transform: translateY(-1px);
@@ -353,7 +395,7 @@ const handleLaunchGame = async () => {
 .search-module input:focus {
   background: var(--bg-input-focus);
   border-color: var(--accent);
-  box-shadow: 
+  box-shadow:
     0 0 0 3px var(--accent-glow),
     0 8px 24px rgba(0, 0, 0, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -389,20 +431,8 @@ const handleLaunchGame = async () => {
   flex: 1;
   min-width: 0;
   position: relative;
-  mask-image: linear-gradient(
-    to right,
-    transparent 0%,
-    black 15%,
-    black 85%,
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent 0%,
-    black 15%,
-    black 85%,
-    transparent 100%
-  );
+  mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
   animation: slide-up-fade 0.5s var(--animation-timing) 0.2s backwards;
 }
 
@@ -487,7 +517,7 @@ const handleLaunchGame = async () => {
   color: var(--text-main);
   transform: translateY(-2px);
   border-color: rgba(255, 255, 255, 0.1);
-  box-shadow: 
+  box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
@@ -505,7 +535,7 @@ const handleLaunchGame = async () => {
   background: var(--glass-effect-focus);
   color: var(--accent);
   border-color: var(--accent);
-  box-shadow: 
+  box-shadow:
     0 4px 20px var(--accent-glow),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transform: translateY(-2px);
@@ -553,7 +583,7 @@ const handleLaunchGame = async () => {
   align-items: center;
   justify-content: center;
   transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 
+  box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.05),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   border: 1.5px solid transparent;
@@ -570,11 +600,7 @@ const handleLaunchGame = async () => {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(var(--accent-rgb, 61, 90, 254), 0.1) 0%,
-    transparent 100%
-  );
+  background: linear-gradient(135deg, rgba(var(--accent-rgb, 61, 90, 254), 0.1) 0%, transparent 100%);
   opacity: 0;
   transition: opacity var(--animation-duration);
 }
@@ -584,7 +610,7 @@ const handleLaunchGame = async () => {
   border-color: var(--border);
   color: var(--accent);
   transform: translateY(-2px) rotate(5deg);
-  box-shadow: 
+  box-shadow:
     0 6px 20px rgba(0, 0, 0, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
@@ -623,7 +649,7 @@ const handleLaunchGame = async () => {
   border-radius: 12px;
   padding: 0 18px;
   gap: 16px;
-  box-shadow: 
+  box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.05),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   transition: all 0.35s var(--animation-timing);
@@ -640,7 +666,7 @@ const handleLaunchGame = async () => {
 .stats-module:hover {
   border-color: var(--accent);
   background: var(--glass-effect-hover);
-  box-shadow: 
+  box-shadow:
     0 6px 20px var(--accent-glow),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transform: translateY(-1px);
@@ -655,11 +681,7 @@ const handleLaunchGame = async () => {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(var(--accent-rgb, 61, 90, 254), 0.05) 0%,
-    transparent 100%
-  );
+  background: linear-gradient(135deg, rgba(var(--accent-rgb, 61, 90, 254), 0.05) 0%, transparent 100%);
   opacity: 0;
   transition: opacity var(--animation-duration);
   z-index: -1;
@@ -705,7 +727,7 @@ const handleLaunchGame = async () => {
   font-family: 'JetBrains Mono', monospace, 'Rajdhani', sans-serif;
   line-height: 1;
   color: var(--text-main);
-  transition: 
+  transition:
     color var(--animation-duration),
     text-shadow var(--animation-duration);
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -723,7 +745,7 @@ const handleLaunchGame = async () => {
 
 .active-stat .stat-num {
   color: var(--accent);
-  text-shadow: 
+  text-shadow:
     0 2px 8px var(--accent-glow),
     0 0 20px rgba(var(--accent-rgb, 61, 90, 254), 0.3);
 }
@@ -739,30 +761,30 @@ const handleLaunchGame = async () => {
     padding: 0 20px;
     gap: 15px;
   }
-  
+
   .search-container {
     flex: 0 1 160px;
   }
-  
+
   .category-nav {
     padding: 10px 20px;
   }
-  
+
   .nav-item {
     padding: 8px 20px;
     font-size: 12px;
   }
-  
+
   .layout-toggle {
     width: 42px;
     height: 42px;
   }
-  
+
   .stats-module {
     padding: 0 15px;
     gap: 12px;
   }
-  
+
   .stat-num {
     font-size: 20px;
   }
@@ -775,39 +797,39 @@ const handleLaunchGame = async () => {
     padding: 15px;
     gap: 12px;
   }
-  
+
   .search-container {
     order: 1;
     flex: 1 0 100%;
     margin-bottom: 12px;
   }
-  
+
   .category-wrapper {
     order: 2;
     flex: 1;
     min-width: 0;
   }
-  
+
   .right-group {
     order: 3;
     flex: 0 0 auto;
     gap: 12px;
   }
-  
+
   .layout-toggle {
     width: 40px;
     height: 40px;
   }
-  
+
   .stats-module {
     height: 40px;
     padding: 0 12px;
   }
-  
+
   .stat-label {
     display: none;
   }
-  
+
   .stat-item:not(:last-child)::after {
     height: 16px;
   }
@@ -818,18 +840,18 @@ const handleLaunchGame = async () => {
     padding: 8px 15px;
     gap: 4px;
   }
-  
+
   .nav-item {
     padding: 6px 16px;
     font-size: 11px;
     border-radius: 8px;
   }
-  
+
   .search-module input {
     height: 42px;
     font-size: 13px;
   }
-  
+
   .right-group {
     gap: 10px;
   }
@@ -838,35 +860,35 @@ const handleLaunchGame = async () => {
 /* 明暗模式特定的调整 */
 :global(.dark-mode) {
   --icon-brightness: 0.85;
-  
+
   /* 搜索框暗模式优化 */
   .search-module input {
     background: var(--bg-input);
   }
-  
+
   .search-module input:hover {
     background: rgba(255, 255, 255, 0.08);
   }
-  
+
   .search-module input:focus {
     background: rgba(255, 255, 255, 0.12);
   }
-  
+
   /* 导航项暗模式优化 - 提高文字对比度 */
   .nav-item {
     color: rgba(255, 255, 255, 0.85);
   }
-  
+
   .nav-item:hover {
     background: rgba(255, 255, 255, 0.08);
   }
-  
+
   /* 统计模块暗模式优化 */
   .stats-module {
     background: rgba(255, 255, 255, 0.05);
     border-color: rgba(255, 255, 255, 0.08);
   }
-  
+
   .stats-module:hover {
     background: rgba(255, 255, 255, 0.08);
   }
@@ -874,37 +896,37 @@ const handleLaunchGame = async () => {
 
 :global(.light-mode) {
   --icon-brightness: 1;
-  
+
   /* 搜索框亮模式优化 */
   .search-module input {
     background: var(--bg-input);
   }
-  
+
   .search-module input:hover {
     background: var(--bg-input-focus);
   }
-  
+
   .search-module input:focus {
     background: var(--bg-input-focus);
   }
-  
+
   /* 导航项亮模式优化 */
   .nav-item {
     background: var(--glass-effect);
   }
-  
+
   .nav-item:hover {
     background: var(--glass-effect-hover);
   }
-  
+
   /* 统计模块亮模式优化 */
   .stats-module {
     background: var(--glass-effect);
   }
-  
+
   /* 亮模式下为选中状态添加轻微阴影 */
   .nav-item.active {
-    box-shadow: 
+    box-shadow:
       0 4px 20px rgba(61, 90, 254, 0.15),
       inset 0 1px 0 rgba(255, 255, 255, 0.5);
   }

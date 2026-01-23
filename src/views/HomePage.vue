@@ -61,7 +61,7 @@ import Settings from '@/components/Settings.vue'
 
 // ================= 响应式数据 =================
 const NavLinksId = ref(1)
-const DarkMode = ref(true)
+const DarkMode = ref(false)
 const EnableBlur = ref(true)
 
 // ================= 提供数据 (Provide) =================
