@@ -55,10 +55,22 @@
   <!-- 中间列表：卡片式流 -->
   <section class="modules-grid" :class="{ 'grid-layout': isGridLayout, 'list-layout': !isGridLayout }">
     <div class="mod-card" v-for="mods in filtermodlist" :key="mods.id" :class="{ 'active-card': mods.active }">
+      <!-- Windows风格关闭按钮 -->
+      <button class="win-close-btn" @click.stop="handleDeleteMod(mods.id)" title="删除此Mod">
+        <svg class="close-icon" viewBox="0 0 10 10" width="10" height="10">
+          <path
+            d="M0.5,0.5 L9.5,9.5 M0.5,9.5 L9.5,0.5"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          />
+        </svg>
+      </button>
+
       <div class="status-indicator" :class="{ inactive: mods.active }"></div>
       <div class="card-content">
         <div class="mod-header">
-          <span class="mod-title">通用前置库 Lib_{{ mods.modName }}</span>
+          <span class="mod-title">{{ mods.modName }}</span>
           <span class="tag">{{ formatType(mods.type) }}</span>
         </div>
         <div class="mod-desc">必要的前置依赖文件</div>
@@ -76,7 +88,7 @@
   <footer class="control-deck">
     <div class="deck-left">
       <button class="deck-btn danger">卸载选中</button>
-      <button class="deck-btn">加载mod</button>
+      <button class="deck-btn" @click="handleDeployMods()">部署mod</button>
       <button class="deck-btn" @click="handleAddMod()">添加mod</button>
     </div>
 
@@ -93,7 +105,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog' // 引入选择框插件
 import { type } from 'os'
@@ -206,36 +218,27 @@ const selectCategory = type => {
   currentCategory.value = type
 }
 
-//添加mod
+//添加mod（需要结合后端）
 const handleAddMod = async () => {
   console.log('开始添加mod')
   try {
     //打开选择对话框
     const selected = await open({
       title: '请选择mod文件',
-      multiple: true,
+      multiple: false, // 一次只选一个
       directory: false,
     })
 
     //判断用户是否选择了文件
     if (selected) {
-      //将seleected内容转化为数组赋值给files
-      const files = Array.isArray(selected) ? selected : [selected]
+      // 调用后端复制文件到mods目录
+      await invoke('copy_mod_file', { src: selected })
+      console.log('Mod文件已复制到mods目录')
 
-      //如果选择了文件就创建新mod
-      if (files.length > 0) {
-        const newMod = {
-          id: modlist.value.length + 1,
-          modName: `a${modlist.value.length + 1}`,
-          active: false,
-          type: 'model',
-        }
+      // 刷新mod列表
+      await refreshModList()
 
-        //将新mod添加到数组
-        modlist.value.push(newMod)
-        alert('添加成功')
-        return
-      }
+      alert('添加成功')
     } else {
       console.log('用户取消选择')
     }
@@ -245,6 +248,114 @@ const handleAddMod = async () => {
   }
 }
 
+// 刷新mod列表函数
+const refreshModList = async () => {
+  try {
+    // 1. 获取所有mod文件列表
+    const modNames = await invoke('list_mods')
+
+    // 2. 获取所有mod的状态
+    const modStatuses = await invoke('get_mod_status')
+
+    // 3. 更新前端的modlist
+    modlist.value = modNames.map((name, index) => {
+      // 找到对应的状态
+      const status = modStatuses.find(s => s.name === name)
+
+      return {
+        id: index + 1,
+        modName: name,
+        active: status ? status.applied : false,
+        type: 'model', // 暂时固定，后续可以从文件名推断
+      }
+    })
+
+    console.log('Mod列表已更新:', modlist.value)
+  } catch (error) {
+    console.error('刷新mod列表失败:', error)
+  }
+}
+
+//删除mod
+const handleDeleteMod = async (id) => {
+  console.log('开始删除流程，ID:', id)
+  
+  try {
+    // 1. 根据id找到对应的mod
+    const modIndex = modlist.value.findIndex(mod => mod.id === id)
+
+    if (modIndex === -1) {
+      alert('找不到要删除的mod')
+      console.log('未找到mod，ID:', id)
+      return
+    }
+
+    const mod = modlist.value[modIndex]
+    const modName = mod.modName
+    console.log('找到要删除的mod:', modName)
+
+    // 2. 显示确认对话框 - 使用同步的confirm
+    const confirmDelete = window.confirm(`确定要删除 "${modName}" 吗？\n\n此操作将：\n1. 从游戏目录恢复原始文件\n2. 删除mod文件\n\n此操作不可撤销！`)
+    
+    if (!confirmDelete) {
+      console.log('用户取消了删除操作')
+      return
+    }
+
+    console.log('用户确认删除，开始调用后端...')
+    
+    // 3. 调用后端的删除命令
+    await invoke('delete_mod_file', { modName: modName })
+    
+    console.log('Mod文件已成功删除')
+    
+    // 4. 从前端列表中移除
+    modlist.value.splice(modIndex, 1)
+    
+    // 5. 重新统计数量
+    console.log('删除成功，更新列表显示')
+    
+    // 可选：显示成功提示
+    alert(`"${modName}" 已成功删除！`)
+    
+  } catch (error) {
+    console.error('删除失败:', error)
+    alert(`删除失败: ${error}`)
+  }
+}
+
+// 部署mod函数
+const handleDeployMods = async () => {
+  console.log('开始执行部署...');
+  
+  try {
+    // 1. 筛选出所有已启用的 Mod 文件名
+    const activeModNames = modlist.value
+      .filter(mod => mod.active)
+      .map(mod => mod.modName);
+
+    if (activeModNames.length === 0) {
+      if (!window.confirm("当前未启用任何Mod，是否继续？(这可能不会更改游戏文件)")) {
+        return;
+      }
+    }
+
+    // 2. 调用后端部署命令
+    // 注意：这里我们传递的是选中的名称列表
+    await invoke('deploy_mods', { modNames: activeModNames });
+
+    alert(`✅ 部署成功！已应用 ${activeModNames.length} 个项目。`);
+    
+    // 3. 刷新列表状态
+    await refreshModList();
+    
+  } catch (error) {
+    console.error('部署失败:', error);
+    alert(`部署失败: ${error}`);
+  }
+};
+
+//启动游戏
 const handleLaunchGame = async () => {
   if (isLaunching.value) return
   isLaunching.value = true
@@ -282,6 +393,35 @@ const handleLaunchGame = async () => {
     isLaunching.value = false
   }
 }
+
+// 在前端添加调试函数
+const debugPaths = async () => {
+  console.log('获取路径调试信息...')
+  try {
+    const paths = await invoke('debug_paths')
+    console.log('路径调试信息:')
+    console.log(paths)
+    
+    // 同时测试list_mods
+    const mods = await invoke('list_mods')
+    console.log('list_mods结果:', mods)
+    
+    return { paths, mods }
+  } catch (error) {
+    console.error('调试失败:', error)
+    return null
+  }
+}
+
+
+onMounted(async () => {
+console.log('组件已加载')
+  const debugInfo = await debugPaths()
+  console.log('调试信息:', debugInfo)
+  
+  // 正常刷新列表
+  await refreshModList()
+})
 </script>
 
 <style scoped>
@@ -1046,6 +1186,84 @@ const handleLaunchGame = async () => {
   box-shadow: 0 8px 32px var(--accent-glow);
 }
 
+/* Windows 11风格的关闭按钮 */
+.win-close-btn {
+  position: absolute;
+  top: 0px; /* 紧贴顶部 */
+  right: 0px; /* 紧贴右侧 */
+  width: 24px; /* Windows按钮标准大小 */
+  height: 24px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.33, 1, 0.68, 1);
+  z-index: 20;
+  opacity: 0;
+  border-radius: 0 8px 0 0; /* 轻微的圆角 */
+}
+
+/* 悬停时的Windows特效 */
+.mod-card:hover .win-close-btn {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 按钮状态 */
+.win-close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* 悬停状态 - Windows经典红色 */
+.win-close-btn:hover {
+  background: #e81123 !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* 激活状态 */
+.win-close-btn:active {
+  background: #c50f1e !important;
+}
+
+/* 更精致的关闭图标 */
+.close-icon {
+  color: rgba(0, 0, 0, 0.8);
+  stroke-width: 1.8;
+  transition: all 0.2s ease;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.1));
+}
+
+:global(.dark-mode) .close-icon {
+  color: rgba(255, 255, 255, 0.9);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
+}
+
+/* 悬停时图标动画 */
+.win-close-btn:hover .close-icon {
+  color: white;
+  transform: scale(1.1);
+}
+
+/* 小屏幕优化 */
+@media (max-width: 768px) {
+  .win-close-btn {
+    width: 28px;
+    height: 28px;
+    opacity: 0.9;
+    background: rgba(232, 17, 35, 0.15);
+  }
+
+  .close-icon {
+    width: 12px;
+    height: 12px;
+  }
+}
+
 /* 状态指示器 */
 .status-indicator {
   width: 10px;
@@ -1106,10 +1324,11 @@ const handleLaunchGame = async () => {
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
+  margin-right: 10px;
 }
 
 .mod-title {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 16px;
   white-space: nowrap;
   overflow: hidden;
@@ -1125,6 +1344,7 @@ const handleLaunchGame = async () => {
   color: var(--text-dim);
   font-weight: 600;
   letter-spacing: 0.5px;
+  flex-shrink: 0;
 }
 
 .mod-desc {

@@ -366,6 +366,24 @@ async fn get_mod_status(app: AppHandle) -> Result<Vec<ModStatus>, String> {
     Ok(statuses)
 }
 
+#[command]
+async fn deploy_mods(app: AppHandle, mod_names: Vec<String>) -> Result<(), String> {
+    // 1. 获取游戏路径
+    let game_path_str = get_game_path(app.clone())?.ok_or("请先在‘启动游戏’处设置游戏路径")?;
+    
+    // 2. (可选) 这里的策略是：在部署新Mod前，可以先根据需要考虑是否恢复纯净备份
+    // 为了简单，我们直接执行安装逻辑，install_mod_logic 内部自带备份功能
+    
+    for name in mod_names {
+        println!("正在部署 Mod: {}", name);
+        // 调用你现有的 install_mod_logic 辅助函数
+        // 该函数会自动：备份原文件 -> 解压覆盖新文件
+        install_mod_logic(&app, &name)?;
+    }
+
+    Ok(())
+}
+
 // ================= 入口函数 =================
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -385,7 +403,8 @@ pub fn run() {
             apply_mod_exclusive, // 智能安装
             restore_mod,         // 卸载
             delete_mod_file,     // 删除
-            get_mod_status       // 状态检查
+            get_mod_status,       // 状态检查
+            deploy_mods
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
