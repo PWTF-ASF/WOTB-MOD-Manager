@@ -55,6 +55,12 @@
   <!-- 中间列表：卡片式流 -->
   <section class="modules-grid" :class="{ 'grid-layout': isGridLayout, 'list-layout': !isGridLayout }">
     <div class="mod-card" v-for="mods in filtermodlist" :key="mods.id" :class="{ 'active-card': mods.active }">
+      <!-- 多选框（左上角） -->
+      <div class="selection-checkbox">
+        <input type="checkbox" v-model="mods.selected" @click.stop :id="'mod-select-' + mods.id" />
+        <label :for="'mod-select-' + mods.id" class="checkbox-label"></label>
+      </div>
+
       <!-- Windows风格关闭按钮 -->
       <button class="win-close-btn" @click.stop="handleDeleteMod(mods.id)" title="删除此Mod">
         <svg class="close-icon" viewBox="0 0 10 10" width="10" height="10">
@@ -87,9 +93,57 @@
   <!-- 底部控制台 -->
   <footer class="control-deck">
     <div class="deck-left">
-      <button class="deck-btn danger">卸载选中</button>
-      <button class="deck-btn" @click="handleDeployMods()">部署mod</button>
-      <button class="deck-btn" @click="handleAddMod()">添加mod</button>
+      <!-- 批量操作行 -->
+      <div class="btn-row">
+        <button class="icon-btn" @click="selectAll" :title="isAllSelected ? '取消全选' : '全选'">
+          <svg class="icon" viewBox="0 0 24 24" width="16" height="16">
+            <path
+              d="M9 11H7V13H9V11ZM13 11H11V13H13V11ZM17 11H15V13H17V11ZM19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM19 19H5V5H19V19Z"
+            />
+          </svg>
+          <span>{{ isAllSelected ? '取消全选' : '全选' }}</span>
+        </button>
+
+        <button class="icon-btn" @click="handleBatchToggle(true)" title="启用选中">
+          <svg class="icon" viewBox="0 0 24 24" width="16" height="16">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+          </svg>
+          <span>启用</span>
+        </button>
+
+        <button class="icon-btn" @click="handleBatchToggle(false)" title="禁用选中">
+          <svg class="icon" viewBox="0 0 24 24" width="16" height="16">
+            <path
+              d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+            />
+          </svg>
+          <span>禁用</span>
+        </button>
+      </div>
+
+      <!-- 操作行 -->
+      <div class="btn-row">
+        <button class="icon-btn accent" @click="handleDeployMods()" title="部署mod">
+          <svg class="icon" viewBox="0 0 24 24" width="16" height="16">
+            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+          </svg>
+          <span>部署</span>
+        </button>
+
+        <button class="icon-btn" @click="handleAddMod()" title="添加mod">
+          <svg class="icon" viewBox="0 0 24 24" width="16" height="16">
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+          </svg>
+          <span>添加</span>
+        </button>
+
+        <button class="icon-btn danger" @click="handleBatchDelete" title="删除选中">
+          <svg class="icon" viewBox="0 0 24 24" width="16" height="16">
+            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+          </svg>
+          <span>删除</span>
+        </button>
+      </div>
     </div>
 
     <div class="deck-right">
@@ -108,38 +162,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog' // 引入选择框插件
-import { type } from 'os'
+import { ask } from '@tauri-apps/plugin-dialog'
 
 // ================= 响应式数据 =================
 const isGridLayout = ref(true)
 const currentCategory = ref('all')
 const navRef = ref(null)
-const modlist = ref([
-  {
-    id: 1,
-    active: true,
-    modName: 'a1',
-    type: 'model',
-  },
-  {
-    id: 2,
-    active: false,
-    modName: 'a2',
-    type: 'voice',
-  },
-  {
-    id: 3,
-    active: false,
-    modName: 'a3',
-    type: 'ui',
-  },
-  {
-    id: 4,
-    active: false,
-    modName: 'a4',
-    type: 'ui',
-  },
-])
+const modlist = ref([])
 // 游戏启动状态
 const isLaunching = ref(false)
 
@@ -163,6 +192,7 @@ const categories = [
 const toggleLayout = () => {
   isGridLayout.value = !isGridLayout.value
 }
+
 const filtermodlist = computed(() => {
   if (currentCategory.value === 'all') {
     return modlist.value
@@ -170,12 +200,15 @@ const filtermodlist = computed(() => {
     return modlist.value.filter(mods => mods.type === currentCategory.value)
   }
 })
+
 const totalmods = computed(() => {
   return modlist.value.length
 })
+
 const activemods = computed(() => {
   return modlist.value.filter(mods => mods.active).length
 })
+
 const TYPE_MAP = {
   all: '全部',
   model: '3d模型',
@@ -183,9 +216,11 @@ const TYPE_MAP = {
   ui: 'UI',
   lightIcon: '点亮图标',
 }
+
 const formatType = type => {
   return TYPE_MAP[type] || '未知类型'
 }
+
 //滚轮重定向 (纵向转横向)
 const handleWheel = e => {
   if (e.deltaY !== 0) {
@@ -216,6 +251,58 @@ const handleMouseUp = () => {
 
 const selectCategory = type => {
   currentCategory.value = type
+}
+
+// 全选/取消全选
+const selectAll = () => {
+  const allSelected = modlist.value.every(mod => mod.selected)
+  modlist.value.forEach(mod => {
+    mod.selected = !allSelected
+  })
+}
+
+// 计算属性：是否全选
+const isAllSelected = computed(() => {
+  return modlist.value.length > 0 && modlist.value.every(mod => mod.selected)
+})
+//批量删除
+const handleBatchDelete = async () => {
+  const selectedMods = modlist.value.filter(mod => mod.selected)
+  if (selectedMods.length === 0) {
+    alert('请先选择要删除的Mod')
+    return
+  }
+
+  // ✅ 使用 await 等待用户选择
+  const confirmDelete = await ask(`确定要删除选中的 ${selectedMods.length} 个Mod吗？`, {
+    title: '确认删除',
+    kind: 'warning',
+    okLabel: '删除',
+    cancelLabel: '取消',
+  })
+
+  console.log('confirmDelete =', confirmDelete) // true / false
+  if (!confirmDelete) return
+
+  try {
+    for (const mod of selectedMods) {
+      await invoke('delete_mod_file', { modName: mod.modName })
+    }
+    await refreshModList()
+    alert(`已成功删除 ${selectedMods.length} 个Mod`)
+  } catch (error) {
+    console.error('批量删除失败:', error)
+    alert(`批量删除失败: ${error}`)
+  }
+}
+
+// 批量启用/禁用
+const handleBatchToggle = enable => {
+  modlist.value
+    .filter(mod => mod.selected)
+    .forEach(mod => {
+      mod.active = enable
+    })
 }
 
 //添加mod（需要结合后端）
@@ -251,24 +338,16 @@ const handleAddMod = async () => {
 // 刷新mod列表函数
 const refreshModList = async () => {
   try {
-    // 1. 获取所有mod文件列表
-    const modNames = await invoke('list_mods')
+    // 单个调用获取所有数据
+    const modStatuses = await invoke('get_mods_with_status')
 
-    // 2. 获取所有mod的状态
-    const modStatuses = await invoke('get_mod_status')
-
-    // 3. 更新前端的modlist
-    modlist.value = modNames.map((name, index) => {
-      // 找到对应的状态
-      const status = modStatuses.find(s => s.name === name)
-
-      return {
-        id: index + 1,
-        modName: name,
-        active: status ? status.applied : false,
-        type: 'model', // 暂时固定，后续可以从文件名推断
-      }
-    })
+    // 直接映射到前端数据结构
+    modlist.value = modStatuses.map((status, index) => ({
+      id: index + 1,
+      modName: status.name,
+      active: status.applied,
+      type: 'model',
+    }))
 
     console.log('Mod列表已更新:', modlist.value)
   } catch (error) {
@@ -277,9 +356,9 @@ const refreshModList = async () => {
 }
 
 //删除mod
-const handleDeleteMod = async (id) => {
+const handleDeleteMod = async id => {
   console.log('开始删除流程，ID:', id)
-  
+
   try {
     // 1. 根据id找到对应的mod
     const modIndex = modlist.value.findIndex(mod => mod.id === id)
@@ -295,29 +374,23 @@ const handleDeleteMod = async (id) => {
     console.log('找到要删除的mod:', modName)
 
     // 2. 显示确认对话框 - 使用同步的confirm
-    const confirmDelete = window.confirm(`确定要删除 "${modName}" 吗？\n\n此操作将：\n1. 从游戏目录恢复原始文件\n2. 删除mod文件\n\n此操作不可撤销！`)
-    
-    if (!confirmDelete) {
-      console.log('用户取消了删除操作')
-      return
-    }
+    const confirmDelete = await ask(`确定要删除 "${modName}" 吗？`, {
+      title: '确认删除',
+      kind: 'warning',
+      okLabel: '删除',
+      cancelLabel: '取消',
+    })
 
-    console.log('用户确认删除，开始调用后端...')
-    
+    if (!confirmDelete) return
+
     // 3. 调用后端的删除命令
     await invoke('delete_mod_file', { modName: modName })
-    
-    console.log('Mod文件已成功删除')
-    
+
     // 4. 从前端列表中移除
     modlist.value.splice(modIndex, 1)
-    
-    // 5. 重新统计数量
-    console.log('删除成功，更新列表显示')
-    
+
     // 可选：显示成功提示
     alert(`"${modName}" 已成功删除！`)
-    
   } catch (error) {
     console.error('删除失败:', error)
     alert(`删除失败: ${error}`)
@@ -326,34 +399,30 @@ const handleDeleteMod = async (id) => {
 
 // 部署mod函数
 const handleDeployMods = async () => {
-  console.log('开始执行部署...');
-  
+  console.log('开始执行部署...')
+
   try {
     // 1. 筛选出所有已启用的 Mod 文件名
-    const activeModNames = modlist.value
-      .filter(mod => mod.active)
-      .map(mod => mod.modName);
+    const activeModNames = modlist.value.filter(mod => mod.active).map(mod => mod.modName)
 
     if (activeModNames.length === 0) {
-      if (!window.confirm("当前未启用任何Mod，是否继续？(这可能不会更改游戏文件)")) {
-        return;
+      if (!window.confirm('当前未启用任何Mod，是否继续？(这可能不会更改游戏文件)')) {
+        return
       }
     }
 
     // 2. 调用后端部署命令
-    // 注意：这里我们传递的是选中的名称列表
-    await invoke('deploy_mods', { modNames: activeModNames });
+    await invoke('deploy_mods', { modNames: activeModNames })
 
-    alert(`✅ 部署成功！已应用 ${activeModNames.length} 个项目。`);
-    
+    alert(`✅ 部署成功！已应用 ${activeModNames.length} 个项目。`)
+
     // 3. 刷新列表状态
-    await refreshModList();
-    
+    await refreshModList()
   } catch (error) {
-    console.error('部署失败:', error);
-    alert(`部署失败: ${error}`);
+    console.error('部署失败:', error)
+    alert(`部署失败: ${error}`)
   }
-};
+}
 
 //启动游戏
 const handleLaunchGame = async () => {
@@ -394,32 +463,8 @@ const handleLaunchGame = async () => {
   }
 }
 
-// 在前端添加调试函数
-const debugPaths = async () => {
-  console.log('获取路径调试信息...')
-  try {
-    const paths = await invoke('debug_paths')
-    console.log('路径调试信息:')
-    console.log(paths)
-    
-    // 同时测试list_mods
-    const mods = await invoke('list_mods')
-    console.log('list_mods结果:', mods)
-    
-    return { paths, mods }
-  } catch (error) {
-    console.error('调试失败:', error)
-    return null
-  }
-}
-
-
 onMounted(async () => {
-console.log('组件已加载')
-  const debugInfo = await debugPaths()
-  console.log('调试信息:', debugInfo)
-  
-  // 正常刷新列表
+  console.log('组件已加载')
   await refreshModList()
 })
 </script>
@@ -1186,6 +1231,66 @@ console.log('组件已加载')
   box-shadow: 0 8px 32px var(--accent-glow);
 }
 
+/* 多选框样式 */
+.selection-checkbox {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+}
+
+.selection-checkbox input[type='checkbox'] {
+  display: none;
+}
+
+.checkbox-label {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.checkbox-label:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.selection-checkbox input:checked + .checkbox-label {
+  background: #0078d4;
+  border-color: #0078d4;
+}
+
+.selection-checkbox input:checked + .checkbox-label::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* 选中的卡片效果 */
+.selected-card {
+  box-shadow:
+    0 0 0 2px #0078d4,
+    0 4px 8px rgba(0, 120, 212, 0.3);
+  background: linear-gradient(135deg, rgba(0, 120, 212, 0.1) 0%, transparent 50%);
+}
+
+/* 调整关闭按钮位置，避免重叠 */
+.win-close-btn {
+  top: 12px;
+  right: 12px;
+  left: auto; /* 确保不会影响左侧 */
+}
+
 /* Windows 11风格的关闭按钮 */
 .win-close-btn {
   position: absolute;
@@ -1445,44 +1550,27 @@ input:checked:hover + .slider {
   gap: 10px;
 }
 
-/* 按钮样式 - 优化明暗模式 */
-.deck-btn {
-  height: 40px;
-  padding: 0 24px;
+/* 图标按钮样式 */
+.icon-btn {
+  height: 36px;
+  padding: 0 12px;
   background: var(--glass-effect);
   border: 1px solid var(--border);
   color: var(--text-main);
   font-family: inherit;
-  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s var(--animation-timing);
-  text-transform: uppercase;
-  text-align: center;
-  line-height: 40px;
-  font-size: 12px;
-  letter-spacing: 1px;
   border-radius: 6px;
-  position: relative;
-  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.deck-btn::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: var(--accent);
-  transform: translate(-50%, -50%);
-  transition:
-    width 0.6s,
-    height 0.6s;
-  opacity: 0.1;
-}
-
-.deck-btn:hover {
+.icon-btn:hover {
   border-color: var(--accent);
   color: var(--text-accent);
   background: var(--glass-effect-hover);
@@ -1490,25 +1578,44 @@ input:checked:hover + .slider {
   box-shadow: 0 4px 12px var(--accent-glow);
 }
 
-.deck-btn:hover::before {
-  width: 200%;
-  height: 200%;
+.icon-btn .icon {
+  fill: currentColor;
+  transition: transform 0.2s;
 }
 
-.deck-btn:active {
-  transform: scale(0.96);
+.icon-btn:hover .icon {
+  transform: scale(1.1);
 }
 
-.deck-btn.danger {
+/* 按钮行布局 */
+.btn-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.btn-row:last-child {
+  margin-bottom: 0;
+}
+
+/* 危险按钮 */
+.icon-btn.danger {
   border-color: #dc2626;
   color: #ef4444;
 }
 
-.deck-btn.danger:hover {
+.icon-btn.danger:hover {
   border-color: #ef4444;
   background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+/* 强调按钮 */
+.icon-btn.accent {
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.1) 0%, transparent 100%);
+  border-color: var(--accent);
+  color: var(--text-accent);
 }
 
 /* 启动按钮 - 优化明暗模式 */

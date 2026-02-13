@@ -44,7 +44,7 @@
             <span class="desc-sm">下载的 Mod 文件将保存在此位置</span>
           </div>
           <div class="input-row">
-            <input type="text" v-model="config.modPath" placeholder="选择文件夹..." readonly />
+            <input type="text" v-model="config.modRepoPath" placeholder="选择文件夹..." readonly />
             <button class="btn-browse" @click="selectPath('mod')">浏览</button>
           </div>
         </div>
@@ -60,27 +60,65 @@
 
 <script setup lang="ts">
 import { reactive, type Ref, inject } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import { open } from '@tauri-apps/plugin-dialog'
 
 // 1. 注入全局毛玻璃状态
 // 这里的类型断言确保 TypeScript 知道这是一个 ref
 const globalBlur = inject('GlobalBlur') as Ref<boolean>
 
-// 模拟配置数据结构
+// 配置状态
 const config = reactive({
-  gamePath: 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\World of Tanks Blitz',
-  modPath: 'D:\\WOTB_Mods\\Library',
+  gamePath: '',
+  modRepoPath: '',
 })
 
-// 模拟选择路径功能
-const selectPath = (type: 'game' | 'mod') => {
-  console.log(`Open file dialog for: ${type}`)
+// 加载保存的路径
+onMounted(async () => {
+  try {
+    const gamePath = await invoke('get_game_path')
+    config.gamePath = (gamePath as string) || ''
+  } catch (e) {
+    console.error(e)
+  }
+  try {
+    const modRepoPath = await invoke('get_mod_repo_path')
+    config.modRepoPath = (modRepoPath as string) || ''
+  } catch (e) {
+    console.error(e)
+  }
+})
+
+// 选择文件夹
+const selectPath = async (type: 'game' | 'mod') => {
+  const selected = await open({
+    directory: true,
+    multiple: false,
+    title: type === 'game' ? '选择游戏安装目录' : '选择Mod存储库目录',
+  });
+  
+  if (selected && !Array.isArray(selected)) {
+    if (type === 'game') {
+      config.gamePath = selected;
+      await invoke('set_game_path', { path: selected });
+    } else { // type === 'mod'
+      config.modRepoPath = selected;
+      await invoke('set_mod_repo_path', { path: selected });
+      
+      if (confirm('是否将当前默认目录中的 Mod 文件移动到新位置？')) {
+        await invoke('migrate_mod_repo', { newPath: selected });
+      }
+    }
+  }
 }
 
-// 重置功能
-const resetToDefaults = () => {
+// 重置
+const resetToDefaults = async () => {
   if (confirm('确定要重置所有设置吗？此操作无法撤销。')) {
     config.gamePath = ''
-    config.modPath = ''
+    config.modRepoPath = ''
+    await invoke('set_game_path', { path: '' })
+    await invoke('set_mod_repo_path', { path: '' })
   }
 }
 </script>

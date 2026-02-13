@@ -11,22 +11,22 @@ name         = "tauri_app_lib"
 crate-type   = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.3", features = [] }
 
 [dependencies]
-tauri                        = { version = "2", features = [] }
-tauri-plugin-shell           = "2"
-tauri-plugin-prevent-default = "2.1"
-tauri-plugin-dialog          = "2.3.2"
-tauri-plugin-fs              = "2.4.1"
+tauri                        = { version = "2.3", features = [] }
+tauri-plugin-shell           = "2.3"
+tauri-plugin-prevent-default = "2.1"       # 无需改动
+tauri-plugin-dialog          = "2.3"
+tauri-plugin-fs              = "2.3"
 
-zip = "2.0"       # 处理 zip 解压
-chrono    = "0.4"
-
-serde     = { version = "1.0", features = ["derive"] }
-serde_json= "1.0"
-sha2 = "0.10"     # 计算文件哈希
-hex = "0.4"       # 将哈希转为字符串
+# 其余依赖保持不变
+zip = "2.0"
+chrono = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+hex = "0.4"
 
 [profile.dev]
 incremental = true

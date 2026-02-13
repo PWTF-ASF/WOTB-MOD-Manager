@@ -16,9 +16,10 @@
     "check": "cargo check --manifest-path src-tauri/Cargo.toml"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.6.0",
-    "@tauri-apps/plugin-dialog": "^2.4.0",
-    "@tauri-apps/plugin-shell": "^2.2.2",
+    "@tauri-apps/api": "^2.3.0",
+    "@tauri-apps/plugin-dialog": "2.3",
+    "@tauri-apps/plugin-fs": "2.3",
+    "@tauri-apps/plugin-shell": "2.3",
     "pinia": "^3.0.3",
     "vue": "^3.5.17",
     "vue-router": "^4.5.1"
@@ -29,7 +30,7 @@
     "@iconify/types": "^2.0.0",
     "@pinia/testing": "^1.0.2",
     "@tailwindcss/vite": "^4.1.10",
-    "@tauri-apps/cli": "^2.6.0",
+    "@tauri-apps/cli": "^2.3.1",
     "@tsconfig/node22": "^22.0.2",
     "@types/lodash-es": "^4.17.12",
     "@types/node": "^24.0.4",
