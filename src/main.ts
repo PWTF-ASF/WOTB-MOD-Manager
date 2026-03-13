@@ -4,6 +4,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import './assets/main.css'
 import router from './router';
+import { createDiscreteApi } from 'naive-ui'
 
 if (process.env.NODE_ENV === 'development') {
   devtools.connect('http://localhost', 8098)

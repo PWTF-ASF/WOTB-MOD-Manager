@@ -1,178 +1,239 @@
 <template>
-  <!-- 顶部信息栏 -->
-  <header class="top-deck">
-    <!-- 左侧：搜索 -->
-    <div class="search-container">
-      <div class="search-module">
-        <span class="search-icon"><img src="@/assets/vue.svg" /></span>
-        <input type="text" />
+  <div class="mod-library">
+    <!-- 顶部栏（重构后） -->
+    <header class="top-deck">
+      <div class="search-container">
+        <n-input v-model:value="searchQuery" size="tiny" clearable placeholder="搜索模组...">
+          <template #suffix>
+            <n-icon :component="SearchOutline" />
+          </template>
+        </n-input>
       </div>
-    </div>
 
-    <!-- 中间：响应式横向滚动导航 -->
-    <div class="category-wrapper">
-      <nav
-        class="category-nav"
-        ref="navRef"
-        @wheel="handleWheel"
-        @mousedown="handleMouseDown"
-        @mousemove="handleMouseMove"
-        @mouseup="handleMouseUp"
-        @mouseleave="handleMouseUp"
-      >
-        <button
-          v-for="cat in categories"
-          :key="cat.type"
-          class="nav-item"
-          :class="{ active: currentCategory === cat.type }"
-          @click="selectCategory(cat.type)"
+      <div class="category-wrapper">
+        <nav
+          ref="navRef"
+          class="category-nav"
+          @wheel="handleWheel"
+          @mousedown="handleMouseDown"
+          @mousemove="handleMouseMove"
+          @mouseup="handleMouseUp"
+          @mouseleave="handleMouseUp"
         >
-          {{ cat.name }}
-        </button>
-      </nav>
-    </div>
-
-    <!-- 右侧：原有工具组 -->
-    <div class="right-group">
-      <!-- 布局切换按钮 -->
-      <button class="layout-toggle" @click="toggleLayout" :title="isGridLayout ? '切换为列表布局' : '切换为网格布局'">
-        <span class="layout-icon">{{ isGridLayout ? '☰' : '□' }}</span>
-      </button>
-
-      <div class="stats-module">
-        <div class="stat-item">
-          <span class="stat-num">{{ totalmods }}</span>
-          <span class="stat-label">已安装</span>
-        </div>
-        <div class="stat-item active-stat">
-          <span class="stat-num">{{ activemods }}</span>
-          <span class="stat-label">运行中</span>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <!-- 中间列表：卡片式流 -->
-  <section class="modules-grid" :class="{ 'grid-layout': isGridLayout, 'list-layout': !isGridLayout }">
-    <div class="mod-card" v-for="mods in filtermodlist" :key="mods.id" :class="{ 'active-card': mods.active }">
-      <!-- 多选框（左上角） -->
-      <div class="selection-checkbox">
-        <input type="checkbox" v-model="mods.selected" @click.stop :id="'mod-select-' + mods.id" />
-        <label :for="'mod-select-' + mods.id" class="checkbox-label"></label>
+          <n-button
+            v-for="cat in categories"
+            :key="cat.type"
+            :type="currentCategory === cat.type ? 'primary' : 'default'"
+            size="small"
+            class="nav-item"
+            @click="selectCategory(cat.type)"
+          >
+            {{ cat.name }}
+          </n-button>
+        </nav>
       </div>
 
-      <!-- Windows风格关闭按钮 -->
-      <button class="win-close-btn" @click.stop="handleDeleteMod(mods.id)" title="删除此Mod">
-        <svg class="close-icon" viewBox="0 0 10 10" width="10" height="10">
-          <path
-            d="M0.5,0.5 L9.5,9.5 M0.5,9.5 L9.5,0.5"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-          />
-        </svg>
-      </button>
+      <div class="right-group">
+        <n-button
+          class="layout-toggle"
+          @click="toggleLayout"
+          :title="isGridLayout ? '切换为列表布局' : '切换为网格布局'"
+          size="large"
+        >
+          <template #icon>
+            <n-icon :component="isGridLayout ? ListOutline : GridOutline" />
+          </template>
+        </n-button>
 
-      <div class="status-indicator" :class="{ inactive: mods.active }"></div>
-      <div class="card-content">
-        <div class="mod-header">
-          <span class="mod-title">{{ mods.modName }}</span>
-          <span class="tag">{{ formatType(mods.type) }}</span>
-        </div>
-        <div class="mod-desc">必要的前置依赖文件</div>
+        <!-- 统计模块：使用 n-card + n-space + n-divider，确保垂直居中 -->
+        <n-card
+          :bordered="true"
+          size="small"
+          class="stats-module"
+          content-style="padding: 0;"
+        >
+          <n-space align="center" :size="16" justify="center" style="height: 100%; flex-wrap: nowrap;">
+            <n-statistic label="已添加" :value="totalmods" />
+            <!-- <n-divider vertical style="height: 30px;" /> -->
+            <n-statistic label="已安装" :value="activemods" class="installed-stat" />
+          </n-space>
+        </n-card>
       </div>
-      <div class="card-action">
-        <label class="switch">
-          <input type="checkbox" v-model="mods.active" />
-          <span class="slider"></span>
-        </label>
+    </header>
+
+    <!-- 中间卡片列表区域（保持不变） -->
+    <main class="modules-grid" :class="{ 'grid-layout': isGridLayout, 'list-layout': !isGridLayout }">
+      <!-- 网格布局 -->
+      <div v-if="isGridLayout" class="grid-container">
+        <n-card
+          v-for="mod in filtermodlist"
+          :key="mod.id"
+          class="mod-card grid-card"
+          :class="{ 'active-card': mod.active }"
+          size="small"
+          hoverable
+        >
+          <template #header>
+            <n-checkbox v-model:checked="mod.selected" size="small" />
+          </template>
+          <template #header-extra>
+            <n-button text class="win-close-btn" @click.stop="handleDeleteMod(mod.id)">
+              <n-icon size="14"><CloseOutline /></n-icon>
+            </n-button>
+          </template>
+          <div class="grid-card-content">
+            <div class="mod-icon">
+              <n-icon size="40" :depth="2"><DocumentOutline /></n-icon>
+            </div>
+            <div class="mod-header">
+              <span class="mod-title">{{ mod.modName }}</span>
+              <n-tag size="small" :bordered="false">{{ formatType(mod.type) }}</n-tag>
+            </div>
+            <div class="mod-meta">
+              <span>2.1 MB</span>
+              <span class="mod-date">2025-01-20</span>
+            </div>
+            <div class="mod-desc">必要的前置依赖文件</div>
+          </div>
+          <template #action>
+            <div class="card-action">
+              <n-switch v-model:value="mod.active" size="small" />
+              <div class="status-indicator" :class="{ inactive: mod.active }" />
+            </div>
+          </template>
+        </n-card>
       </div>
-    </div>
-  </section>
 
-  <!-- 底部控制台 -->
-  <footer class="control-deck">
-    <div class="deck-left">
-      <!-- 批量操作行 -->
-      <div class="btn-row">
-        <button class="icon-btn" @click="selectAll" :title="isAllSelected ? '取消全选' : '全选'">
-          <svg class="icon" viewBox="0 0 24 24" width="16" height="16">
-            <path
-              d="M9 11H7V13H9V11ZM13 11H11V13H13V11ZM17 11H15V13H17V11ZM19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM19 19H5V5H19V19Z"
-            />
-          </svg>
-          <span>{{ isAllSelected ? '取消全选' : '全选' }}</span>
-        </button>
+      <!-- 列表布局 -->
+      <div v-else class="list-container">
+        <n-card
+          v-for="mod in filtermodlist"
+          :key="mod.id"
+          class="mod-card list-card"
+          :class="{ 'active-card': mod.active }"
+          size="small"
+          hoverable
+        >
+          <template #header>
+            <n-checkbox v-model:checked="mod.selected" size="small" />
+          </template>
+          <template #header-extra>
+            <n-button text class="win-close-btn" @click.stop="handleDeleteMod(mod.id)">
+              <n-icon size="14"><CloseOutline /></n-icon>
+            </n-button>
+          </template>
+          <div class="list-layout-content">
+            <div class="mod-icon">
+              <n-icon size="24" :depth="2"><DocumentOutline /></n-icon>
+            </div>
+            <div class="mod-info">
+              <div class="mod-header">
+                <span class="mod-title">{{ mod.modName }}</span>
+                <n-tag size="small" :bordered="false">{{ formatType(mod.type) }}</n-tag>
+              </div>
+              <div class="mod-desc">必要的前置依赖文件 · 2.1 MB · 2025-01-20</div>
+            </div>
+            <div class="card-action">
+              <n-switch v-model:value="mod.active" size="small" />
+              <div class="status-indicator" :class="{ inactive: mod.active }" />
+            </div>
+          </div>
+        </n-card>
+      </div>
+    </main>
 
-        <button class="icon-btn" @click="handleBatchToggle(true)" title="启用选中">
-          <svg class="icon" viewBox="0 0 24 24" width="16" height="16">
-            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-          </svg>
-          <span>启用</span>
-        </button>
-
-        <button class="icon-btn" @click="handleBatchToggle(false)" title="禁用选中">
-          <svg class="icon" viewBox="0 0 24 24" width="16" height="16">
-            <path
-              d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-            />
-          </svg>
-          <span>禁用</span>
-        </button>
+    <!-- 底部控制台（保持不变） -->
+    <footer class="control-deck">
+      <div class="deck-left">
+        <n-space vertical :size="12">
+          <n-space :size="8">
+            <n-button @click="selectAll" size="small" secondary>
+              <template #icon><n-icon :component="CheckboxOutline" /></template>
+              {{ isAllSelected ? '取消全选' : '全选' }}
+            </n-button>
+            <n-button type="success" @click="handleBatchToggle(true)" size="small" secondary>
+              <template #icon><n-icon :component="CheckmarkOutline" /></template>
+              启用
+            </n-button>
+            <n-button type="warning" @click="handleBatchToggle(false)" size="small" secondary>
+              <template #icon><n-icon :component="CloseOutline" /></template>
+              禁用
+            </n-button>
+          </n-space>
+          <n-space :size="8">
+            <n-button type="primary" @click="handleDeployMods" size="small" secondary>
+              <template #icon><n-icon :component="RocketOutline" /></template>
+              部署
+            </n-button>
+            <n-button type="info" @click="handleAddMod" size="small" secondary>
+              <template #icon><n-icon :component="AddOutline" /></template>
+              添加
+            </n-button>
+            <n-button type="error" @click="handleBatchDelete" size="small" secondary>
+              <template #icon><n-icon :component="TrashOutline" /></template>
+              删除
+            </n-button>
+          </n-space>
+        </n-space>
       </div>
 
-      <!-- 操作行 -->
-      <div class="btn-row">
-        <button class="icon-btn accent" @click="handleDeployMods()" title="部署mod">
-          <svg class="icon" viewBox="0 0 24 24" width="16" height="16">
-            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
-          </svg>
-          <span>部署</span>
-        </button>
-
-        <button class="icon-btn" @click="handleAddMod()" title="添加mod">
-          <svg class="icon" viewBox="0 0 24 24" width="16" height="16">
-            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-          </svg>
-          <span>添加</span>
-        </button>
-
-        <button class="icon-btn danger" @click="handleBatchDelete" title="删除选中">
-          <svg class="icon" viewBox="0 0 24 24" width="16" height="16">
-            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
-          </svg>
-          <span>删除</span>
-        </button>
+      <div class="deck-right">
+        <n-button
+          class="launch-btn"
+          :loading="isLaunching"
+          type="info"
+          @click="handleLaunchGame"
+          size="large"
+          :disabled="isLaunching"
+        >
+          <div class="launch-text">
+            <span class="launch-title">{{ isLaunching ? '正在启动...' : '启动游戏' }}</span>
+            <span class="launch-sub">READY TO LAUNCH</span>
+          </div>
+        </n-button>
       </div>
-    </div>
-
-    <div class="deck-right">
-      <button class="launch-btn" @click="handleLaunchGame" :disabled="isLaunching">
-        <div class="launch-content">
-          <span class="launch-title">{{ isLaunching ? '正在启动...' : '启动游戏' }}</span>
-          <span class="launch-sub">READY TO LAUNCH</span>
-        </div>
-        <div class="launch-effect"></div>
-      </button>
-    </div>
-  </footer>
+    </footer>
+  </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { open } from '@tauri-apps/plugin-dialog' // 引入选择框插件
-import { ask } from '@tauri-apps/plugin-dialog'
+import { open, ask } from '@tauri-apps/plugin-dialog'
+import {
+  NInput,
+  NButton,
+  NCheckbox,
+  NSwitch,
+  NCard,
+  NStatistic,
+  NSpace,
+  NTag,
+  NIcon,
+  NDivider,
+} from 'naive-ui'
+import {
+  DocumentOutline,
+  SearchOutline,
+  ListOutline,
+  GridOutline,
+  CloseOutline,
+  CheckboxOutline,
+  CheckmarkOutline,
+  RocketOutline,
+  AddOutline,
+  TrashOutline,
+} from '@vicons/ionicons5'
 
 // ================= 响应式数据 =================
 const isGridLayout = ref(true)
 const currentCategory = ref('all')
 const navRef = ref(null)
 const modlist = ref([])
-// 游戏启动状态
 const isLaunching = ref(false)
+const searchQuery = ref('')
 
-//鼠标拖拽逻辑
+// 鼠标拖拽逻辑
 let isDragging = false
 let startX = 0
 let scrollLeft = 0
@@ -184,30 +245,9 @@ const categories = [
   { type: 'voice', name: '语音包' },
   { type: 'ui', name: 'UI' },
   { type: 'lightIcon', name: '点亮' },
-  { type: 'script', name: '扩展脚本' }, // 增加几个测试滚动
+  { type: 'script', name: '扩展脚本' },
   { type: 'map', name: '地图纹理' },
 ]
-
-// ================= 方法 =================
-const toggleLayout = () => {
-  isGridLayout.value = !isGridLayout.value
-}
-
-const filtermodlist = computed(() => {
-  if (currentCategory.value === 'all') {
-    return modlist.value
-  } else {
-    return modlist.value.filter(mods => mods.type === currentCategory.value)
-  }
-})
-
-const totalmods = computed(() => {
-  return modlist.value.length
-})
-
-const activemods = computed(() => {
-  return modlist.value.filter(mods => mods.active).length
-})
 
 const TYPE_MAP = {
   all: '全部',
@@ -217,11 +257,33 @@ const TYPE_MAP = {
   lightIcon: '点亮图标',
 }
 
-const formatType = type => {
-  return TYPE_MAP[type] || '未知类型'
+// ================= 计算属性 =================
+const filtermodlist = computed(() => {
+  let result = modlist.value
+  if (currentCategory.value !== 'all') {
+    result = result.filter(mod => mod.type === currentCategory.value)
+  }
+  const query = searchQuery.value.trim().toLowerCase()
+  if (query) {
+    result = result.filter(mod => mod.modName.toLowerCase().includes(query))
+  }
+  return result
+})
+
+const totalmods = computed(() => modlist.value.length)
+const activemods = computed(() => modlist.value.filter(m => m.active).length)
+const isAllSelected = computed(() => {
+  return modlist.value.length > 0 && modlist.value.every(mod => mod.selected)
+})
+
+// ================= 方法 =================
+const toggleLayout = () => {
+  isGridLayout.value = !isGridLayout.value
 }
 
-//滚轮重定向 (纵向转横向)
+const formatType = type => TYPE_MAP[type] || '未知类型'
+
+// 横向滚轮
 const handleWheel = e => {
   if (e.deltaY !== 0) {
     e.preventDefault()
@@ -229,6 +291,7 @@ const handleWheel = e => {
   }
 }
 
+// 拖拽滚动
 const handleMouseDown = e => {
   isDragging = true
   navRef.value.classList.add('grabbing')
@@ -240,7 +303,7 @@ const handleMouseMove = e => {
   if (!isDragging) return
   e.preventDefault()
   const x = e.pageX - navRef.value.offsetLeft
-  const walk = (x - startX) * 1.5 // 1.5是滚动速度
+  const walk = (x - startX) * 1.5
   navRef.value.scrollLeft = scrollLeft - walk
 }
 
@@ -261,41 +324,6 @@ const selectAll = () => {
   })
 }
 
-// 计算属性：是否全选
-const isAllSelected = computed(() => {
-  return modlist.value.length > 0 && modlist.value.every(mod => mod.selected)
-})
-//批量删除
-const handleBatchDelete = async () => {
-  const selectedMods = modlist.value.filter(mod => mod.selected)
-  if (selectedMods.length === 0) {
-    alert('请先选择要删除的Mod')
-    return
-  }
-
-  // ✅ 使用 await 等待用户选择
-  const confirmDelete = await ask(`确定要删除选中的 ${selectedMods.length} 个Mod吗？`, {
-    title: '确认删除',
-    kind: 'warning',
-    okLabel: '删除',
-    cancelLabel: '取消',
-  })
-
-  console.log('confirmDelete =', confirmDelete) // true / false
-  if (!confirmDelete) return
-
-  try {
-    for (const mod of selectedMods) {
-      await invoke('delete_mod_file', { modName: mod.modName })
-    }
-    await refreshModList()
-    alert(`已成功删除 ${selectedMods.length} 个Mod`)
-  } catch (error) {
-    console.error('批量删除失败:', error)
-    alert(`批量删除失败: ${error}`)
-  }
-}
-
 // 批量启用/禁用
 const handleBatchToggle = enable => {
   modlist.value
@@ -305,1228 +333,380 @@ const handleBatchToggle = enable => {
     })
 }
 
-//添加mod（需要结合后端）
-const handleAddMod = async () => {
-  console.log('开始添加mod')
+// 批量删除
+const handleBatchDelete = async () => {
+  const selectedMods = modlist.value.filter(mod => mod.selected)
+  if (selectedMods.length === 0) {
+    window.alert('请先选择要删除的Mod')
+    return
+  }
+  const confirmDelete = await ask(`确定要删除选中的 ${selectedMods.length} 个Mod吗？`, {
+    title: '确认删除',
+    kind: 'warning',
+    okLabel: '删除',
+    cancelLabel: '取消',
+  })
+  if (!confirmDelete) return
   try {
-    //打开选择对话框
-    const selected = await open({
-      title: '请选择mod文件',
-      multiple: false, // 一次只选一个
-      directory: false,
-    })
-
-    //判断用户是否选择了文件
-    if (selected) {
-      // 调用后端复制文件到mods目录
-      await invoke('copy_mod_file', { src: selected })
-      console.log('Mod文件已复制到mods目录')
-
-      // 刷新mod列表
-      await refreshModList()
-
-      alert('添加成功')
-    } else {
-      console.log('用户取消选择')
+    for (const mod of selectedMods) {
+      await invoke('delete_mod_file', { modName: mod.modName })
     }
+    await refreshModList()
+    window.alert(`已成功删除 ${selectedMods.length} 个Mod`)
   } catch (error) {
-    console.error('出错了:', error)
-    alert(`添加Mod时出错: ${error}`)
+    console.error('批量删除失败:', error)
+    window.alert(`批量删除失败: ${error}`)
   }
 }
 
-// 刷新mod列表函数
+// 添加 Mod
+const handleAddMod = async () => {
+  try {
+    const selected = await open({
+      title: '请选择mod文件',
+      multiple: false,
+      directory: false,
+    })
+    if (selected) {
+      await invoke('copy_mod_file', { src: selected })
+      await refreshModList()
+      window.alert('添加成功')
+    }
+  } catch (error) {
+    console.error('出错了:', error)
+    window.alert(`添加Mod时出错: ${error}`)
+  }
+}
+
+// 刷新列表
 const refreshModList = async () => {
   try {
-    // 单个调用获取所有数据
     const modStatuses = await invoke('get_mods_with_status')
-
-    // 直接映射到前端数据结构
     modlist.value = modStatuses.map((status, index) => ({
       id: index + 1,
       modName: status.name,
       active: status.applied,
       type: 'model',
+      selected: false,
     }))
-
-    console.log('Mod列表已更新:', modlist.value)
   } catch (error) {
     console.error('刷新mod列表失败:', error)
   }
 }
 
-//删除mod
+// 删除单个 Mod
 const handleDeleteMod = async id => {
-  console.log('开始删除流程，ID:', id)
-
   try {
-    // 1. 根据id找到对应的mod
     const modIndex = modlist.value.findIndex(mod => mod.id === id)
-
-    if (modIndex === -1) {
-      alert('找不到要删除的mod')
-      console.log('未找到mod，ID:', id)
-      return
-    }
-
+    if (modIndex === -1) return
     const mod = modlist.value[modIndex]
-    const modName = mod.modName
-    console.log('找到要删除的mod:', modName)
-
-    // 2. 显示确认对话框 - 使用同步的confirm
-    const confirmDelete = await ask(`确定要删除 "${modName}" 吗？`, {
+    const confirmDelete = await ask(`确定要删除 "${mod.modName}" 吗？`, {
       title: '确认删除',
       kind: 'warning',
       okLabel: '删除',
       cancelLabel: '取消',
     })
-
     if (!confirmDelete) return
-
-    // 3. 调用后端的删除命令
-    await invoke('delete_mod_file', { modName: modName })
-
-    // 4. 从前端列表中移除
+    await invoke('delete_mod_file', { modName: mod.modName })
     modlist.value.splice(modIndex, 1)
-
-    // 可选：显示成功提示
-    alert(`"${modName}" 已成功删除！`)
+    window.alert(`"${mod.modName}" 已成功删除！`)
   } catch (error) {
     console.error('删除失败:', error)
-    alert(`删除失败: ${error}`)
+    window.alert(`删除失败: ${error}`)
   }
 }
 
-// 部署mod函数
+// 部署 Mod
 const handleDeployMods = async () => {
-  console.log('开始执行部署...')
-
   try {
-    // 1. 筛选出所有已启用的 Mod 文件名
     const activeModNames = modlist.value.filter(mod => mod.active).map(mod => mod.modName)
-
     if (activeModNames.length === 0) {
-      if (!window.confirm('当前未启用任何Mod，是否继续？(这可能不会更改游戏文件)')) {
-        return
-      }
+      if (!window.confirm('当前未启用任何Mod，是否继续？')) return
     }
-
-    // 2. 调用后端部署命令
     await invoke('deploy_mods', { modNames: activeModNames })
-
-    alert(`✅ 部署成功！已应用 ${activeModNames.length} 个项目。`)
-
-    // 3. 刷新列表状态
+    window.alert(`✅ 部署成功！已应用 ${activeModNames.length} 个项目。`)
     await refreshModList()
   } catch (error) {
     console.error('部署失败:', error)
-    alert(`部署失败: ${error}`)
+    window.alert(`部署失败: ${error}`)
   }
 }
 
-//启动游戏
+// 启动游戏
 const handleLaunchGame = async () => {
   if (isLaunching.value) return
   isLaunching.value = true
-
   try {
-    // 1. 判断是否获取了游戏启动路径
     let gamePath = await invoke('get_game_path')
-
-    // 2. 如果路径为空，弹窗让用户指定目录
     if (!gamePath) {
       const selected = await open({
-        directory: true, // 只能选择文件夹
-        multiple: false, // 不允许多选
+        directory: true,
+        multiple: false,
         title: '请选择《坦克世界闪击战》安装目录 (包含 wotblitz.exe 的文件夹)',
       })
-
       if (selected) {
-        // 用户选择了路径，保存到后端
         gamePath = selected
         await invoke('set_game_path', { path: gamePath })
       } else {
-        // 用户取消了选择
-        console.log('用户取消了路径选择')
         return
       }
     }
-
-    // 3. 调用后端启动程序
     await invoke('launch_game')
-    console.log('游戏指令已发送')
   } catch (error) {
-    // 捕获 Rust 返回的 Result::Err
-    alert(`操作失败: ${error}`)
+    window.alert(`操作失败: ${error}`)
   } finally {
     isLaunching.value = false
   }
 }
 
 onMounted(async () => {
-  console.log('组件已加载')
   await refreshModList()
 })
 </script>
 
 <style scoped>
-/* ================= 顶部栏 ================= */
+.mod-library {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  position: relative;
+}
+
+/* 顶部栏（sticky） */
 .top-deck {
-  height: 80px;
-  padding: 0 30px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  padding: 0 24px;
+  height: 80px;
   background: var(--glass-effect);
-  backdrop-filter: blur(25px) saturate(200%);
-  -webkit-backdrop-filter: blur(25px) saturate(200%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
-  animation: slide-up-fade 0.5s var(--animation-timing) 0.1s backwards;
-  z-index: 20;
   position: sticky;
   top: 0;
-  transition: all var(--animation-duration) var(--animation-timing);
-  box-shadow:
-    0 2px 12px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  z-index: 10;
+  flex-shrink: 0;
 }
 
-.top-deck:hover {
-  background: var(--glass-effect-hover);
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-/* 搜索容器 - 修复暗色模式割裂问题 */
-.search-container {
-  flex: 0 1 180px;
-  min-width: 140px;
-  display: flex;
-  align-items: center;
-  position: relative;
-  animation: fade-scale-in 0.4s var(--animation-timing) 0.15s backwards;
-}
-
-.search-module {
-  position: relative;
-  width: 100%;
-  display: block;
-  isolation: isolate;
-}
-
-.search-icon {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-dim);
-  font-size: 18px;
-  z-index: 2;
-  transition: all var(--animation-duration);
-  pointer-events: none;
-}
-
-.search-icon img {
-  width: 18px;
-  height: 18px;
-  filter: brightness(var(--icon-brightness, 0.8));
-  transition:
-    filter var(--animation-duration),
-    transform var(--animation-duration);
-}
-
-.search-module input {
-  width: 100%;
-  height: 46px;
-  background: var(--bg-input);
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  border-radius: 12px;
-  padding: 0 48px 0 48px;
-  color: var(--text-main);
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.35s var(--animation-timing);
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  border: 1.5px solid var(--border);
-  outline: none;
-}
-
-/* 修复暗色模式搜索框背景 */
-:global(.dark-mode) .search-module input {
-  background: var(--bg-input);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-.search-module input:hover {
-  background: var(--bg-input-focus);
-  border-color: var(--border);
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  transform: translateY(-1px);
-}
-
-:global(.dark-mode) .search-module input:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-.search-module input:focus {
-  background: var(--bg-input-focus);
-  border-color: var(--accent);
-  box-shadow:
-    0 0 0 3px var(--accent-glow),
-    0 8px 24px rgba(0, 0, 0, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transform: translateY(-1px) scale(1.02);
-}
-
-:global(.dark-mode) .search-module input:focus {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: var(--accent);
-}
-
-.search-module input:focus ~ .search-icon {
-  color: var(--accent);
-}
-
-.search-module input:focus ~ .search-icon img {
-  filter: brightness(1.2);
-  transform: scale(1.1);
-}
-
-.search-module input::placeholder {
-  color: var(--text-dim);
-  opacity: 0.7;
-  font-weight: 400;
-}
-
-.search-module input:focus::placeholder {
-  opacity: 0.5;
-}
-
-/* 分类导航包装器 */
 .category-wrapper {
   flex: 1;
   min-width: 0;
-  position: relative;
   mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
-  animation: slide-up-fade 0.5s var(--animation-timing) 0.2s backwards;
 }
-
 .category-nav {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   overflow-x: auto;
-  overflow-y: hidden;
-  padding: 12px 30px;
   scrollbar-width: none;
   cursor: grab;
-  scroll-behavior: smooth;
-  user-select: none;
-  position: relative;
+  padding: 12px 0;
   align-items: center;
 }
-
 .category-nav::-webkit-scrollbar {
   display: none;
 }
-
 .category-nav.grabbing {
   cursor: grabbing;
-  scroll-behavior: auto;
 }
-
-/* 导航项 - 优化暗色模式文字可读性 */
 .nav-item {
   flex-shrink: 0;
-  background: var(--glass-effect);
-  border: 1.5px solid transparent;
-  color: var(--text-dim);
-  padding: 10px 24px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  border-radius: 10px;
-  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  white-space: nowrap;
-  position: relative;
-  overflow: hidden;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  isolation: isolate;
 }
-
-/* 提高暗色模式未选中状态文字对比度 */
-:global(.dark-mode) .nav-item {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.nav-item::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(var(--accent-rgb, 61, 90, 254), 0.1) 0%,
-    rgba(var(--accent-rgb, 61, 90, 254), 0.05) 50%,
-    transparent 100%
-  );
-  opacity: 0;
-  transition: opacity var(--animation-duration);
-  z-index: -1;
-}
-
-.nav-item::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%) scaleX(0);
-  width: 40%;
-  height: 2px;
-  background: var(--accent);
-  border-radius: 1px;
-  transition: transform 0.4s var(--animation-timing);
-}
-
-.nav-item:hover {
-  background: var(--glass-effect-hover);
-  color: var(--text-main);
-  transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.1);
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-:global(.dark-mode) .nav-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-.nav-item:hover::before {
-  opacity: 1;
-}
-
-.nav-item.active {
-  background: var(--glass-effect-focus);
-  color: var(--accent);
-  border-color: var(--accent);
-  box-shadow:
-    0 4px 20px var(--accent-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transform: translateY(-2px);
-}
-
-.nav-item.active::before {
-  opacity: 1;
-  background: linear-gradient(
-    135deg,
-    rgba(var(--accent-rgb, 61, 90, 254), 0.15) 0%,
-    rgba(var(--accent-rgb, 61, 90, 254), 0.08) 100%
-  );
-}
-
-.nav-item.active::after {
-  transform: translateX(-50%) scaleX(1);
-}
-
-.nav-item:active {
-  transform: translateY(0) scale(0.98);
-}
-
-/* 右侧工具组 */
 .right-group {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
   flex-shrink: 0;
-  animation: slide-up-fade 0.5s var(--animation-timing) 0.25s backwards;
 }
 
-/* 布局切换按钮 */
-.layout-toggle {
-  width: 46px;
-  height: 46px;
+/* 统计模块样式 - 确保完美垂直居中 */
+.stats-module {
+  height: 60px;
   background: var(--glass-effect);
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  border-radius: 12px;
-  color: var(--text-main);
-  font-family: inherit;
-  font-size: 16px;
-  cursor: pointer;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  overflow: hidden;
+  padding: 5px;
+}
+.stats-module:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px var(--accent-glow);
+  background: var(--glass-effect-hover);
+  transform: translateY(-1px);
+}
+/* 卡片内容区域填满高度并垂直居中 */
+.stats-module .n-card__content {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 !important;
+}
+.stats-module .n-space {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  border: 1.5px solid transparent;
-  position: relative;
-  overflow: hidden;
+  flex-wrap: nowrap; /* 防止换行 */
+}
+/* 统计项内部水平居中，并统一行高 */
+.stats-module .n-statistic {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  line-height: 1.2; /* 统一行高 */
+}
+.stats-module .n-statistic .n-statistic-label,
+.stats-module .n-statistic .n-statistic-value {
+  line-height: 1.2;
+  padding: 0;
+}
+.stats-module .n-statistic .n-statistic-label {
+  font-size: 12px;
+  margin-bottom: 2px;
+  color: var(--text-dim);
+}
+.stats-module .n-statistic .n-statistic-value {
+  font-size: 18px;
+}
+.stats-module :deep(.installed-stat .n-statistic-value) {
+  --n-value-text-color: var(--accent);  /* 增加优先级 */
 }
 
-:global(.dark-mode) .layout-toggle {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
+/* 卡片区域 - 占据剩余高度，底部留出footer空间 */
+.modules-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  margin-bottom: 90px; /* 为fixed footer留出空间 */
 }
 
-.layout-toggle::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(var(--accent-rgb, 61, 90, 254), 0.1) 0%, transparent 100%);
-  opacity: 0;
-  transition: opacity var(--animation-duration);
+/* 网格容器：纯 CSS Grid 响应式 */
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
 }
 
-.layout-toggle:hover {
-  background: var(--glass-effect-hover);
-  border-color: var(--border);
-  color: var(--accent);
-  transform: translateY(-2px) rotate(5deg);
-  box-shadow:
-    0 6px 20px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+/* 网格卡片样式 - 增加信息密度 */
+.grid-card .grid-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 12px 8px;
 }
-
-:global(.dark-mode) .layout-toggle:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-.layout-toggle:hover::before {
-  opacity: 1;
-}
-
-.layout-toggle:active {
-  transform: translateY(0) scale(0.95);
-}
-
-.layout-icon {
-  font-size: 20px;
-  font-weight: 600;
-  transition: transform 0.3s ease;
-}
-
-.layout-toggle:hover .layout-icon {
-  transform: rotate(15deg);
-}
-
-/* 统计模块 - 修复黑色边框突兀问题 */
-.stats-module {
-  height: 46px;
+.grid-card .mod-icon {
+  width: 64px;
+  height: 64px;
+  background: var(--glass-effect);
+  border-radius: 16px;
   display: flex;
   align-items: center;
-  background: var(--glass-effect);
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  border-radius: 12px;
-  padding: 0 18px;
-  gap: 16px;
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  transition: all 0.35s var(--animation-timing);
-  isolation: isolate;
-  /* 修复边框突兀问题 */
-  border: 1.5px solid transparent;
+  justify-content: center;
 }
-
-:global(.dark-mode) .stats-module {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-.stats-module:hover {
-  border-color: var(--accent);
-  background: var(--glass-effect-hover);
-  box-shadow:
-    0 6px 20px var(--accent-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  transform: translateY(-1px);
-}
-
-:global(.dark-mode) .stats-module:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--accent);
-}
-
-.stats-module::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(var(--accent-rgb, 61, 90, 254), 0.05) 0%, transparent 100%);
-  opacity: 0;
-  transition: opacity var(--animation-duration);
-  z-index: -1;
-}
-
-.stats-module:hover::before {
-  opacity: 1;
-}
-
-.stat-item {
+.grid-card .mod-meta {
+  font-size: 11px;
+  color: var(--text-dim);
   display: flex;
-  align-items: baseline;
   gap: 8px;
-  position: relative;
-  animation: fade-scale-in 0.4s var(--animation-timing) backwards;
-  padding: 4px 0;
 }
-
-.stat-item:nth-child(1) {
-  animation-delay: 0.3s;
+.grid-card .mod-date {
+  opacity: 0.8;
 }
-.stat-item:nth-child(2) {
-  animation-delay: 0.35s;
-}
-
-.stat-item:not(:last-child)::after {
-  content: '';
-  width: 1px;
-  height: 20px;
-  background: rgba(255, 255, 255, 0.15);
-  margin-left: 12px;
-  align-self: center;
-  opacity: 0.5;
-}
-
-:global(.light-mode) .stat-item:not(:last-child)::after {
-  background: rgba(0, 0, 0, 0.15);
-}
-
-.stat-num {
-  font-size: 22px;
-  font-weight: 800;
-  font-family: 'JetBrains Mono', monospace, 'Rajdhani', sans-serif;
-  line-height: 1;
-  color: var(--text-main);
-  transition:
-    color var(--animation-duration),
-    text-shadow var(--animation-duration);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.stat-label {
+.grid-card .mod-desc {
   font-size: 11px;
   color: var(--text-dim);
   white-space: nowrap;
-  letter-spacing: 0.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  transition: color var(--animation-duration);
-}
-
-.active-stat .stat-num {
-  color: var(--accent);
-  text-shadow:
-    0 2px 8px var(--accent-glow),
-    0 0 20px rgba(var(--accent-rgb, 61, 90, 254), 0.3);
-}
-
-.active-stat .stat-label {
-  color: var(--text-accent);
-  font-weight: 700;
-}
-
-/* 响应式设计 - 顶栏部分 */
-@media (max-width: 1200px) {
-  .top-deck {
-    padding: 0 20px;
-    gap: 15px;
-  }
-
-  .search-container {
-    flex: 0 1 160px;
-  }
-
-  .category-nav {
-    padding: 10px 20px;
-  }
-
-  .nav-item {
-    padding: 8px 20px;
-    font-size: 12px;
-  }
-
-  .layout-toggle {
-    width: 42px;
-    height: 42px;
-  }
-
-  .stats-module {
-    padding: 0 15px;
-    gap: 12px;
-  }
-
-  .stat-num {
-    font-size: 20px;
-  }
-}
-
-@media (max-width: 768px) {
-  .top-deck {
-    flex-wrap: wrap;
-    height: auto;
-    padding: 15px;
-    gap: 12px;
-  }
-
-  .search-container {
-    order: 1;
-    flex: 1 0 100%;
-    margin-bottom: 12px;
-  }
-
-  .category-wrapper {
-    order: 2;
-    flex: 1;
-    min-width: 0;
-  }
-
-  .right-group {
-    order: 3;
-    flex: 0 0 auto;
-    gap: 12px;
-  }
-
-  .layout-toggle {
-    width: 40px;
-    height: 40px;
-  }
-
-  .stats-module {
-    height: 40px;
-    padding: 0 12px;
-  }
-
-  .stat-label {
-    display: none;
-  }
-
-  .stat-item:not(:last-child)::after {
-    height: 16px;
-  }
-}
-
-@media (max-width: 480px) {
-  .category-nav {
-    padding: 8px 15px;
-    gap: 4px;
-  }
-
-  .nav-item {
-    padding: 6px 16px;
-    font-size: 11px;
-    border-radius: 8px;
-  }
-
-  .search-module input {
-    height: 42px;
-    font-size: 13px;
-  }
-
-  .right-group {
-    gap: 10px;
-  }
-}
-
-/* 明暗模式特定的调整 */
-:global(.dark-mode) {
-  --icon-brightness: 0.85;
-
-  /* 搜索框暗模式优化 */
-  .search-module input {
-    background: var(--bg-input);
-  }
-
-  .search-module input:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  .search-module input:focus {
-    background: rgba(255, 255, 255, 0.12);
-  }
-
-  /* 导航项暗模式优化 - 提高文字对比度 */
-  .nav-item {
-    color: rgba(255, 255, 255, 0.85);
-  }
-
-  .nav-item:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  /* 统计模块暗模式优化 */
-  .stats-module {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .stats-module:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-}
-
-:global(.light-mode) {
-  --icon-brightness: 1;
-
-  /* 搜索框亮模式优化 */
-  .search-module input {
-    background: var(--bg-input);
-  }
-
-  .search-module input:hover {
-    background: var(--bg-input-focus);
-  }
-
-  .search-module input:focus {
-    background: var(--bg-input-focus);
-  }
-
-  /* 导航项亮模式优化 */
-  .nav-item {
-    background: var(--glass-effect);
-  }
-
-  .nav-item:hover {
-    background: var(--glass-effect-hover);
-  }
-
-  /* 统计模块亮模式优化 */
-  .stats-module {
-    background: var(--glass-effect);
-  }
-
-  /* 亮模式下为选中状态添加轻微阴影 */
-  .nav-item.active {
-    box-shadow:
-      0 4px 20px rgba(61, 90, 254, 0.15),
-      inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  }
-}
-
-/* 性能优化 */
-.top-deck,
-.search-module,
-.category-nav,
-.nav-item,
-.layout-toggle,
-.stats-module {
-  will-change: transform, opacity, background-color;
-  contain: layout style;
-}
-
-/* ================= Mod 卡片区域 ================= */
-.modules-grid {
-  flex: 1;
-  padding: 20px 40px 0;
-  overflow-y: auto;
-  grid-auto-rows: max-content;
-  gap: 15px;
-  padding-bottom: 110px;
-  animation: fade-scale-in 0.5s var(--animation-timing) 0.1s backwards;
-}
-
-/* 网格布局 */
-.modules-grid.grid-layout {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-}
-
-/* 列表布局 */
-.modules-grid.list-layout {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-
-/* 自定义滚动条 */
-.modules-grid::-webkit-scrollbar {
-  width: 6px;
-}
-
-.modules-grid::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.modules-grid::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
-  transition: background var(--animation-duration);
-}
-
-.modules-grid::-webkit-scrollbar-thumb:hover {
-  background: var(--accent);
-}
-
-/* Mod 卡片 */
-.mod-card {
-  border-radius: 12px;
-  padding: 18px;
-  display: flex;
-  align-items: center;
-  position: relative;
-  transition: all 0.3s var(--animation-timing);
   overflow: hidden;
-  backdrop-filter: blur(var(--global-blur));
-  -webkit-backdrop-filter: blur(var(--global-blur));
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  animation: card-enter 0.5s var(--animation-timing) backwards;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
-@keyframes card-enter {
-  from {
-    opacity: 0;
-    transform: translateY(20px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.mod-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--accent);
-  background: var(--bg-card-hover);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-}
-
-.mod-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.mod-card:hover::before {
-  opacity: 0.5;
-}
-
-/* 活动卡片 */
-.mod-card.active-card {
-  border-left: 4px solid var(--accent);
-  background: rgba(var(--accent-rgb, 61, 90, 254), 0.05);
-}
-
-.mod-card.active-card:hover {
-  box-shadow: 0 8px 32px var(--accent-glow);
-}
-
-/* 多选框样式 */
-.selection-checkbox {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 2;
-}
-
-.selection-checkbox input[type='checkbox'] {
-  display: none;
-}
-
-.checkbox-label {
-  display: block;
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.3);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.checkbox-label:hover {
-  border-color: rgba(255, 255, 255, 0.6);
-  background: rgba(0, 0, 0, 0.5);
-}
-
-.selection-checkbox input:checked + .checkbox-label {
-  background: #0078d4;
-  border-color: #0078d4;
-}
-
-.selection-checkbox input:checked + .checkbox-label::after {
-  content: '';
-  position: absolute;
-  left: 5px;
-  top: 2px;
-  width: 5px;
-  height: 10px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-
-/* 选中的卡片效果 */
-.selected-card {
-  box-shadow:
-    0 0 0 2px #0078d4,
-    0 4px 8px rgba(0, 120, 212, 0.3);
-  background: linear-gradient(135deg, rgba(0, 120, 212, 0.1) 0%, transparent 50%);
-}
-
-/* 调整关闭按钮位置，避免重叠 */
-.win-close-btn {
-  top: 12px;
-  right: 12px;
-  left: auto; /* 确保不会影响左侧 */
-}
-
-/* Windows 11风格的关闭按钮 */
-.win-close-btn {
-  position: absolute;
-  top: 0px; /* 紧贴顶部 */
-  right: 0px; /* 紧贴右侧 */
-  width: 24px; /* Windows按钮标准大小 */
-  height: 24px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
+/* 列表卡片样式 */
+.list-card .list-layout-content {
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: all 0.2s cubic-bezier(0.33, 1, 0.68, 1);
-  z-index: 20;
-  opacity: 0;
-  border-radius: 0 8px 0 0; /* 轻微的圆角 */
+  gap: 16px;
+  width: 100%;
 }
-
-/* 悬停时的Windows特效 */
-.mod-card:hover .win-close-btn {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* 按钮状态 */
-.win-close-btn {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-/* 悬停状态 - Windows经典红色 */
-.win-close-btn:hover {
-  background: #e81123 !important;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-/* 激活状态 */
-.win-close-btn:active {
-  background: #c50f1e !important;
-}
-
-/* 更精致的关闭图标 */
-.close-icon {
-  color: rgba(0, 0, 0, 0.8);
-  stroke-width: 1.8;
-  transition: all 0.2s ease;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.1));
-}
-
-:global(.dark-mode) .close-icon {
-  color: rgba(255, 255, 255, 0.9);
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
-}
-
-/* 悬停时图标动画 */
-.win-close-btn:hover .close-icon {
-  color: white;
-  transform: scale(1.1);
-}
-
-/* 小屏幕优化 */
-@media (max-width: 768px) {
-  .win-close-btn {
-    width: 28px;
-    height: 28px;
-    opacity: 0.9;
-    background: rgba(232, 17, 35, 0.15);
-  }
-
-  .close-icon {
-    width: 12px;
-    height: 12px;
-  }
-}
-
-/* 状态指示器 */
-.status-indicator {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--text-dim);
-  margin-right: 15px;
-  position: relative;
+.list-card .mod-icon {
   flex-shrink: 0;
-  transition: all 0.3s;
 }
-
-.status-indicator::after {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  transition: border-color 0.3s;
-}
-
-.status-indicator.inactive {
-  background: var(--accent);
-  box-shadow: 0 0 10px var(--accent);
-}
-
-.status-indicator.inactive::after {
-  border-color: var(--accent);
-  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes pulse-ring {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.2);
-    opacity: 0.5;
-  }
-}
-
-/* 卡片内容 */
-.card-content {
+.list-card .mod-info {
   flex: 1;
   min-width: 0;
 }
-
-.list-layout .card-content {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.mod-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-  margin-right: 10px;
-}
-
-.mod-title {
-  font-weight: 600;
-  font-size: 16px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--text-main);
-}
-
-.tag {
-  font-size: 10px;
-  padding: 3px 8px;
-  background: var(--border);
-  border-radius: 4px;
-  color: var(--text-dim);
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  flex-shrink: 0;
-}
-
-.mod-desc {
+.list-card .mod-desc {
   font-size: 12px;
   color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.4;
+}
+.list-card .card-action {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.list-layout .mod-desc {
-  white-space: normal;
-  max-width: 600px;
+/* 通用卡片样式 - 优化标题与标签布局 */
+.mod-card {
+  transition: all 0.2s;
 }
-
-/* 开关样式 */
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 40px;
-  height: 18px;
+.mod-card.active-card {
+  border-left: 4px solid var(--accent);
+}
+.mod-card :deep(.n-card-header) {
+  padding: 8px 12px;
+}
+.mod-card :deep(.n-card__action) {
+  padding: 8px 12px;
+}
+.mod-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.mod-title {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+.mod-header :deep(.n-tag) {
   flex-shrink: 0;
 }
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+.card-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: var(--switch-track);
-  border: 1px solid var(--switch-border);
-  transition: 0.3s var(--animation-timing);
-  border-radius: 12px;
-}
-
-.slider:before {
-  position: absolute;
-  content: '';
-  height: 14px;
-  width: 14px;
-  left: 2px;
-  bottom: 1px;
-  background-color: var(--switch-thumb);
-  transition: 0.3s var(--animation-timing);
+.status-indicator {
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  background: var(--text-dim);
+}
+.status-indicator.inactive {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
 }
 
-input:checked + .slider {
-  background-color: var(--switch-track-checked);
-  border-color: var(--switch-border-checked);
-}
-
-input:checked + .slider:before {
-  transform: translateX(20px);
-  background-color: var(--switch-thumb-checked);
-}
-
-.switch:hover .slider {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent-glow);
-}
-
-input:checked:hover + .slider {
-  box-shadow: 0 0 12px var(--accent-glow);
-}
-
-/* ================= 底部控制台 ================= */
+/* 底部控制台（fixed，适配侧边栏宽度） */
 .control-deck {
   height: 90px;
   background: var(--deck-bg);
@@ -1534,275 +714,75 @@ input:checked:hover + .slider {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 40px;
-  position: absolute;
+  padding: 0 24px;
+  position: fixed;
   bottom: 0;
-  width: 100%;
-  z-index: 50;
-  animation: slide-up-fade 0.5s var(--animation-timing) 0.15s backwards;
+  left: 90px; /* 与侧边栏宽度一致 */
+  right: 0;
+  z-index: 30;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  transition: all var(--animation-duration);
 }
-
-.deck-left {
-  display: flex;
-  gap: 10px;
+.deck-left .n-space {
+  flex-wrap: nowrap;
 }
-
-/* 图标按钮样式 */
-.icon-btn {
-  height: 36px;
-  padding: 0 12px;
-  background: var(--glass-effect);
-  border: 1px solid var(--border);
-  color: var(--text-main);
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.3s var(--animation-timing);
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.icon-btn:hover {
-  border-color: var(--accent);
-  color: var(--text-accent);
-  background: var(--glass-effect-hover);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px var(--accent-glow);
-}
-
-.icon-btn .icon {
-  fill: currentColor;
-  transition: transform 0.2s;
-}
-
-.icon-btn:hover .icon {
-  transform: scale(1.1);
-}
-
-/* 按钮行布局 */
-.btn-row {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.btn-row:last-child {
-  margin-bottom: 0;
-}
-
-/* 危险按钮 */
-.icon-btn.danger {
-  border-color: #dc2626;
-  color: #ef4444;
-}
-
-.icon-btn.danger:hover {
-  border-color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
-}
-
-/* 强调按钮 */
-.icon-btn.accent {
-  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.1) 0%, transparent 100%);
-  border-color: var(--accent);
-  color: var(--text-accent);
-}
-
-/* 启动按钮 - 优化明暗模式 */
 .launch-btn {
   height: 60px;
-  padding: 0 50px;
+  padding: 0 40px;
   background: linear-gradient(135deg, var(--accent) 0%, #536dfe 100%);
   border: none;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
+  color: white;
   clip-path: polygon(12px 0, 100% 0, 100% 100%, 0 100%, 0 12px);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 32px var(--accent-glow);
-  transition: all 0.3s var(--animation-timing);
 }
-
-.launch-btn:hover {
-  transform: scale(1.02);
-  filter: brightness(1.15);
-  box-shadow: 0 12px 40px var(--accent-glow);
-}
-
-.launch-btn:active {
-  transform: scale(0.98);
-}
-
-.launch-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-  filter: none;
-}
-
-.launch-content {
+.launch-text {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  z-index: 2;
-  color: white;
+  line-height: 1.2;
+  gap: 2px;
 }
-
 .launch-title {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: 2px;
-  text-transform: uppercase;
+  font-size: 18px;
+  font-weight: 700;
 }
-
 .launch-sub {
   font-size: 10px;
-  opacity: 0.9;
-  letter-spacing: 1px;
-  font-weight: 500;
+  opacity: 0.8;
+  letter-spacing: 0.5px;
 }
 
-.launch-effect {
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  animation: shimmer 3s infinite;
+/* 新增：启动游戏按钮交互效果 */
+.launch-btn:not(:disabled):hover {
+  filter: brightness(1.1);
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+}
+.launch-btn:not(:disabled):active {
+  transform: scale(0.98);
+  filter: brightness(0.9);
+  transition: all 0.1s ease;
+}
+.launch-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-/* ================= 响应式设计 ================= */
-@media (max-width: 1200px) {
-  .top-deck {
-    padding: 0 20px;
-  }
-
-  .modules-grid {
-    padding: 20px 20px 0;
-  }
-
-  .control-deck {
-    padding: 0 20px;
-  }
+/* 适配明暗模式变量 */
+:deep(.dark-mode) {
+  --border: rgba(255, 255, 255, 0.12);
+  --text-dim: rgba(255, 255, 255, 0.6);
+  --glass-effect: rgba(255, 255, 255, 0.05);
+  --glass-effect-hover: rgba(255, 255, 255, 0.08);
+  --deck-bg: rgba(15, 17, 21, 0.95);
 }
-
-@media (max-width: 768px) {
-  .top-deck {
-    flex-wrap: wrap;
-    height: auto;
-    padding: 15px;
-  }
-
-  .search-container {
-    order: 1;
-    flex: 1 0 100%;
-    margin-bottom: 15px;
-  }
-
-  .category-wrapper {
-    order: 2;
-    flex: 1;
-  }
-
-  .right-group {
-    order: 3;
-  }
-
-  .modules-grid.grid-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .layout-toggle {
-    padding: 0 12px;
-  }
-
-  .stat-label {
-    display: none;
-  }
-
-  .launch-btn {
-    padding: 0 30px;
-  }
-
-  .launch-title {
-    font-size: 16px;
-  }
-}
-
-@media (max-width: 480px) {
-  .category-nav {
-    padding: 10px 20px;
-  }
-
-  .nav-item {
-    padding: 6px 16px;
-    font-size: 12px;
-  }
-
-  .deck-btn {
-    padding: 0 16px;
-    font-size: 11px;
-  }
-
-  .launch-btn {
-    padding: 0 20px;
-    height: 50px;
-  }
-}
-
-/* ================= 明暗模式特定的调整 ================= */
-:global(.dark-mode) {
-  --icon-brightness: 0.8;
-}
-
-:global(.light-mode) {
-  --icon-brightness: 1;
-}
-
-:global(.light-mode) .search-module input {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-}
-
-:global(.light-mode) .search-module input:hover {
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
-}
-
-:global(.light-mode) .search-module input:focus {
-  box-shadow: 0 0 20px rgba(61, 90, 254, 0.15);
-}
-
-:global(.light-mode) .launch-btn {
-  box-shadow: 0 8px 32px rgba(61, 90, 254, 0.3);
-}
-
-:global(.light-mode) .launch-btn:hover {
-  box-shadow: 0 12px 40px rgba(61, 90, 254, 0.4);
-}
-
-:global(.light-mode) .deck-btn.danger:hover {
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
-}
-
-/* ================= 性能优化 ================= */
-.top-deck,
-.category-nav,
-.mod-card,
-.deck-btn,
-.launch-btn,
-.layout-toggle {
-  will-change: transform, box-shadow, border-color;
+:deep(.light-mode) {
+  --border: rgba(0, 0, 0, 0.12);
+  --text-dim: rgba(0, 0, 0, 0.6);
+  --glass-effect: rgba(255, 255, 255, 0.8);
+  --glass-effect-hover: rgba(255, 255, 255, 0.9);
+  --deck-bg: rgba(255, 255, 255, 0.95);
 }
 </style>
