@@ -1,53 +1,64 @@
 <template>
-  <div class="command-center">
-    <!-- 背景图：使用 CSS 变量控制，浅色模式下可降低透明度或更换 -->
-    <div class="background" :style="{ '--global-blur': EnableBlur ? '10px' : '0px' }"></div>
+  <n-config-provider :theme-overrides="themeOverrides" :locale="zhCN" :date-locale="dateZhCN">
+    <div class="command-center">
+      <!-- 背景图：使用 CSS 变量控制，浅色模式下可降低透明度或更换 -->
+      <div class="background" :style="backgroundStyle"></div>
 
-    <!-- 1. 左侧导航栏 -->
-    <aside class="sidebar">
-      <div class="logo-box">
-        <div class="logo-icon"><img src="@/assets/WOTBIcon.png" /></div>
-        <span class="logo-text">MOD<br />Manager</span>
-      </div>
-
-      <nav class="nav-links">
-        <div class="nav-item" :class="{ active: NavLinksId === 1 }" @click="NavLinksId = 1">
-          <span class="icon">
-            <!-- 图标逻辑保持不变，确保图标颜色与文字匹配 -->
-            <img :src="DarkMode ? HomeDarkIcon : NavLinksId === 1 ? HomeActiveIcon : HomeIcon" alt="模组库" />
-          </span>
-          <span class="label">模组库</span>
+      <!-- 1. 左侧导航栏 -->
+      <aside class="sidebar">
+        <div class="logo-box">
+          <div class="logo-icon"><img src="@/assets/WOTBIcon.png" /></div>
+          <span class="logo-text">MOD<br />Manager</span>
         </div>
-        <div class="nav-item" :class="{ active: NavLinksId === 2 }" @click="NavLinksId = 2">
-          <span class="icon">
-            <img :src="DarkMode ? SettingDarkIcon : NavLinksId === 2 ? SettingActiveIcon : SettingIcon" alt="设置" />
-          </span>
-          <span class="label">系统设置</span>
-        </div>
-      </nav>
 
-      <div class="sidebar-footer">
-        <!-- 添加一个临时开关方便调试，实际项目中这通常在 Settings 组件里控制 -->
-        <div class="debug-toggle" @click="DarkMode = !DarkMode" title="点击切换主题演示">
-          {{ DarkMode ? 'Dark' : 'Light' }}
-        </div>
-        <div class="version">v1.2.0</div>
-      </div>
-    </aside>
+        <nav class="nav-links">
+          <div class="nav-item" :class="{ active: NavLinksId === 1 }" @click="NavLinksId = 1">
+            <span class="icon">
+              <img :src="DarkMode ? HomeDarkIcon : NavLinksId === 1 ? HomeActiveIcon : HomeIcon" alt="模组库" />
+            </span>
+            <span class="label">模组库</span>
+          </div>
+          <div class="nav-item" :class="{ active: NavLinksId === 2 }" @click="NavLinksId = 2">
+            <span class="icon">
+              <img :src="DarkMode ? SettingDarkIcon : NavLinksId === 2 ? SettingActiveIcon : SettingIcon" alt="设置" />
+            </span>
+            <span class="label">系统设置</span>
+          </div>
+        </nav>
 
-    <!-- 主视口容器 -->
-    <main class="main-viewport">
-      <!-- 这里将 DarkMode 传递给子组件，或者使用 Pinia 全局管理 -->
-      <ModLibrary v-if="NavLinksId === 1" />
-      <Settings v-else-if="NavLinksId === 2" />
-    </main>
-  </div>
+        <div class="sidebar-footer">
+          <!-- 使用 Naive UI 按钮替代原生调试开关 -->
+          <n-button
+            class="debug-toggle"
+            @click="DarkMode = !DarkMode"
+            size="tiny"
+            :type="DarkMode ? 'primary' : 'default'"
+            title="点击切换主题演示"
+          >
+            {{ DarkMode ? 'Dark' : 'Light' }}
+          </n-button>
+          <div class="version">v1.2.0</div>
+        </div>
+      </aside>
+
+      <!-- 主视口容器 -->
+      <main class="main-viewport">
+        <ModLibrary v-if="NavLinksId === 1" />
+        <Settings v-else-if="NavLinksId === 2" />
+      </main>
+    </div>
+  </n-config-provider>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, provide } from 'vue'
+import { ref, watch, provide, computed, onMounted } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import { convertFileSrc } from '@tauri-apps/api/core'
+import { zhCN, dateZhCN, NConfigProvider, NButton } from 'naive-ui'
+import type { GlobalThemeOverrides } from 'naive-ui'
+import defaultBg from '@/assets/123517794_p0.jpg'
 
-// ================= 图标资源 (假设路径正确) =================
+// ================= 图标资源 =================
 import SettingIcon from '@/assets/设置.svg'
 import SettingActiveIcon from '@/assets/设置_HL.svg'
 import SettingDarkIcon from '@/assets/设置Dark.svg'
@@ -63,15 +74,53 @@ import Settings from '@/components/Settings.vue'
 const NavLinksId = ref(1)
 const DarkMode = ref(false)
 const EnableBlur = ref(true)
+const backgroundImagePath = ref<string | null>(null)
 
-// ================= 提供数据 (Provide) =================
-// 我们把 DarkMode 这个 ref 对象直接提供出去，名字叫 'GlobalTheme'
-// 这样子组件拿到后，修改它的 .value，父组件也会同步变
+// ================= 提供数据 =================
 provide('GlobalTheme', DarkMode)
 provide('GlobalBlur', EnableBlur)
+provide('backgroundImagePath', backgroundImagePath)
+
+// ================= 提供更新背景图片的方法 =================
+const setBackgroundImage = async (imagePath: string | null) => {
+  if (imagePath === null) {
+    // 移除背景
+    await invoke('remove_background_image')
+    backgroundImagePath.value = null
+  } else {
+    // 上传并保存背景
+    const savedPath = await invoke('set_background_image', { imagePath })
+    backgroundImagePath.value = savedPath as string
+  }
+}
+provide('setBackgroundImage', setBackgroundImage)
+
+// 计算背景样式
+const backgroundStyle = computed(() => {
+  let bgImage = `url("${defaultBg}")`;
+  if (backgroundImagePath.value) {
+    const url = convertFileSrc(backgroundImagePath.value);
+    bgImage = `url("${url}")`;
+  }
+  return {
+    backgroundImage: bgImage,
+    '--global-blur': EnableBlur.value ? '10px' : '0px'
+  };
+});
+
+// 加载保存的背景图片
+onMounted(async () => {
+  try {
+    const savedPath = await invoke('get_background_image')
+    if (savedPath && typeof savedPath === 'string') {
+      backgroundImagePath.value = savedPath
+    }
+  } catch (err) {
+    console.error('加载背景图片失败:', err)
+  }
+})
 
 // ================= 主题切换逻辑 =================
-// 监听 DarkMode 变化，动态修改 HTML 根节点的 class
 watch(
   DarkMode,
   isDark => {
@@ -87,6 +136,65 @@ watch(
   },
   { immediate: true }
 )
+
+// ================= Naive UI 主题覆盖 =================
+// 根据 DarkMode 动态生成覆盖变量，与全局 CSS 变量保持一致
+const themeOverrides = computed<GlobalThemeOverrides>(() => {
+  if (DarkMode.value) {
+    return {
+      common: {
+        primaryColor: '#3d5afe',
+        primaryColorHover: '#536dfe',
+        primaryColorPressed: '#2a3eb1',
+        primaryColorSuppl: '#3d5afe',
+        // 其他颜色可以从 CSS 变量中读取，但这里直接映射简化示例
+        bodyColor: 'transparent', // 背景透明，让背景图显示
+        textColorBase: '#ffffff',
+        textColor1: '#ffffff',
+        textColor2: '#9ca3af',
+        textColor3: '#6b7280',
+        borderColor: '#3a3d47',
+        borderRadius: '4px',
+        boxShadow1: '0 2px 8px 0 rgba(0, 0, 0, 0.2)',
+        // 可添加更多变量以覆盖其他组件
+      },
+      Button: {
+        textColor: '#ffffff',
+        textColorHover: '#ffffff',
+        color: 'rgba(255, 255, 255, 0.05)',
+        colorHover: 'rgba(255, 255, 255, 0.08)',
+        border: '1px solid #3a3d47',
+        borderHover: '1px solid #3d5afe',
+      },
+    }
+  } else {
+    // 亮色模式
+    return {
+      common: {
+        primaryColor: '#3d5afe',
+        primaryColorHover: '#536dfe',
+        primaryColorPressed: '#2a3eb1',
+        primaryColorSuppl: '#3d5afe',
+        bodyColor: 'transparent',
+        textColorBase: '#1e293b',
+        textColor1: '#1e293b',
+        textColor2: '#64748b',
+        textColor3: '#94a3b8',
+        borderColor: '#e2e8f0',
+        borderRadius: '4px',
+        boxShadow1: '0 2px 8px 0 rgba(0, 0, 0, 0.05)',
+      },
+      Button: {
+        textColor: '#1e293b',
+        textColorHover: '#1e293b',
+        color: 'rgba(255, 255, 255, 0.8)',
+        colorHover: 'rgba(255, 255, 255, 0.9)',
+        border: '1px solid #e2e8f0',
+        borderHover: '1px solid #3d5afe',
+      },
+    }
+  }
+})
 </script>
 
 <style>
@@ -200,9 +308,8 @@ watch(
 .background {
   position: absolute;
   inset: 0;
-  background-image: url('@/assets/123517794_p0.jpg');
-  background-position: center;
   background-size: cover;
+  background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;
   z-index: 0;

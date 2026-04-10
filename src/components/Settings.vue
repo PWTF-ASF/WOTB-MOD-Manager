@@ -1,23 +1,41 @@
 <template>
   <div class="settings-container">
     <div class="content-wrapper">
-      <h2 class="page-title">系统设置 <span class="sub-title">SYSTEM CONFIGURATION</span></h2>
+      <h2 class="page-title">
+        系统设置
+        <span class="sub-title">SYSTEM CONFIGURATION</span>
+      </h2>
 
       <!-- 设置组：外观 -->
       <section class="setting-group">
         <h3 class="group-title">外观 / VISUALS</h3>
-
-        <!-- 明暗模式开关已删除 -->
 
         <div class="setting-item">
           <div class="text-info">
             <span class="label">启用毛玻璃特效 (Acrylic Blur)</span>
             <span class="desc">开启后背景将呈现模糊透视效果，可能会轻微影响性能。</span>
           </div>
-          <label class="switch">
-            <input type="checkbox" v-model="globalBlur" />
-            <span class="slider round"></span>
-          </label>
+          <n-switch v-model:value="globalBlur" size="small" />
+        </div>
+
+        <!-- 新增：自定义背景 -->
+        <div class="setting-item vertical">
+          <div class="text-info">
+            <span class="label">自定义背景图片</span>
+            <span class="desc">支持 JPG、PNG、WEBP 等格式，推荐 1920x1080 以上分辨率。</span>
+          </div>
+          <div class="background-preview" v-if="backgroundPreviewUrl">
+            <img :src="backgroundPreviewUrl" alt="背景预览" class="preview-thumb" />
+            <n-button size="small" type="error" @click="handleRemoveBackground" :loading="updatingBg">
+              移除
+            </n-button>
+          </div>
+          <div class="bg-actions" v-else>
+            <n-button size="small" secondary @click="handleSelectBackground" :loading="updatingBg">
+              选择图片
+            </n-button>
+            <span class="desc-sm" style="margin-left: 12px;">未设置，使用默认背景</span>
+          </div>
         </div>
       </section>
 
@@ -32,8 +50,11 @@
             <span class="desc-sm">World of Tanks Blitz 的主程序目录</span>
           </div>
           <div class="input-row">
-            <input type="text" v-model="config.gamePath" placeholder="例如: C:\Games\World_of_Tanks_Blitz" readonly />
-            <button class="btn-browse" @click="selectPath('game')">浏览</button>
+            <n-input v-model:value="config.gamePath" readonly placeholder="例如: C:\Games\World_of_Tanks_Blitz"
+              size="small" />
+            <n-button size="small" secondary @click="selectPath('game')">
+              浏览
+            </n-button>
           </div>
         </div>
 
@@ -44,86 +65,166 @@
             <span class="desc-sm">下载的 Mod 文件将保存在此位置</span>
           </div>
           <div class="input-row">
-            <input type="text" v-model="config.modRepoPath" placeholder="选择文件夹..." readonly />
-            <button class="btn-browse" @click="selectPath('mod')">浏览</button>
+            <n-input v-model:value="config.modRepoPath" readonly placeholder="选择文件夹..." size="small" />
+            <n-button size="small" secondary @click="selectPath('mod')">
+              浏览
+            </n-button>
           </div>
         </div>
       </section>
 
       <!-- 底部操作区 -->
       <div class="action-footer">
-        <button class="btn-reset" @click="resetToDefaults"><span class="icon">↺</span> 重置为默认设置</button>
+        <n-button size="small" secondary @click="resetToDefaults">
+          <template #icon>
+            <n-icon :component="RefreshOutline" />
+          </template>
+          重置为默认设置
+        </n-button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, type Ref, inject } from 'vue'
+import { reactive, ref, inject, onMounted, computed, type Ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
+import { convertFileSrc } from '@tauri-apps/api/core'
+import {
+  NButton,
+  NSwitch,
+  NInput,
+  NIcon,
+} from 'naive-ui'
+import { RefreshOutline } from '@vicons/ionicons5'
 
-// 1. 注入全局毛玻璃状态
-// 这里的类型断言确保 TypeScript 知道这是一个 ref
+// 注入全局状态
 const globalBlur = inject('GlobalBlur') as Ref<boolean>
+const backgroundImagePath = inject<Ref<string | null>>('backgroundImagePath')
+const setBackgroundImage = inject<(path: string | null) => Promise<void>>('setBackgroundImage')
 
-// 配置状态
+// 本地状态
 const config = reactive({
   gamePath: '',
   modRepoPath: '',
 })
+const updatingBg = ref(false)
 
-// 加载保存的路径
+// 预览 URL
+const backgroundPreviewUrl = computed(() => {
+  if (backgroundImagePath?.value) {
+    return convertFileSrc(backgroundImagePath.value)
+  }
+  return null
+})
+
+// 选择背景图片
+const handleSelectBackground = async () => {
+  const selected = await open({
+    title: '选择背景图片',
+    multiple: false,
+    filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
+  })
+  if (!selected || Array.isArray(selected)) return
+
+  updatingBg.value = true
+  try {
+    if (setBackgroundImage) {
+      await setBackgroundImage(selected)
+    }
+  } catch (err) {
+    console.error('设置背景失败:', err)
+    alert(`设置背景失败: ${err}`)
+  } finally {
+    updatingBg.value = false
+  }
+}
+
+// 移除背景
+const handleRemoveBackground = async () => {
+  updatingBg.value = true
+  try {
+    if (setBackgroundImage) {
+      await setBackgroundImage(null)
+    }
+  } catch (err) {
+    console.error('移除背景失败:', err)
+    alert(`移除背景失败: ${err}`)
+  } finally {
+    updatingBg.value = false
+  }
+}
+
+// 加载保存的路径（原有）
 onMounted(async () => {
   try {
     const gamePath = await invoke('get_game_path')
     config.gamePath = (gamePath as string) || ''
-  } catch (e) {
-    console.error(e)
-  }
+  } catch (e) { console.error(e) }
   try {
     const modRepoPath = await invoke('get_mod_repo_path')
     config.modRepoPath = (modRepoPath as string) || ''
-  } catch (e) {
-    console.error(e)
-  }
+  } catch (e) { console.error(e) }
 })
 
-// 选择文件夹
+// 选择文件夹（原有）
 const selectPath = async (type: 'game' | 'mod') => {
   const selected = await open({
     directory: true,
     multiple: false,
     title: type === 'game' ? '选择游戏安装目录' : '选择Mod存储库目录',
-  });
-  
+  })
   if (selected && !Array.isArray(selected)) {
     if (type === 'game') {
-      config.gamePath = selected;
-      await invoke('set_game_path', { path: selected });
-    } else { // type === 'mod'
-      config.modRepoPath = selected;
-      await invoke('set_mod_repo_path', { path: selected });
-      
+      config.gamePath = selected
+      await invoke('set_game_path', { path: selected })
+    } else {
+      config.modRepoPath = selected
+      await invoke('set_mod_repo_path', { path: selected })
       if (confirm('是否将当前默认目录中的 Mod 文件移动到新位置？')) {
-        await invoke('migrate_mod_repo', { newPath: selected });
+        await invoke('migrate_mod_repo', { newPath: selected })
       }
     }
   }
 }
 
-// 重置
+// 重置设置（原有）
 const resetToDefaults = async () => {
   if (confirm('确定要重置所有设置吗？此操作无法撤销。')) {
     config.gamePath = ''
     config.modRepoPath = ''
     await invoke('set_game_path', { path: '' })
     await invoke('set_mod_repo_path', { path: '' })
+    // 可选：也可重置背景，但这里不自动重置，以免意外
   }
 }
 </script>
 
 <style scoped>
+
+.background-preview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.preview-thumb {
+  width: 120px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--glass-effect);
+}
+
+.bg-actions {
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+}
+
 /* ================= 页面容器 ================= */
 .settings-container {
   width: 100%;
@@ -200,6 +301,7 @@ const resetToDefaults = async () => {
 .setting-group:nth-child(1) {
   animation-delay: 0.15s;
 }
+
 .setting-group:nth-child(2) {
   animation-delay: 0.2s;
 }
@@ -251,6 +353,7 @@ const resetToDefaults = async () => {
 .setting-item:nth-child(1) {
   animation-delay: 0.25s;
 }
+
 .setting-item:nth-child(2) {
   animation-delay: 0.3s;
 }
@@ -326,157 +429,30 @@ const resetToDefaults = async () => {
   opacity: 0.8;
 }
 
-/* 输入框和按钮行 - 优化明暗模式 */
+/* 输入框和按钮行 */
 .input-row {
   display: flex;
   width: 100%;
   gap: 12px;
 }
 
-input[type='text'] {
-  flex: 1;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  color: var(--text-main);
-  padding: 12px 16px;
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 14px;
-  letter-spacing: 0.5px;
-  outline: none;
-  transition: all 0.3s var(--animation-timing);
-  border-radius: 8px;
-  backdrop-filter: blur(5px);
+/* 适配 Naive UI 组件在明暗模式下的样式 */
+:deep(.n-input) {
+  --n-border: var(--border);
+  --n-border-hover: var(--accent);
+  --n-border-focus: var(--accent);
+  --n-color: var(--bg-input);
+  --n-color-focus: var(--bg-input-focus);
+  --n-text-color: var(--text-main);
 }
 
-input[type='text']:hover {
-  border-color: var(--accent);
-  background: var(--bg-input-focus);
-}
-
-input[type='text']:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
-  background: var(--bg-input-focus);
-}
-
-.btn-browse {
-  background: var(--glass-effect);
-  border: 1px solid var(--border);
-  color: var(--text-main);
-  padding: 0 24px;
-  font-family: 'Rajdhani', sans-serif;
-  font-weight: 700;
-  cursor: pointer;
-  text-transform: uppercase;
-  transition: all 0.3s var(--animation-timing);
-  border-radius: 8px;
-  font-size: 12px;
-  letter-spacing: 1px;
-  position: relative;
-  overflow: hidden;
-  height: 44px;
-}
-
-.btn-browse::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: var(--accent);
-  transform: translate(-50%, -50%);
-  transition:
-    width 0.6s,
-    height 0.6s;
-  opacity: 0.1;
-}
-
-.btn-browse:hover {
-  border-color: var(--accent);
-  color: var(--text-accent);
-  background: var(--glass-effect-hover);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px var(--accent-glow);
-}
-
-.btn-browse:hover::before {
-  width: 200%;
-  height: 200%;
-}
-
-.btn-browse:active {
-  transform: scale(0.96);
-}
-
-/* ================= 开关样式 ================= */
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 50px;
-  height: 24px;
-  flex-shrink: 0;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: var(--switch-track);
-  border: 1px solid var(--switch-border);
-  transition: 0.4s var(--animation-timing);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.slider:before {
-  position: absolute;
-  content: '';
-  height: 18px;
-  width: 18px;
-  left: 2px;
-  bottom: 2px;
-  background-color: var(--switch-thumb);
-  transition: 0.4s var(--animation-timing);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-}
-
-/* 选中状态 */
-input:checked + .slider {
-  background-color: var(--switch-track-checked);
-  border-color: var(--switch-border-checked);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.1),
-    0 0 8px var(--accent-glow);
-}
-
-input:checked + .slider:before {
-  transform: translateX(26px);
-  background-color: var(--switch-thumb-checked);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-/* 圆角 */
-.slider.round {
-  border-radius: 24px;
-}
-
-.slider.round:before {
-  border-radius: 50%;
-}
-
-.switch:hover .slider {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent-glow);
+:deep(.n-button) {
+  --n-border: var(--border);
+  --n-border-hover: var(--accent);
+  --n-color: var(--glass-effect);
+  --n-color-hover: var(--glass-effect-hover);
+  --n-text-color: var(--text-main);
+  --n-text-color-hover: var(--text-accent);
 }
 
 /* ================= 底部操作区 ================= */
@@ -489,66 +465,41 @@ input:checked + .slider:before {
   animation: slide-up-fade 0.5s var(--animation-timing) 0.25s backwards;
 }
 
-.btn-reset {
-  background: var(--glass-effect);
-  border: 1px solid var(--border);
-  color: var(--text-main);
-  padding: 12px 28px;
-  font-family: 'Rajdhani', sans-serif;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  transition: all 0.3s var(--animation-timing);
-  font-size: 14px;
-  border-radius: 8px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  position: relative;
-  overflow: hidden;
+/* ================= 动画 ================= */
+@keyframes page-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
-.btn-reset::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: #ef4444;
-  transform: translate(-50%, -50%);
-  transition:
-    width 0.6s,
-    height 0.6s;
-  opacity: 0.1;
+@keyframes slide-up-fade {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.btn-reset:hover {
-  border-color: #ef4444;
-  color: #ef4444;
-  background: var(--glass-effect-hover);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
-}
+@keyframes fade-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
 
-.btn-reset:hover::before {
-  width: 200%;
-  height: 200%;
-}
-
-.btn-reset:active {
-  transform: scale(0.96);
-}
-
-.btn-reset .icon {
-  font-size: 18px;
-  transition: transform 0.6s var(--animation-timing);
-}
-
-.btn-reset:hover .icon {
-  transform: rotate(180deg);
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* ================= 滚动条美化 ================= */
@@ -625,11 +576,6 @@ input:checked + .slider:before {
     flex-direction: column;
   }
 
-  .btn-browse {
-    width: 100%;
-    justify-content: center;
-  }
-
   .action-footer {
     justify-content: center;
   }
@@ -655,14 +601,9 @@ input:checked + .slider:before {
   .desc {
     font-size: 12px;
   }
-
-  .btn-reset {
-    width: 100%;
-    justify-content: center;
-  }
 }
 
-/* ================= 明暗模式特定的调整 ================= */
+/* ================= 明暗模式特定的背景 ================= */
 :global(.light-mode) .settings-container {
   background: rgba(255, 255, 255, 0.95);
 }
@@ -671,36 +612,7 @@ input:checked + .slider:before {
   background: rgba(255, 255, 255, 0.9);
 }
 
-:global(.light-mode) input[type='text'] {
+:global(.light-mode) .setting-item:hover {
   background: rgba(255, 255, 255, 0.95);
-}
-
-:global(.light-mode) input[type='text']:focus {
-  background: rgba(255, 255, 255, 0.98);
-}
-
-:global(.light-mode) .btn-browse {
-  background: rgba(255, 255, 255, 0.8);
-}
-
-:global(.light-mode) .btn-browse:hover {
-  background: rgba(255, 255, 255, 0.9);
-}
-
-:global(.light-mode) .btn-reset {
-  background: rgba(255, 255, 255, 0.8);
-}
-
-:global(.light-mode) .btn-reset:hover {
-  background: rgba(255, 255, 255, 0.9);
-}
-
-/* ================= 性能优化 ================= */
-.setting-item,
-.switch,
-.btn-browse,
-.btn-reset,
-input[type='text'] {
-  will-change: transform, box-shadow, border-color;
 }
 </style>

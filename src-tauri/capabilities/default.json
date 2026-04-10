@@ -1,17 +1,18 @@
 {
   "identifier": "default",
-  "description": "Allow dialog and scoped FS access",
+  "description": "Capability for the main window",
   "windows": ["main"],
   "permissions": [
+    "core:default",
     "dialog:default",
+    "shell:default",
+    "fs:default",
     {
-      "identifier": "fs:default",
+      "identifier": "fs:allow-read",
       "allow": [
-        {
-          "path": "$APPCONFIG/*",
-          "read": true,
-          "write": true
-        }
+        { "path": "$APPDATA/**" },
+        { "path": "$CONFIG/**" },
+        { "path": "**" } 
       ]
     }
   ]
