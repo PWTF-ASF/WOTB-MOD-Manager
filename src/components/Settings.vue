@@ -37,6 +37,54 @@
             <span class="desc-sm" style="margin-left: 12px;">未设置，使用默认背景</span>
           </div>
         </div>
+
+        <!-- 新增：背景遮罩 -->
+        <div class="setting-item">
+          <div class="text-info">
+            <span class="label">启用背景遮罩</span>
+            <span class="desc">开启后将在背景上添加一层半透明遮罩，增强文字可读性。</span>
+          </div>
+          <n-switch v-model:value="backgroundMask" size="small" />
+        </div>
+
+        <!-- 新增：模糊度调节 -->
+        <div class="setting-item vertical">
+          <div class="text-info">
+            <span class="label">背景模糊度</span>
+            <span class="desc">调整背景的模糊程度，值越大模糊效果越明显。</span>
+          </div>
+          <div class="slider-container">
+            <n-slider v-model:value="blurAmount" :min="0" :max="20" :step="1" size="small" :disabled="!globalBlur" />
+            <span class="slider-value">{{ blurAmount }}px</span>
+          </div>
+        </div>
+
+        <!-- 新增：遮罩透明度 -->
+        <div class="setting-item vertical">
+          <div class="text-info">
+            <span class="label">遮罩透明度</span>
+            <span class="desc">调整背景遮罩的透明度，值越大遮罩越不透明。</span>
+          </div>
+          <div class="slider-container">
+            <n-slider v-model:value="maskOpacity" :min="0" :max="100" :step="1" size="small" :disabled="!backgroundMask" />
+            <span class="slider-value">{{ maskOpacity }}%</span>
+          </div>
+        </div>
+
+        <!-- 新增：主题模式 -->
+        <div class="setting-item vertical">
+          <div class="text-info">
+            <span class="label">主题模式</span>
+            <span class="desc">选择应用的主题模式，可跟随系统主题变化。</span>
+          </div>
+          <div class="theme-options">
+            <n-radio-group v-model:value="themeMode" name="theme-mode">
+              <n-radio value="light">浅色模式</n-radio>
+              <n-radio value="dark">深色模式</n-radio>
+              <n-radio value="system">跟随系统</n-radio>
+            </n-radio-group>
+          </div>
+        </div>
       </section>
 
       <!-- 设置组：路径 -->
@@ -96,11 +144,18 @@ import {
   NSwitch,
   NInput,
   NIcon,
+  NSlider,
+  NRadio,
+  NRadioGroup,
 } from 'naive-ui'
 import { RefreshOutline } from '@vicons/ionicons5'
 
 // 注入全局状态
 const globalBlur = inject('GlobalBlur') as Ref<boolean>
+const blurAmount = inject('BlurAmount') as Ref<number>
+const backgroundMask = inject('BackgroundMask') as Ref<boolean>
+const maskOpacity = inject('MaskOpacity') as Ref<number>
+const themeMode = inject('ThemeMode') as Ref<'light' | 'dark' | 'system'>
 const backgroundImagePath = inject<Ref<string | null>>('backgroundImagePath')
 const setBackgroundImage = inject<(path: string | null) => Promise<void>>('setBackgroundImage')
 
@@ -223,6 +278,51 @@ const resetToDefaults = async () => {
   display: flex;
   align-items: center;
   margin-top: 8px;
+}
+
+/* 滑块容器 */
+.slider-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.slider-container :deep(.n-slider) {
+  flex: 1;
+}
+
+.slider-value {
+  font-size: 13px;
+  color: var(--text-dim);
+  min-width: 50px;
+  text-align: right;
+  font-weight: 600;
+}
+
+/* 主题选项 */
+.theme-options {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.theme-options :deep(.n-radio-group) {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.theme-options :deep(.n-radio) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.3s var(--animation-timing);
+}
+
+.theme-options :deep(.n-radio:hover) {
+  color: var(--accent);
 }
 
 /* ================= 页面容器 ================= */
@@ -441,9 +541,33 @@ const resetToDefaults = async () => {
   --n-border: var(--border);
   --n-border-hover: var(--accent);
   --n-border-focus: var(--accent);
-  --n-color: var(--bg-input);
-  --n-color-focus: var(--bg-input-focus);
-  --n-text-color: var(--text-main);
+  --n-color: var(--bg-input) !important;
+  --n-color-focus: var(--bg-input-focus) !important;
+  --n-text-color: var(--text-main) !important;
+  --n-color-disabled: var(--bg-input) !important;
+  background: var(--bg-input) !important;
+  height: 32px !important;
+}
+
+:deep(.n-input:hover) {
+  background: var(--bg-input-focus) !important;
+}
+
+:deep(.n-input:focus) {
+  background: var(--bg-input-focus) !important;
+}
+
+:deep(.n-input.n-input--disabled) {
+  background: var(--bg-input) !important;
+  --n-color: var(--bg-input) !important;
+}
+
+:deep(.n-input__input) {
+  background: transparent !important;
+  color: var(--text-main) !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
 }
 
 :deep(.n-button) {
@@ -453,6 +577,10 @@ const resetToDefaults = async () => {
   --n-color-hover: var(--glass-effect-hover);
   --n-text-color: var(--text-main);
   --n-text-color-hover: var(--text-accent);
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 /* ================= 底部操作区 ================= */

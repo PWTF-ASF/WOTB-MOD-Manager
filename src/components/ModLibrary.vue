@@ -771,6 +771,52 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
+/* 搜索容器 */
+.search-container {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-right: 20px;
+}
+
+/* 搜索框样式 */
+.search-container :deep(.n-input) {
+  background: var(--bg-input) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-main) !important;
+  height: 40px;
+  min-width: 200px;
+  display: flex !important;
+  align-items: center !important;
+  line-height: 1 !important;
+}
+
+.search-container :deep(.n-input:hover) {
+  background: var(--bg-input-focus) !important;
+  border-color: var(--accent) !important;
+}
+
+.search-container :deep(.n-input:focus) {
+  background: var(--bg-input-focus) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px var(--accent-glow) !important;
+}
+
+.search-container :deep(.n-input .n-input__prefix),
+.search-container :deep(.n-input .n-input__suffix) {
+  color: var(--text-dim) !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.search-container :deep(.n-input .n-input__input) {
+  line-height: 1 !important;
+  padding: 0 !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
 .category-wrapper {
   flex: 1;
   min-width: 0;
@@ -786,6 +832,7 @@ onMounted(async () => {
   cursor: grab;
   padding: 12px 0;
   align-items: center;
+  height: 100%;
 }
 
 .category-nav::-webkit-scrollbar {
@@ -798,6 +845,9 @@ onMounted(async () => {
 
 .nav-item {
   flex-shrink: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
 }
 
 .right-group {
@@ -805,6 +855,16 @@ onMounted(async () => {
   align-items: center;
   gap: 16px;
   flex-shrink: 0;
+  height: 100%;
+}
+
+/* 布局切换按钮 */
+.layout-toggle {
+  height: 40px;
+  width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 统计模块样式 - 确保完美垂直居中 */
@@ -968,18 +1028,51 @@ onMounted(async () => {
 /* 通用卡片样式 - 优化标题与标签布局 */
 .mod-card {
   transition: all 0.2s;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.mod-card:hover {
+  background: var(--bg-card-hover) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 8px 24px var(--accent-glow) !important;
 }
 
 .mod-card.active-card {
-  border-left: 4px solid var(--accent);
+  border-left: 4px solid var(--accent) !important;
 }
 
 .mod-card :deep(.n-card-header) {
   padding: 8px 12px;
+  background: transparent !important;
 }
 
 .mod-card :deep(.n-card__action) {
   padding: 8px 12px;
+  background: transparent !important;
+}
+
+/* 确保 Naive UI 卡片在暗色模式下正确显示 */
+:deep(.n-card) {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-main) !important;
+}
+
+:deep(.n-card:hover) {
+  background: var(--bg-card-hover) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 8px 24px var(--accent-glow) !important;
+}
+
+:deep(.n-card-header) {
+  background: transparent !important;
+  color: var(--text-main) !important;
+}
+
+:deep(.n-card-footer) {
+  background: transparent !important;
+  color: var(--text-main) !important;
 }
 
 .mod-header {

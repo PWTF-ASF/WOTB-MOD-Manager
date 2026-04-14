@@ -30,7 +30,7 @@
           <!-- 使用 Naive UI 按钮替代原生调试开关 -->
           <n-button
             class="debug-toggle"
-            @click="DarkMode = !DarkMode"
+            @click="toggleTheme"
             size="tiny"
             :type="DarkMode ? 'primary' : 'default'"
             title="点击切换主题演示"
@@ -74,11 +74,19 @@ import Settings from '@/components/Settings.vue'
 const NavLinksId = ref(1)
 const DarkMode = ref(false)
 const EnableBlur = ref(true)
+const BlurAmount = ref(10) // 模糊度，范围 0-20
+const BackgroundMask = ref(true) // 是否启用背景遮罩
+const MaskOpacity = ref(20) // 遮罩透明度，范围 0-100
 const backgroundImagePath = ref<string | null>(null)
+const ThemeMode = ref<'light' | 'dark' | 'system'>('system') // 主题模式：浅色、深色、跟随系统
 
 // ================= 提供数据 =================
 provide('GlobalTheme', DarkMode)
+provide('ThemeMode', ThemeMode)
 provide('GlobalBlur', EnableBlur)
+provide('BlurAmount', BlurAmount)
+provide('BackgroundMask', BackgroundMask)
+provide('MaskOpacity', MaskOpacity)
 provide('backgroundImagePath', backgroundImagePath)
 
 // ================= 提供更新背景图片的方法 =================
@@ -102,13 +110,45 @@ const backgroundStyle = computed(() => {
     const url = convertFileSrc(backgroundImagePath.value);
     bgImage = `url("${url}")`;
   }
+  // 计算遮罩颜色，根据当前主题模式使用不同的基础颜色
+  const maskColor = DarkMode.value ? 
+    `rgba(0, 0, 0, ${BackgroundMask.value ? MaskOpacity.value / 100 : 0})` : 
+    `rgba(255, 255, 255, ${BackgroundMask.value ? (85 + MaskOpacity.value * 0.15) / 100 : 0})`;
+  
   return {
     backgroundImage: bgImage,
-    '--global-blur': EnableBlur.value ? '10px' : '0px'
+    '--global-blur': EnableBlur.value ? `${BlurAmount.value}px` : '0px',
+    '--app-bg-overlay': maskColor
   };
 });
 
-// 加载保存的背景图片
+// 检测系统主题
+const checkSystemTheme = () => {
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+}
+
+// 根据主题模式更新 DarkMode 状态
+const updateThemeMode = () => {
+  if (ThemeMode.value === 'system') {
+    DarkMode.value = checkSystemTheme()
+  } else {
+    DarkMode.value = ThemeMode.value === 'dark'
+  }
+}
+
+// 监听系统主题变化
+const setupSystemThemeListener = () => {
+  if (window.matchMedia) {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    mediaQuery.addEventListener('change', () => {
+      if (ThemeMode.value === 'system') {
+        updateThemeMode()
+      }
+    })
+  }
+}
+
+// 加载保存的背景图片和主题设置
 onMounted(async () => {
   try {
     const savedPath = await invoke('get_background_image')
@@ -118,6 +158,18 @@ onMounted(async () => {
   } catch (err) {
     console.error('加载背景图片失败:', err)
   }
+  
+  // 加载保存的主题设置
+  const savedThemeMode = localStorage.getItem('app-theme-mode') as 'light' | 'dark' | 'system'
+  if (savedThemeMode) {
+    ThemeMode.value = savedThemeMode
+  }
+  
+  // 更新主题
+  updateThemeMode()
+  
+  // 设置系统主题监听器
+  setupSystemThemeListener()
 })
 
 // ================= 主题切换逻辑 =================
@@ -135,6 +187,35 @@ watch(
     localStorage.setItem('app-theme', isDark ? 'dark' : 'light')
   },
   { immediate: true }
+)
+
+// 切换主题的函数
+const toggleTheme = () => {
+  // 切换 DarkMode 状态
+  DarkMode.value = !DarkMode.value
+  // 更新 ThemeMode 为对应的模式，确保设置页同步
+  ThemeMode.value = DarkMode.value ? 'dark' : 'light'
+  // 保存主题设置到本地存储
+  localStorage.setItem('app-theme', DarkMode.value ? 'dark' : 'light')
+  localStorage.setItem('app-theme-mode', ThemeMode.value)
+  // 更新根元素的类
+  const root = document.documentElement
+  if (DarkMode.value) {
+    root.classList.remove('light-mode')
+    root.classList.add('dark-mode')
+  } else {
+    root.classList.remove('dark-mode')
+    root.classList.add('light-mode')
+  }
+}
+
+// 监听主题模式变化
+watch(
+  ThemeMode,
+  () => {
+    updateThemeMode()
+    localStorage.setItem('app-theme-mode', ThemeMode.value)
+  }
 )
 
 // ================= Naive UI 主题覆盖 =================
