@@ -841,6 +841,21 @@ async fn remove_background_image(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// 读取图片并返回 base64 编码（解决 Linux asset 协议问题）
+#[command]
+async fn read_image_base64(path: String) -> Result<String, String> {
+    let img_path = PathBuf::from(&path);
+    if !img_path.exists() {
+        return Err(format!("图片不存在: {}", path));
+    }
+    
+    let mut file = File::open(&img_path).map_err(|e| e.to_string())?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
+    
+    Ok(base64::encode(&buffer))
+}
+
 // ================= 入口函数 =================
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -873,6 +888,7 @@ pub fn run() {
             set_background_image,
             get_background_image,
             remove_background_image,
+            read_image_base64,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

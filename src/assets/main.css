@@ -20,13 +20,20 @@
   }
 }
 
-html {
-  @apply text-[14px] text-gray-200 bg-gray-800;
+html, body {
+  @apply text-[14px] text-gray-200;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  outline: none;
+  border: none;
+  background: #000000;
 }
 
 a,

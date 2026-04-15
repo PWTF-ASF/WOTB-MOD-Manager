@@ -74,39 +74,103 @@ import Settings from '@/components/Settings.vue'
 const NavLinksId = ref(1)
 const DarkMode = ref(false)
 const EnableBlur = ref(true)
+const EnableOverlay = ref(true)
+const BlurIntensity = ref(10)
+const OverlayIntensity = ref(40)
+const EnableGlassEffect = ref(true)
+const GlassBlurIntensity = ref(16)
 const backgroundImagePath = ref<string | null>(null)
 
 // ================= 提供数据 =================
 provide('GlobalTheme', DarkMode)
 provide('GlobalBlur', EnableBlur)
+provide('EnableOverlay', EnableOverlay)
+provide('BlurIntensity', BlurIntensity)
+provide('OverlayIntensity', OverlayIntensity)
+provide('EnableGlassEffect', EnableGlassEffect)
+provide('GlassBlurIntensity', GlassBlurIntensity)
 provide('backgroundImagePath', backgroundImagePath)
 
 // ================= 提供更新背景图片的方法 =================
 const setBackgroundImage = async (imagePath: string | null) => {
-  if (imagePath === null) {
-    // 移除背景
-    await invoke('remove_background_image')
-    backgroundImagePath.value = null
-  } else {
-    // 上传并保存背景
-    const savedPath = await invoke('set_background_image', { imagePath })
-    backgroundImagePath.value = savedPath as string
+  console.log('HomePage setBackgroundImage 被调用, 路径:', imagePath)
+  try {
+    if (imagePath === null) {
+      // 移除背景
+      await invoke('remove_background_image')
+      backgroundImagePath.value = null
+      console.log('背景已移除')
+    } else {
+      // 上传并保存背景
+      const savedPath = await invoke('set_background_image', { imagePath })
+      console.log('后端返回的保存路径:', savedPath)
+      backgroundImagePath.value = savedPath as string
+    }
+  } catch (err) {
+    console.error('后端调用出错:', err)
+    throw err
   }
 }
 provide('setBackgroundImage', setBackgroundImage)
 
+// 将变量应用到全局
+watch(
+  [EnableBlur, BlurIntensity, EnableOverlay, OverlayIntensity, EnableGlassEffect, GlassBlurIntensity],
+  () => {
+    const root = document.documentElement;
+    const overlayOpacity = EnableOverlay.value ? OverlayIntensity.value / 100 : 0;
+    // Bewly Cat 风格毛玻璃：高透明度 + 强模糊 + 高饱和度
+    const glassAlpha = EnableGlassEffect.value ? 0.7 : 1;
+    const glassBlur = EnableGlassEffect.value ? `${GlassBlurIntensity.value}px` : '0px';
+    const glassSaturate = EnableGlassEffect.value ? '200%' : '100%';
+    root.style.setProperty('--global-blur', EnableBlur.value ? `${BlurIntensity.value}px` : '0px');
+    root.style.setProperty('--overlay-opacity', `${overlayOpacity}`);
+    root.style.setProperty('--glass-bg-alpha', `${glassAlpha}`);
+    root.style.setProperty('--glass-blur', glassBlur);
+    root.style.setProperty('--glass-saturate', glassSaturate);
+  },
+  { immediate: true, deep: true }
+);
+
 // 计算背景样式
 const backgroundStyle = computed(() => {
-  let bgImage = `url("${defaultBg}")`;
-  if (backgroundImagePath.value) {
-    const url = convertFileSrc(backgroundImagePath.value);
-    bgImage = `url("${url}")`;
-  }
-  return {
-    backgroundImage: bgImage,
-    '--global-blur': EnableBlur.value ? '10px' : '0px'
-  };
+  return {};
 });
+
+// 强制更新背景图片
+const updateBackground = async (path: string | null) => {
+  const bgEl = document.querySelector('.background') as HTMLElement;
+  if (!bgEl) {
+    console.warn('Background element not found, retrying...');
+    setTimeout(() => updateBackground(path), 50);
+    return;
+  }
+  
+  if (path) {
+    console.log('设置背景路径:', path);
+    try {
+      // 后端读取图片返回 base64，最可靠的跨平台方式
+      const base64 = await invoke<string>('read_image_base64', { path });
+      console.log('Base64 长度:', base64.length);
+      bgEl.style.backgroundImage = `url("data:image/png;base64,${base64}")`;
+    } catch (err) {
+      console.error('读取背景图片失败:', err);
+      // fallback: 尝试直接使用 convertFileSrc
+      const url = convertFileSrc(path);
+      console.log('Fallback URL:', url);
+      bgEl.style.backgroundImage = `url("${url}")`;
+    }
+  } else {
+    bgEl.style.backgroundImage = `url("${defaultBg}")`;
+  }
+  console.log('最终样式:', bgEl.style.backgroundImage);
+};
+
+watch(
+  backgroundImagePath,
+  (newPath) => updateBackground(newPath),
+  { immediate: true, deep: true }
+);
 
 // 加载保存的背景图片
 onMounted(async () => {
@@ -153,7 +217,7 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
         textColor1: '#ffffff',
         textColor2: '#9ca3af',
         textColor3: '#6b7280',
-        borderColor: '#3a3d47',
+        borderColor: 'transparent',
         borderRadius: '4px',
         boxShadow1: '0 2px 8px 0 rgba(0, 0, 0, 0.2)',
         // 可添加更多变量以覆盖其他组件
@@ -163,7 +227,7 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
         textColorHover: '#ffffff',
         color: 'rgba(255, 255, 255, 0.05)',
         colorHover: 'rgba(255, 255, 255, 0.08)',
-        border: '1px solid #3a3d47',
+        border: '1px solid transparent',
         borderHover: '1px solid #3d5afe',
       },
     }
@@ -219,7 +283,7 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
 
   /* 文字颜色 */
   --text-main: #ffffff;
-  --text-dim: #9ca3af;
+  --text-dim: #6b7280;
   --text-accent: #3d5afe;
 
   /* 边框和强调色 */
@@ -302,6 +366,8 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   height: 100vh;
   position: relative;
   animation: fade-scale-in 0.5s var(--animation-timing);
+  outline: none;
+  border: none;
 }
 
 /* ================= 背景层 ================= */
@@ -313,6 +379,8 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   background-repeat: no-repeat;
   background-attachment: fixed;
   z-index: 0;
+  filter: blur(var(--global-blur));
+  transform: scale(1.02);
   transition: filter 0.5s ease;
 }
 
@@ -320,12 +388,8 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   content: '';
   position: absolute;
   inset: 0;
-  background: var(--app-bg-overlay);
-  backdrop-filter: blur(var(--global-blur));
-  -webkit-backdrop-filter: blur(var(--global-blur));
-  transition:
-    background var(--animation-duration) ease,
-    backdrop-filter var(--animation-duration) ease;
+  background: color-mix(in srgb, var(--app-bg-overlay), transparent calc((1 - var(--overlay-opacity, 0.4)) * 100%));
+  transition: background var(--animation-duration) ease;
 }
 
 /* ================= 侧边栏 ================= */
@@ -439,7 +503,7 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
 }
 
 .nav-item.active .icon img {
-  filter: drop-shadow(0 0 8px var(--accent-glow));
+  filter: brightness(1.2);
 }
 
 .nav-item .icon {
@@ -522,6 +586,8 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   z-index: 5;
   overflow: hidden;
   animation: fade-scale-in 0.5s var(--animation-timing) 0.1s backwards;
+  outline: none;
+  border: none;
 }
 
 /* ================= 响应式设计 ================= */

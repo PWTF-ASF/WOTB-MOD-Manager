@@ -2,12 +2,56 @@
   <div class="mod-library">
     <!-- 顶部栏（重构后） -->
     <header class="top-deck">
-      <div class="search-container">
-        <n-input v-model:value="searchQuery" size="tiny" clearable placeholder="搜索模组...">
-          <template #suffix>
-            <n-icon :component="SearchOutline" />
-          </template>
-        </n-input>
+      <div class="search-container" ref="searchContainerRef">
+        <div class="fancy-search" :class="{ 'is-focused': isSearchFocused, 'is-open': showSearchDropdown }">
+          <n-icon :component="SearchOutline" class="search-icon" />
+          <input
+            ref="searchInputRef"
+            v-model="searchQuery"
+            type="text"
+            placeholder="搜索模组..."
+            class="search-input"
+            @focus="isSearchFocused = true; showSearchDropdown = true"
+            @blur="isSearchFocused = false"
+            @keydown="handleSearchKeydown"
+            @input="onSearchInput"
+          />
+          <button v-if="searchQuery" class="clear-btn" @click="clearSearch">
+            <n-icon :component="CloseOutline" size="14" />
+          </button>
+        </div>
+        <transition name="dropdown-fade">
+          <div v-if="showSearchDropdown" class="search-dropdown">
+            <div v-if="searchHistory.length > 0" class="dropdown-section">
+              <div class="section-title">搜索历史</div>
+              <div
+                v-for="(item, index) in searchHistory"
+                :key="'history-' + index"
+                class="dropdown-item"
+                :class="{ 'is-highlighted': highlightedIndex === index }"
+                @click="selectSearchItem(item)"
+                @mouseenter="highlightedIndex = index"
+              >
+                <n-icon :component="TimeOutline" size="14" />
+                <span>{{ item }}</span>
+              </div>
+            </div>
+            <div class="dropdown-section">
+              <div class="section-title">热门搜索</div>
+              <div
+                v-for="(item, index) in hotSearches"
+                :key="'hot-' + index"
+                class="dropdown-item"
+                :class="{ 'is-highlighted': highlightedIndex === searchHistory.length + index }"
+                @click="selectSearchItem(item)"
+                @mouseenter="highlightedIndex = searchHistory.length + index"
+              >
+                <n-icon :component="FlameOutline" size="14" />
+                <span>{{ item }}</span>
+              </div>
+            </div>
+          </div>
+        </transition>
       </div>
 
       <div class="category-wrapper">
@@ -28,15 +72,6 @@
             <n-icon :component="isGridLayout ? ListOutline : GridOutline" />
           </template>
         </n-button>
-
-        <!-- 统计模块：使用 n-card + n-space + n-divider，确保垂直居中 -->
-        <n-card :bordered="true" size="small" class="stats-module" content-style="padding: 0;">
-          <n-space align="center" :size="16" justify="center" style="height: 100%; flex-wrap: nowrap;">
-            <n-statistic label="已添加" :value="totalmods" />
-            <!-- <n-divider vertical style="height: 30px;" /> -->
-            <n-statistic label="已安装" :value="activemods" class="installed-stat" />
-          </n-space>
-        </n-card>
       </div>
     </header>
 
@@ -123,39 +158,37 @@
       </div>
     </main>
 
-    <!-- 底部控制台（保持不变） -->
+    <!-- 底部控制台（Flexbox布局） -->
     <footer class="control-deck">
       <div class="deck-left">
-        <n-space vertical :size="12">
-          <n-space :size="8">
-            <n-button @click="selectAll" size="small" secondary>
-              <template #icon><n-icon :component="CheckboxOutline" /></template>
-              {{ isAllSelected ? '取消全选' : '全选' }}
-            </n-button>
-            <n-button type="success" @click="handleBatchToggle(true)" size="small" secondary>
-              <template #icon><n-icon :component="CheckmarkOutline" /></template>
-              启用
-            </n-button>
-            <n-button type="warning" @click="handleBatchToggle(false)" size="small" secondary>
-              <template #icon><n-icon :component="CloseOutline" /></template>
-              禁用
-            </n-button>
-          </n-space>
-          <n-space :size="8">
-            <n-button type="primary" @click="handleDeployMods" size="small" secondary>
-              <template #icon><n-icon :component="RocketOutline" /></template>
-              部署
-            </n-button>
-            <n-button type="info" @click="handleAddMod" size="small" secondary>
-              <template #icon><n-icon :component="AddOutline" /></template>
-              添加
-            </n-button>
-            <n-button type="error" @click="handleBatchDelete" size="small" secondary>
-              <template #icon><n-icon :component="TrashOutline" /></template>
-              删除
-            </n-button>
-          </n-space>
-        </n-space>
+        <div class="button-row">
+          <n-button @click="selectAll" size="small" secondary>
+            <template #icon><n-icon :component="CheckboxOutline" /></template>
+            {{ isAllSelected ? '取消全选' : '全选' }}
+          </n-button>
+          <n-button type="success" @click="handleBatchToggle(true)" size="small" secondary>
+            <template #icon><n-icon :component="CheckmarkOutline" /></template>
+            启用
+          </n-button>
+          <n-button type="warning" @click="handleBatchToggle(false)" size="small" secondary>
+            <template #icon><n-icon :component="CloseOutline" /></template>
+            禁用
+          </n-button>
+        </div>
+        <div class="button-row">
+          <n-button type="primary" @click="handleDeployMods" size="small" secondary>
+            <template #icon><n-icon :component="RocketOutline" /></template>
+            部署
+          </n-button>
+          <n-button type="info" @click="handleAddMod" size="small" secondary>
+            <template #icon><n-icon :component="AddOutline" /></template>
+            添加
+          </n-button>
+          <n-button type="error" @click="handleBatchDelete" size="small" secondary>
+            <template #icon><n-icon :component="TrashOutline" /></template>
+            删除
+          </n-button>
+        </div>
       </div>
 
       <div class="deck-right">
@@ -169,7 +202,6 @@
       </div>
     </footer>
 
-    <!-- 图标预览/自定义模态框 -->
     <!-- 图标预览/自定义模态框 -->
     <n-modal v-model:show="showIconModal" preset="card" :title="currentMod ? currentMod.displayName : 'Mod 图标'"
       style="width: 400px">
@@ -207,13 +239,10 @@ import { invoke } from '@tauri-apps/api/core'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { open, ask } from '@tauri-apps/plugin-dialog'
 import {
-  NInput,
   NButton,
   NCheckbox,
   NSwitch,
   NCard,
-  NStatistic,
-  NSpace,
   NTag,
   NIcon,
   NModal,
@@ -230,7 +259,9 @@ import {
   RocketOutline,
   AddOutline,
   TrashOutline,
-  PencilOutline
+  PencilOutline,
+  TimeOutline,
+  FlameOutline
 } from '@vicons/ionicons5'
 
 // ================= 响应式数据 =================
@@ -241,6 +272,15 @@ const modlist = ref([])
 const isLaunching = ref(false)
 const searchQuery = ref('')
 const loadingIcon = ref(false)      // 预览图片加载状态
+
+// 搜索框状态
+const searchContainerRef = ref(null)
+const searchInputRef = ref(null)
+const isSearchFocused = ref(false)
+const showSearchDropdown = ref(false)
+const highlightedIndex = ref(-1)
+const searchHistory = ref(['瞄准插件', '去草', '高清纹理', '语音包'])
+const hotSearches = ['高清模型包', '黑科技插件', '去烟雾', '解锁60帧']
 // 图标预览模态框相关
 const showIconModal = ref(false)      // 控制模态框显示
 const currentMod = ref(null)          // 当前选中的 Mod
@@ -287,10 +327,6 @@ const filtermodlist = computed(() => {
   return result
 })
 
-const totalmods = computed(() => modlist.value.length)
-
-const activemods = computed(() => modlist.value.filter(m => m.active).length)
-
 const isAllSelected = computed(() => {
   return modlist.value.length > 0 && modlist.value.every(mod => mod.selected)
 })
@@ -306,6 +342,51 @@ const toggleLayout = () => {
 }
 
 const formatType = type => TYPE_MAP[type] || '未知类型'
+
+// 搜索框相关方法
+const clearSearch = () => {
+  searchQuery.value = ''
+  searchInputRef.value?.focus()
+}
+
+const onSearchInput = () => {
+  highlightedIndex.value = -1
+}
+
+const selectSearchItem = (item) => {
+  searchQuery.value = item
+  showSearchDropdown.value = false
+  if (!searchHistory.value.includes(item)) {
+    searchHistory.value.unshift(item)
+    searchHistory.value = searchHistory.value.slice(0, 10)
+  }
+}
+
+const handleSearchKeydown = (e) => {
+  const totalItems = searchHistory.value.length + hotSearches.length
+
+  if (e.key === 'Escape') {
+    showSearchDropdown.value = false
+    searchInputRef.value?.blur()
+    return
+  }
+
+  if (!showSearchDropdown.value) return
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    highlightedIndex.value = highlightedIndex.value < totalItems - 1 ? highlightedIndex.value + 1 : 0
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    highlightedIndex.value = highlightedIndex.value > 0 ? highlightedIndex.value - 1 : totalItems - 1
+  } else if (e.key === 'Enter') {
+    e.preventDefault()
+    if (highlightedIndex.value >= 0) {
+      const allItems = [...searchHistory.value, ...hotSearches]
+      selectSearchItem(allItems[highlightedIndex.value])
+    }
+  }
+}
 
 // 横向滚轮
 const handleWheel = e => {
@@ -670,7 +751,15 @@ const onIconPreviewError = () => {
 
 onMounted(async () => {
   await refreshModList()
+
+  document.addEventListener('click', handleClickOutside)
 })
+
+const handleClickOutside = (e) => {
+  if (searchContainerRef.value && !searchContainerRef.value.contains(e.target)) {
+    showSearchDropdown.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -747,7 +836,7 @@ onMounted(async () => {
 }
 
 .mod-library {
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: transparent;
@@ -761,14 +850,19 @@ onMounted(async () => {
   justify-content: space-between;
   padding: 0 24px;
   height: 80px;
-  background: var(--glass-effect);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, var(--glass-bg-alpha));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1);
   position: sticky;
   top: 0;
   z-index: 10;
   flex-shrink: 0;
+  transition: background 0.3s ease, backdrop-filter 0.3s ease;
+}
+
+:global(.dark-mode) .top-deck {
+  background: rgba(20, 20, 24, var(--glass-bg-alpha));
 }
 
 .category-wrapper {
@@ -800,6 +894,10 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
+:global(.dark-mode) .category-nav :deep(.n-button) {
+  color: var(--text-dim) !important;
+}
+
 .right-group {
   display: flex;
   align-items: center;
@@ -807,74 +905,300 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-/* 统计模块样式 - 确保完美垂直居中 */
-.stats-module {
-  height: 60px;
-  background: var(--glass-effect);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
-  overflow: hidden;
-  padding: 5px;
+/* 悬浮极简毛玻璃搜索框样式 */
+.search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  z-index: 100;
 }
 
-.stats-module:hover {
+.fancy-search {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: border-radius 350ms cubic-bezier(0.33, 1, 0.68, 1),
+              background 250ms ease-out,
+              border-color 250ms ease-out,
+              box-shadow 250ms ease-out;
+  gap: 10px;
+}
+
+.fancy-search:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.fancy-search.is-focused,
+.fancy-search.is-open {
+  background: rgba(255, 255, 255, 0.15);
   border-color: var(--accent);
-  box-shadow: 0 4px 12px var(--accent-glow);
-  background: var(--glass-effect-hover);
-  transform: translateY(-1px);
+  border-radius: 12px;
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
-/* 卡片内容区域填满高度并垂直居中 */
-.stats-module .n-card__content {
+.search-icon {
+  color: var(--text-dim);
+  transition: color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.fancy-search.is-focused .search-icon,
+.fancy-search.is-open .search-icon {
+  color: var(--accent);
+}
+
+.search-input {
+  width: 200px;
   height: 100%;
-  display: flex;
-  align-items: center;
-  padding: 0 !important;
-}
-
-.stats-module .n-space {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: nowrap;
-  /* 防止换行 */
-}
-
-/* 统计项内部水平居中，并统一行高 */
-.stats-module .n-statistic {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100%;
-  line-height: 1.2;
-  /* 统一行高 */
-}
-
-.stats-module .n-statistic .n-statistic-label,
-.stats-module .n-statistic .n-statistic-value {
-  line-height: 1.2;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-main);
+  font-size: 14px;
   padding: 0;
 }
 
-.stats-module .n-statistic .n-statistic-label {
-  font-size: 12px;
-  margin-bottom: 2px;
+.search-input::placeholder {
   color: var(--text-dim);
+  opacity: 0.7;
 }
 
-.stats-module .n-statistic .n-statistic-value {
-  font-size: 18px;
+.clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
-.stats-module :deep(.installed-stat .n-statistic-value) {
-  --n-value-text-color: var(--accent);
-  /* 增加优先级 */
+.clear-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--text-main);
+}
+
+/* 搜索下拉面板 */
+.search-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 300px;
+  padding: 12px 0;
+  background: rgba(255, 255, 255, calc(0.08 * var(--glass-bg-alpha) + 0.2));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: backdrop-filter 0.3s ease;
+}
+
+.dropdown-section {
+  padding: 0 4px;
+}
+
+.dropdown-section + .dropdown-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 12px 8px;
+  opacity: 0.8;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 0 4px;
+  border-radius: 10px;
+  color: var(--text-main);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dropdown-item:hover,
+.dropdown-item.is-highlighted {
+  background: rgba(61, 90, 254, 0.15);
+  color: var(--accent);
+}
+
+.dropdown-item svg {
+  color: var(--text-dim);
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.dropdown-item:hover svg,
+.dropdown-item.is-highlighted svg {
+  color: var(--accent);
+}
+
+/* 下拉面板动画 */
+.dropdown-fade-enter-active,
+.dropdown-fade-leave-active {
+  transition: all 0.2s ease;
+}
+
+.dropdown-fade-enter-from,
+.dropdown-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* 浅色模式适配 - 增强可见性 */
+:global(.light-mode) .fancy-search {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+:global(.light-mode) .fancy-search:hover {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+:global(.light-mode) .fancy-search.is-focused,
+:global(.light-mode) .fancy-search.is-open {
+  background: rgba(255, 255, 255, 1);
+  border-color: var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+:global(.light-mode) .search-input::placeholder {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+:global(.light-mode) .search-icon {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+:global(.light-mode) .fancy-search.is-focused .search-icon,
+:global(.light-mode) .fancy-search.is-open .search-icon {
+  color: var(--accent);
+}
+
+:global(.light-mode) .clear-btn {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.4);
+}
+
+:global(.light-mode) .clear-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+:global(.light-mode) .search-dropdown {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+:global(.light-mode) .dropdown-section + .dropdown-section {
+  border-top-color: rgba(0, 0, 0, 0.06);
+}
+
+:global(.light-mode) .dropdown-item {
+  color: var(--text-main);
+}
+
+:global(.light-mode) .dropdown-item:hover,
+:global(.light-mode) .dropdown-item.is-highlighted {
+  background: rgba(61, 90, 254, 0.1);
+}
+
+/* 浅色模式按钮适配 - 与搜索框一致 */
+:global(.light-mode) .layout-toggle,
+:global(.light-mode) .category-nav :deep(.n-button) {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+}
+
+:global(.light-mode) .layout-toggle:hover,
+:global(.light-mode) .category-nav :deep(.n-button:hover) {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border-color: rgba(0, 0, 0, 0.18) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+}
+
+:global(.light-mode) .category-nav :deep(.n-button.n-button--primary-type) {
+  color: #ffffff !important;
+}
+
+/* 统一顶部栏按钮样式 - 与搜索框一致的胶囊按钮 */
+.layout-toggle {
+  height: 44px !important;
+  width: 44px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  transition: background 250ms ease-out,
+              border-color 250ms ease-out,
+              box-shadow 250ms ease-out !important;
+}
+
+.layout-toggle:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+}
+
+.category-nav :deep(.n-button) {
+  height: 44px !important;
+  padding: 0 20px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  color: var(--text-main) !important;
+  transition: background 250ms ease-out,
+              border-color 250ms ease-out,
+              box-shadow 250ms ease-out !important;
+}
+
+.category-nav :deep(.n-button:hover) {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+}
+
+.category-nav :deep(.n-button.n-button--primary-type) {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(61, 90, 254, 0.3) !important;
+}
+
+.category-nav :deep(.n-button.n-button--primary-type:hover) {
+  box-shadow: 0 4px 16px rgba(61, 90, 254, 0.4) !important;
 }
 
 /* 卡片区域 - 占据剩余高度，底部留出footer空间 */
@@ -1021,11 +1345,13 @@ onMounted(async () => {
   box-shadow: 0 0 8px var(--accent-glow);
 }
 
-/* 底部控制台（fixed，适配侧边栏宽度） */
+/* 底部控制台（fixed，适配侧边栏宽度，与顶部栏样式统一） */
 .control-deck {
   height: 90px;
-  background: var(--deck-bg);
-  border-top: 1px solid var(--border);
+  background: rgba(255, 255, 255, var(--glass-bg-alpha));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border-top: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1036,11 +1362,23 @@ onMounted(async () => {
   /* 与侧边栏宽度一致 */
   right: 0;
   z-index: 30;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15), 0 -1px 3px rgba(0, 0, 0, 0.1);
+  transition: background 0.3s ease, backdrop-filter 0.3s ease;
 }
 
-.deck-left .n-space {
+:global(.dark-mode) .control-deck {
+  background: rgba(20, 20, 24, var(--glass-bg-alpha));
+}
+
+.deck-left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
   flex-wrap: nowrap;
 }
 

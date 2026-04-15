@@ -3493,6 +3493,7 @@ dependencies = [
 name = "tauri-app"
 version = "2.6.0"
 dependencies = [
+ "base64 0.21.7",
  "chrono",
  "hex",
  "serde",

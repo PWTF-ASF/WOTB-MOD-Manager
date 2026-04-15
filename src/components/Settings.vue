@@ -10,12 +10,44 @@
       <section class="setting-group">
         <h3 class="group-title">外观 / VISUALS</h3>
 
-        <div class="setting-item">
-          <div class="text-info">
-            <span class="label">启用毛玻璃特效 (Acrylic Blur)</span>
-            <span class="desc">开启后背景将呈现模糊透视效果，可能会轻微影响性能。</span>
+        <div class="setting-item vertical">
+          <div class="switches-row">
+            <div class="switch-item">
+              <div class="text-info">
+                <span class="label">启用背景模糊</span>
+                <span class="desc">开启后背景将呈现模糊透视效果，可能会轻微影响性能。</span>
+              </div>
+              <n-switch v-model:value="globalBlur" size="small" />
+            </div>
+            <div class="switch-item">
+              <div class="text-info">
+                <span class="label">启用背景遮罩</span>
+                <span class="desc">开启后将在背景上添加一层半透明遮罩，提升文字可读性。</span>
+              </div>
+              <n-switch v-model:value="enableOverlay" size="small" />
+            </div>
+            <div class="switch-item">
+              <div class="text-info">
+                <span class="label">启用毛玻璃效果</span>
+                <span class="desc">开启后界面元素将呈现毛玻璃质感，营造现代沉浸感。</span>
+              </div>
+              <n-switch v-model:value="enableGlassEffect" size="small" />
+            </div>
           </div>
-          <n-switch v-model:value="globalBlur" size="small" />
+          <div class="slider-group">
+            <div class="slider-item">
+              <span class="slider-label">背景模糊强度: {{ blurIntensity }}px</span>
+              <n-slider v-model:value="blurIntensity" :min="0" :max="30" :disabled="!globalBlur" size="small" />
+            </div>
+            <div class="slider-item">
+              <span class="slider-label">遮罩强度: {{ overlayIntensity }}%</span>
+              <n-slider v-model:value="overlayIntensity" :min="0" :max="100" :disabled="!enableOverlay" size="small" />
+            </div>
+            <div class="slider-item">
+              <span class="slider-label">毛玻璃强度: {{ glassBlurIntensity }}px</span>
+              <n-slider v-model:value="glassBlurIntensity" :min="8" :max="24" :disabled="!enableGlassEffect" size="small" />
+            </div>
+          </div>
         </div>
 
         <!-- 新增：自定义背景 -->
@@ -96,11 +128,17 @@ import {
   NSwitch,
   NInput,
   NIcon,
+  NSlider,
 } from 'naive-ui'
 import { RefreshOutline } from '@vicons/ionicons5'
 
 // 注入全局状态
 const globalBlur = inject('GlobalBlur') as Ref<boolean>
+const enableOverlay = inject('EnableOverlay') as Ref<boolean>
+const blurIntensity = inject('BlurIntensity') as Ref<number>
+const overlayIntensity = inject('OverlayIntensity') as Ref<number>
+const enableGlassEffect = inject('EnableGlassEffect') as Ref<boolean>
+const glassBlurIntensity = inject('GlassBlurIntensity') as Ref<number>
 const backgroundImagePath = inject<Ref<string | null>>('backgroundImagePath')
 const setBackgroundImage = inject<(path: string | null) => Promise<void>>('setBackgroundImage')
 
@@ -111,13 +149,27 @@ const config = reactive({
 })
 const updatingBg = ref(false)
 
-// 预览 URL
-const backgroundPreviewUrl = computed(() => {
-  if (backgroundImagePath?.value) {
-    return convertFileSrc(backgroundImagePath.value)
-  }
-  return null
-})
+// 预览 URL（使用 base64，最可靠的方式）
+const backgroundPreviewUrl = ref<string | null>(null)
+
+watch(
+  () => backgroundImagePath?.value,
+  async (newPath) => {
+    if (newPath) {
+      try {
+        const base64 = await invoke<string>('read_image_base64', { path: newPath })
+        backgroundPreviewUrl.value = `data:image/png;base64,${base64}`
+        console.log('Settings 预览图片加载成功，长度:', base64.length)
+      } catch (err) {
+        console.error('Settings 预览图片加载失败:', err)
+        backgroundPreviewUrl.value = null
+      }
+    } else {
+      backgroundPreviewUrl.value = null
+    }
+  },
+  { immediate: true }
+)
 
 // 选择背景图片
 const handleSelectBackground = async () => {
@@ -126,12 +178,18 @@ const handleSelectBackground = async () => {
     multiple: false,
     filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
   })
+  console.log('用户选择文件:', selected)
+  
   if (!selected || Array.isArray(selected)) return
 
   updatingBg.value = true
   try {
     if (setBackgroundImage) {
+      console.log('开始设置背景...')
       await setBackgroundImage(selected)
+      console.log('背景设置完成')
+    } else {
+      console.error('setBackgroundImage 函数未注入')
     }
   } catch (err) {
     console.error('设置背景失败:', err)
@@ -232,8 +290,6 @@ const resetToDefaults = async () => {
   padding: 40px;
   box-sizing: border-box;
   overflow-y: auto;
-  backdrop-filter: blur(var(--global-blur)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--global-blur)) saturate(180%);
   color: var(--text-main);
   transition: all 0.3s var(--animation-timing);
   animation: page-slide-in 0.4s var(--animation-timing) backwards;
@@ -328,26 +384,30 @@ const resetToDefaults = async () => {
   height: 16px;
   background: var(--accent);
   border-radius: 2px;
-  box-shadow: 0 0 8px var(--accent-glow);
 }
 
 /* ================= 设置项 ================= */
 .setting-item {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   padding: 24px;
   margin-bottom: 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: all 0.3s var(--animation-timing);
+  transition: all 0.3s var(--animation-timing), backdrop-filter 0.3s ease;
   border-radius: 12px;
   position: relative;
   overflow: hidden;
   animation: fade-scale-in 0.4s var(--animation-timing) backwards;
-  backdrop-filter: blur(var(--global-blur));
-  -webkit-backdrop-filter: blur(var(--global-blur));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+:global(.dark-mode) .setting-item {
+  background: rgba(30, 30, 35, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .setting-item:nth-child(1) {
@@ -372,13 +432,20 @@ const resetToDefaults = async () => {
 
 .setting-item:hover {
   border-color: var(--accent);
-  background: var(--bg-card-hover);
-  box-shadow: 0 8px 24px var(--accent-glow);
-  transform: translateX(4px);
+  box-shadow: 0 8px 24px rgba(61, 90, 254, 0.15), 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: scale(1.02) translateY(-2px);
 }
 
 .setting-item:hover::before {
   opacity: 1;
+}
+
+:global(.dark-mode) .setting-item:hover {
+  background: rgba(61, 90, 254, 0.15);
+}
+
+:global(.light-mode) .setting-item:hover {
+  background: rgba(61, 90, 254, 0.08) !important;
 }
 
 .setting-item.vertical {
@@ -453,6 +520,66 @@ const resetToDefaults = async () => {
   --n-color-hover: var(--glass-effect-hover);
   --n-text-color: var(--text-main);
   --n-text-color-hover: var(--text-accent);
+}
+
+/* 开关行样式 */
+.switches-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.switch-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+/* 滑块组样式 */
+.slider-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-top: 8px;
+}
+
+.slider-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.slider-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slider-label::before {
+  content: '';
+  width: 4px;
+  height: 12px;
+  background: var(--accent);
+  border-radius: 2px;
+  opacity: 0.6;
+}
+
+:deep(.n-slider) {
+  --n-rail-color: var(--border);
+  --n-rail-color-hover: var(--border);
+  --n-fill-color: var(--accent);
+  --n-fill-color-hover: var(--accent);
+  --n-handle-color: var(--text-main);
+  --n-handle-color-hover: var(--text-main);
+  --n-handle-border: 2px solid var(--accent);
+  --n-opacity-disabled: 0.4;
 }
 
 /* ================= 底部操作区 ================= */
@@ -605,14 +732,14 @@ const resetToDefaults = async () => {
 
 /* ================= 明暗模式特定的背景 ================= */
 :global(.light-mode) .settings-container {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, var(--glass-bg-alpha));
+}
+
+:global(.dark-mode) .settings-container {
+  background: rgba(20, 20, 24, var(--glass-bg-alpha));
 }
 
 :global(.light-mode) .setting-item {
-  background: rgba(255, 255, 255, 0.9);
-}
-
-:global(.light-mode) .setting-item:hover {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.8);
 }
 </style>
