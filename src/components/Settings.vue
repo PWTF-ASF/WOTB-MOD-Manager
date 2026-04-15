@@ -541,33 +541,9 @@ const resetToDefaults = async () => {
   --n-border: var(--border);
   --n-border-hover: var(--accent);
   --n-border-focus: var(--accent);
-  --n-color: var(--bg-input) !important;
-  --n-color-focus: var(--bg-input-focus) !important;
-  --n-text-color: var(--text-main) !important;
-  --n-color-disabled: var(--bg-input) !important;
-  background: var(--bg-input) !important;
-  height: 32px !important;
-}
-
-:deep(.n-input:hover) {
-  background: var(--bg-input-focus) !important;
-}
-
-:deep(.n-input:focus) {
-  background: var(--bg-input-focus) !important;
-}
-
-:deep(.n-input.n-input--disabled) {
-  background: var(--bg-input) !important;
-  --n-color: var(--bg-input) !important;
-}
-
-:deep(.n-input__input) {
-  background: transparent !important;
-  color: var(--text-main) !important;
-  height: 100% !important;
-  display: flex !important;
-  align-items: center !important;
+  --n-color: var(--bg-input);
+  --n-color-focus: var(--bg-input-focus);
+  --n-text-color: var(--text-main);
 }
 
 :deep(.n-button) {
@@ -577,10 +553,6 @@ const resetToDefaults = async () => {
   --n-color-hover: var(--glass-effect-hover);
   --n-text-color: var(--text-main);
   --n-text-color-hover: var(--text-accent);
-  height: 32px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
 }
 
 /* ================= 底部操作区 ================= */

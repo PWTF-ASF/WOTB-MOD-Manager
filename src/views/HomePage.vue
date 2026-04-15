@@ -30,7 +30,7 @@
           <!-- 使用 Naive UI 按钮替代原生调试开关 -->
           <n-button
             class="debug-toggle"
-            @click="toggleTheme"
+            @click="toggleTheme()"
             size="tiny"
             :type="DarkMode ? 'primary' : 'default'"
             title="点击切换主题演示"
