@@ -89,6 +89,14 @@ provide('BackgroundMask', BackgroundMask)
 provide('MaskOpacity', MaskOpacity)
 provide('backgroundImagePath', backgroundImagePath)
 
+// 毛玻璃效果相关变量
+const EnableGlassEffect = ref(true)
+const GlassBlurIntensity = ref(12)
+
+// 提供毛玻璃效果相关变量
+provide('EnableGlassEffect', EnableGlassEffect)
+provide('GlassBlurIntensity', GlassBlurIntensity)
+
 // ================= 提供更新背景图片的方法 =================
 const setBackgroundImage = async (imagePath: string | null) => {
   if (imagePath === null) {
@@ -103,6 +111,28 @@ const setBackgroundImage = async (imagePath: string | null) => {
 }
 provide('setBackgroundImage', setBackgroundImage)
 
+// 将变量应用到全局
+watch(
+  [EnableBlur, BlurAmount, BackgroundMask, MaskOpacity, EnableGlassEffect, GlassBlurIntensity],
+  () => {
+    const root = document.documentElement;
+    const overlayOpacity = BackgroundMask.value ? MaskOpacity.value / 100 : 0;
+    // Bewly Cat 风格毛玻璃
+    // 当启用毛玻璃效果时：使用半透明背景 + 模糊 + 高饱和度
+    // 当未启用毛玻璃效果时：使用不透明背景，无模糊
+    const glassAlpha = EnableGlassEffect.value ? 0.7 : 1;
+    const glassBlur = EnableGlassEffect.value ? GlassBlurIntensity.value : 0;
+    const glassSaturate = EnableGlassEffect.value ? 200 : 100;
+    const glassEnabled = EnableGlassEffect.value ? 1 : 0;
+    root.style.setProperty('--global-blur', EnableBlur.value ? `${BlurAmount.value}px` : '0px');
+    root.style.setProperty('--overlay-opacity', `${overlayOpacity}`);
+    root.style.setProperty('--glass-bg-alpha', `${glassAlpha}`);
+    root.style.setProperty('--glass-blur', `${glassBlur}`);
+    root.style.setProperty('--glass-saturate', `${glassSaturate}%`);
+    root.style.setProperty('--glass-enabled', glassEnabled.toString());
+  },
+  { immediate: true, deep: true }
+);
 // 计算背景样式
 const backgroundStyle = computed(() => {
   let bgImage = `url("${defaultBg}")`;
@@ -372,6 +402,55 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   --switch-thumb-checked: #ffffff;
   --switch-border: rgba(0, 0, 0, 0.2);
   --switch-border-checked: rgba(61, 90, 254, 0.8);
+}
+
+/* 深色模式下顶部栏和底部栏样式 */
+html.dark-mode .top-deck {
+  background: rgba(15, 17, 21, var(--glass-bg-alpha, 1)) !important;
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+}
+
+html.dark-mode .control-deck {
+  background: rgba(15, 17, 21, var(--glass-bg-alpha, 1)) !important;
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+}
+
+/* 浅色模式顶部栏和底部栏样式 */
+html.light-mode .top-deck {
+  background: rgba(255, 255, 255, var(--glass-bg-alpha, 1)) !important;
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+}
+
+html.light-mode .control-deck {
+  background: rgba(255, 255, 255, var(--glass-bg-alpha, 1)) !important;
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+}
+
+/* 设置页设置项深色模式样式 */
+html.dark-mode .setting-item {
+  background: rgba(15, 17, 21, var(--glass-bg-alpha, 1)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+}
+
+html.light-mode .setting-item {
+  background: rgba(255, 255, 255, var(--glass-bg-alpha, 1)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+}
+
+html.dark-mode .setting-item:hover {
+  background: rgba(15, 17, 21, var(--glass-bg-alpha, 1)) !important;
+}
+
+html.light-mode .setting-item:hover {
+  background: rgba(255, 255, 255, var(--glass-bg-alpha, 1)) !important;
 }
 </style>
 

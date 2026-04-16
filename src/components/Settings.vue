@@ -433,8 +433,8 @@ const resetToDefaults = async () => {
 
 /* ================= 设置项 ================= */
 .setting-item {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, var(--glass-bg-alpha, 1));
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   padding: 24px;
   margin-bottom: 16px;
@@ -446,8 +446,22 @@ const resetToDefaults = async () => {
   position: relative;
   overflow: hidden;
   animation: fade-scale-in 0.4s var(--animation-timing) backwards;
-  backdrop-filter: blur(var(--global-blur));
-  -webkit-backdrop-filter: blur(var(--global-blur));
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+}
+
+:global(html.dark-mode) .setting-item {
+  background: rgba(15, 17, 21, var(--glass-bg-alpha, 1)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+}
+
+:global(html.light-mode) .setting-item {
+  background: rgba(255, 255, 255, var(--glass-bg-alpha, 1)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
 }
 
 .setting-item:nth-child(1) {
@@ -479,6 +493,14 @@ const resetToDefaults = async () => {
 
 .setting-item:hover::before {
   opacity: 1;
+}
+
+:global(html.dark-mode) .setting-item:hover {
+  background: rgba(15, 17, 21, var(--glass-bg-alpha, 1)) !important;
+}
+
+:global(html.light-mode) .setting-item:hover {
+  background: rgba(255, 255, 255, var(--glass-bg-alpha, 1)) !important;
 }
 
 .setting-item.vertical {
