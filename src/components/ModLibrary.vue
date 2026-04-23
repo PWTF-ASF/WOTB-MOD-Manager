@@ -2,12 +2,39 @@
   <div class="mod-library">
     <!-- 顶部栏（重构后） -->
     <header class="top-deck">
-      <div class="search-container">
-        <n-input v-model:value="searchQuery" size="tiny" clearable placeholder="搜索模组...">
+      <div class="search-container" ref="searchContainerRef">
+        <n-input 
+          v-model:value="searchQuery" 
+          size="tiny" 
+          clearable 
+          placeholder="搜索模组..."
+          :readonly="false"
+          @focus="showSuggestions = true"
+          @keydown="handleSuggestionKeydown"
+        >
           <template #suffix>
             <n-icon :component="SearchOutline" />
           </template>
         </n-input>
+        
+        <!-- 搜索建议下拉面板 -->
+        <div v-if="showSuggestions && searchSuggestions.length > 0" class="search-suggestions">
+          <div class="suggestion-header">
+            <n-icon :component="FlameOutline" size="14" />
+            <span>热门搜索</span>
+          </div>
+          <div 
+            v-for="(item, index) in searchSuggestions" 
+            :key="item"
+            class="suggestion-item"
+            :class="{ active: index === selectedSuggestionIndex }"
+            @click="selectSuggestion(item)"
+            @mouseenter="selectedSuggestionIndex = index"
+          >
+            <n-icon :component="SearchOutline" size="14" />
+            <span>{{ item }}</span>
+          </div>
+        </div>
       </div>
 
       <div class="category-wrapper">
@@ -28,15 +55,6 @@
             <n-icon :component="isGridLayout ? ListOutline : GridOutline" />
           </template>
         </n-button>
-
-        <!-- 统计模块：使用 n-card + n-space + n-divider，确保垂直居中 -->
-        <n-card :bordered="true" size="small" class="stats-module" content-style="padding: 0;">
-          <n-space align="center" :size="16" justify="center" style="height: 100%; flex-wrap: nowrap;">
-            <n-statistic label="已添加" :value="totalmods" />
-            <!-- <n-divider vertical style="height: 30px;" /> -->
-            <n-statistic label="已安装" :value="activemods" class="installed-stat" />
-          </n-space>
-        </n-card>
       </div>
     </header>
 
@@ -202,7 +220,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { open, ask } from '@tauri-apps/plugin-dialog'
@@ -230,7 +248,8 @@ import {
   RocketOutline,
   AddOutline,
   TrashOutline,
-  PencilOutline
+  PencilOutline,
+  FlameOutline
 } from '@vicons/ionicons5'
 
 // ================= 响应式数据 =================
@@ -241,6 +260,81 @@ const modlist = ref([])
 const isLaunching = ref(false)
 const searchQuery = ref('')
 const loadingIcon = ref(false)      // 预览图片加载状态
+const showSuggestions = ref(false)  // 搜索建议面板显示状态
+const selectedSuggestionIndex = ref(-1)  // 键盘选中的建议项索引
+const searchContainerRef = ref(null)  // 搜索容器DOM引用
+
+// 点击外部区域关闭搜索建议
+const handleClickOutside = (event) => {
+  if (searchContainerRef.value && !searchContainerRef.value.contains(event.target)) {
+    showSuggestions.value = false
+    selectedSuggestionIndex.value = -1
+  }
+}
+
+// 热门搜索建议（从现有模组提取）
+const searchSuggestions = computed(() => {
+  // 提取所有模组名称作为建议源
+  const modNames = modlist.value
+    .slice(0, 10)
+    .map(mod => mod.displayName)
+  
+  // 热门类别关键词
+  const hotKeywords = ['3d改模', '语音包', '点亮', '高清', '去草', '反和谐', '涂装']
+  
+  // 如果有输入，过滤匹配的建议
+  const query = searchQuery.value.trim().toLowerCase()
+  if (query) {
+    return [...hotKeywords, ...modNames].filter(item => 
+      item.toLowerCase().includes(query)
+    ).slice(0, 6)
+  }
+  
+  // 默认显示热门关键词
+  return hotKeywords.slice(0, 6)
+})
+
+// ================= 搜索建议方法 =================
+// 选择搜索建议
+const selectSuggestion = (item) => {
+  searchQuery.value = item
+  showSuggestions.value = false
+  selectedSuggestionIndex.value = -1
+}
+
+// 搜索建议键盘导航
+const handleSuggestionKeydown = (e) => {
+  const suggestions = searchSuggestions.value
+  if (!suggestions.length) return
+  
+  switch (e.key) {
+    case 'ArrowDown':
+      e.preventDefault()
+      selectedSuggestionIndex.value = Math.min(
+        selectedSuggestionIndex.value + 1,
+        suggestions.length - 1
+      )
+      break
+    case 'ArrowUp':
+      e.preventDefault()
+      selectedSuggestionIndex.value = Math.max(
+        selectedSuggestionIndex.value - 1,
+        -1
+      )
+      break
+    case 'Enter':
+      if (selectedSuggestionIndex.value >= 0) {
+        e.preventDefault()
+        selectSuggestion(suggestions[selectedSuggestionIndex.value])
+      }
+      break
+    case 'Escape':
+      showSuggestions.value = false
+      selectedSuggestionIndex.value = -1
+      break
+  }
+}
+
 // 图标预览模态框相关
 const showIconModal = ref(false)      // 控制模态框显示
 const currentMod = ref(null)          // 当前选中的 Mod
@@ -670,6 +764,11 @@ const onIconPreviewError = () => {
 
 onMounted(async () => {
   await refreshModList()
+  document.addEventListener('click', handleClickOutside, true)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside, true)
 })
 </script>
 
@@ -781,6 +880,9 @@ onMounted(async () => {
 .category-wrapper {
   flex: 1;
   min-width: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
   mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
 }
@@ -791,8 +893,8 @@ onMounted(async () => {
   overflow-x: auto;
   scrollbar-width: none;
   cursor: grab;
-  padding: 12px 0;
   align-items: center;
+  height: 100%;
 }
 
 .category-nav::-webkit-scrollbar {
@@ -814,74 +916,189 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-/* 统计模块样式 - 确保完美垂直居中 */
-.stats-module {
-  height: 60px;
-  background: var(--glass-effect);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
-  overflow: hidden;
-  padding: 5px;
-}
-
-.stats-module:hover {
-  border-color: var(--accent);
-  box-shadow: 0 4px 12px var(--accent-glow);
-  background: var(--glass-effect-hover);
-  transform: translateY(-1px);
-}
-
-/* 卡片内容区域填满高度并垂直居中 */
-.stats-module .n-card__content {
-  height: 100%;
+/* ================= 顶部栏组件统一样式：高度 + 圆角 ================= */
+/* 搜索框 */
+.search-container {
+  position: relative;
+  height: 44px;
   display: flex;
   align-items: center;
-  padding: 0 !important;
+  width: 280px;
 }
 
-.stats-module .n-space {
-  width: 100%;
-  height: 100%;
+.search-container :deep(.n-input) {
+  border-radius: 12px;
+  height: 44px;
+}
+
+.search-container :deep(.n-input-wrapper) {
+  border-radius: 12px;
+  height: 44px;
+}
+
+.search-container :deep(.n-input .n-input__input) {
+  height: 44px !important;
+  line-height: 44px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.search-container :deep(.n-input .n-input__input-el) {
+  height: 44px !important;
+  line-height: 44px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.search-container :deep(.n-input__suffix) {
+  display: flex !important;
+  align-items: center !important;
+  height: 44px !important;
+}
+
+.search-container :deep(.n-input-state-border) {
+  border-radius: 12px;
+}
+
+/* 搜索建议下拉面板 - 默认深色主题 */
+html.dark-mode .search-suggestions {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(30, 31, 36, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid #3a3d47;
+  border-radius: 12px;
+  padding: 8px 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+html.dark-mode .suggestion-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-wrap: nowrap;
-  /* 防止换行 */
-}
-
-/* 统计项内部水平居中，并统一行高 */
-.stats-module .n-statistic {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100%;
-  line-height: 1.2;
-  /* 统一行高 */
-}
-
-.stats-module .n-statistic .n-statistic-label,
-.stats-module .n-statistic .n-statistic-value {
-  line-height: 1.2;
-  padding: 0;
-}
-
-.stats-module .n-statistic .n-statistic-label {
+  gap: 6px;
+  padding: 8px 16px;
   font-size: 12px;
-  margin-bottom: 2px;
-  color: var(--text-dim);
+  color: #9ca3af;
+  font-weight: 500;
 }
 
-.stats-module .n-statistic .n-statistic-value {
-  font-size: 18px;
+html.dark-mode .suggestion-header .n-icon {
+  color: #f59e0b;
 }
 
-.stats-module :deep(.installed-stat .n-statistic-value) {
-  --n-value-text-color: var(--accent);
-  /* 增加优先级 */
+html.dark-mode .suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #e5e7eb;
+  transition: background 0.2s ease;
+}
+
+html.dark-mode .suggestion-item:hover,
+html.dark-mode .suggestion-item.active {
+  background: rgba(61, 90, 254, 0.15);
+  color: #ffffff;
+}
+
+html.dark-mode .suggestion-item .n-icon {
+  color: #6b7280;
+  transition: color 0.2s ease;
+}
+
+html.dark-mode .suggestion-item:hover .n-icon,
+html.dark-mode .suggestion-item.active .n-icon {
+  color: #3d5afe;
+}
+
+/* 亮色主题适配 */
+html:not(.dark-mode) .search-suggestions {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 8px 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+html:not(.dark-mode) .suggestion-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+html:not(.dark-mode) .suggestion-header .n-icon {
+  color: #f59e0b;
+}
+
+html:not(.dark-mode) .suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #1e293b;
+  transition: background 0.2s ease;
+}
+
+html:not(.dark-mode) .suggestion-item:hover,
+html:not(.dark-mode) .suggestion-item.active {
+  background: rgba(61, 90, 254, 0.08);
+  color: #1e293b;
+}
+
+html:not(.dark-mode) .suggestion-item .n-icon {
+  color: #94a3b8;
+  transition: color 0.2s ease;
+}
+
+html:not(.dark-mode) .suggestion-item:hover .n-icon,
+html:not(.dark-mode) .suggestion-item.active .n-icon {
+  color: #3d5afe;
+}
+
+/* 分类导航按钮 */
+.nav-item {
+  flex-shrink: 0;
+  border-radius: 12px;
+  height: 44px;
+}
+
+.nav-item :deep(.n-button) {
+  border-radius: 12px;
+  height: 44px !important;
+  line-height: 44px;
+}
+
+/* 布局切换按钮 */
+.layout-toggle {
+  border-radius: 12px;
+  height: 44px;
+}
+
+.layout-toggle :deep(.n-button) {
+  border-radius: 12px;
+  height: 44px !important;
+  width: 44px;
 }
 
 /* 卡片区域 - 占据剩余高度，底部留出footer空间 */

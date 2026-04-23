@@ -70,32 +70,95 @@ import HomeDarkIcon from '@/assets/首页Dark.svg'
 import ModLibrary from '@/components/ModLibrary.vue'
 import Settings from '@/components/Settings.vue'
 
+// ================= 平台检测 =================
+const isLinux = ref(false)
+const isWindows = ref(false)
+const isMacOS = ref(false)
+
+// 检测运行平台（Linux适配关键）
+function detectPlatform() {
+  const userAgent = navigator.userAgent.toLowerCase()
+  isLinux.value = userAgent.includes('linux')
+  isWindows.value = userAgent.includes('win')
+  isMacOS.value = userAgent.includes('mac') || userAgent.includes('apple')
+}
+
 // ================= 响应式数据 =================
 const NavLinksId = ref(1)
 const DarkMode = ref(false)
-const EnableBlur = ref(true)
-const BlurAmount = ref(10) // 模糊度，范围 0-20
 const BackgroundMask = ref(true) // 是否启用背景遮罩
 const MaskOpacity = ref(20) // 遮罩透明度，范围 0-100
 const backgroundImagePath = ref<string | null>(null)
+const backgroundImageBase64 = ref<string | null>(null)
 const ThemeMode = ref<'light' | 'dark' | 'system'>('system') // 主题模式：浅色、深色、跟随系统
+
+// 背景模糊效果相关变量
+const enableBackgroundBlur = ref(true)
+const backgroundBlurAmount = ref(10) // 模糊度，范围 0-20px
+
+// 毛玻璃效果相关变量 - BewlyCat单一强度控制模式
+const enableGlassEffect = ref(true)
+const glassIntensity = ref(50) // 单一强度控制 0-100
+
+// 通过单一强度值计算各项玻璃参数 (BewlyCat风格曲线映射)
+const computedGlassParams = computed(() => {
+  const intensity = glassIntensity.value
+  const t = intensity / 100
+  
+  return {
+    opacity: 0.9 - t * 0.3,              // 0.9 → 0.6 (通透 → 磨砂)
+    blur: 4 + t * 24,                    // 4px → 28px
+    saturate: 140 + t * 80               // 140% → 220%
+  }
+})
+
+// ================= 默认值配置 =================
+const defaultVisualSettings = {
+  enableBackgroundBlur: true,
+  backgroundBlurAmount: 10,
+  enableGlassEffect: true,
+  glassIntensity: 50,
+  backgroundMask: true,
+  maskOpacity: 20
+}
 
 // ================= 提供数据 =================
 provide('GlobalTheme', DarkMode)
 provide('ThemeMode', ThemeMode)
-provide('GlobalBlur', EnableBlur)
-provide('BlurAmount', BlurAmount)
 provide('BackgroundMask', BackgroundMask)
 provide('MaskOpacity', MaskOpacity)
 provide('backgroundImagePath', backgroundImagePath)
 
-// 毛玻璃效果相关变量
-const EnableGlassEffect = ref(true)
-const GlassBlurIntensity = ref(12)
+// 提供背景模糊相关变量
+provide('enableBackgroundBlur', enableBackgroundBlur)
+provide('backgroundBlurAmount', backgroundBlurAmount)
 
-// 提供毛玻璃效果相关变量
-provide('EnableGlassEffect', EnableGlassEffect)
-provide('GlassBlurIntensity', GlassBlurIntensity)
+// 提供毛玻璃效果相关变量 - BewlyCat单一强度模式
+provide('enableGlassEffect', enableGlassEffect)
+provide('glassIntensity', glassIntensity)
+
+// 提供平台检测信息 (Linux适配)
+provide('isLinux', isLinux)
+
+// 提供重置视觉效果的方法
+provide('resetVisualSettings', resetVisualSettings)
+
+// ================= 背景图片Base64转换 (Linux适配核心) =================
+const convertBackgroundToBase64 = async (path: string): Promise<string | null> => {
+  if (!path) return null
+  try {
+    const base64 = await invoke('read_image_base64', { path }) as string
+    // 根据图片扩展名判断MIME类型
+    const ext = path.toLowerCase().split('.').pop()
+    let mimeType = 'image/jpeg'
+    if (ext === 'png') mimeType = 'image/png'
+    if (ext === 'webp') mimeType = 'image/webp'
+    return `data:${mimeType};base64,${base64}`
+  } catch (err) {
+    console.error('转换背景图片Base64失败:', err)
+    return null
+  }
+}
 
 // ================= 提供更新背景图片的方法 =================
 const setBackgroundImage = async (imagePath: string | null) => {
@@ -103,33 +166,55 @@ const setBackgroundImage = async (imagePath: string | null) => {
     // 移除背景
     await invoke('remove_background_image')
     backgroundImagePath.value = null
+    backgroundImageBase64.value = null
   } else {
     // 上传并保存背景
-    const savedPath = await invoke('set_background_image', { imagePath })
-    backgroundImagePath.value = savedPath as string
+    const savedPath = await invoke('set_background_image', { imagePath }) as string
+    backgroundImagePath.value = savedPath
+    
+    // Linux平台强制使用Base64方式显示图片
+    if (isLinux.value) {
+      backgroundImageBase64.value = await convertBackgroundToBase64(savedPath)
+    }
   }
 }
 provide('setBackgroundImage', setBackgroundImage)
 
+// 重置视觉效果到默认值
+function resetVisualSettings() {
+  enableBackgroundBlur.value = defaultVisualSettings.enableBackgroundBlur
+  backgroundBlurAmount.value = defaultVisualSettings.backgroundBlurAmount
+  enableGlassEffect.value = defaultVisualSettings.enableGlassEffect
+  glassIntensity.value = defaultVisualSettings.glassIntensity
+  BackgroundMask.value = defaultVisualSettings.backgroundMask
+  MaskOpacity.value = defaultVisualSettings.maskOpacity
+}
+
 // 将变量应用到全局
 watch(
-  [EnableBlur, BlurAmount, BackgroundMask, MaskOpacity, EnableGlassEffect, GlassBlurIntensity],
+  [enableBackgroundBlur, backgroundBlurAmount, BackgroundMask, MaskOpacity, enableGlassEffect, glassIntensity],
   () => {
     const root = document.documentElement;
     const overlayOpacity = BackgroundMask.value ? MaskOpacity.value / 100 : 0;
-    // Bewly Cat 风格毛玻璃
-    // 当启用毛玻璃效果时：使用半透明背景 + 模糊 + 高饱和度
-    // 当未启用毛玻璃效果时：使用不透明背景，无模糊
-    const glassAlpha = EnableGlassEffect.value ? 0.7 : 1;
-    const glassBlur = EnableGlassEffect.value ? GlassBlurIntensity.value : 0;
-    const glassSaturate = EnableGlassEffect.value ? 200 : 100;
-    const glassEnabled = EnableGlassEffect.value ? 1 : 0;
-    root.style.setProperty('--global-blur', EnableBlur.value ? `${BlurAmount.value}px` : '0px');
+    
+    // 背景模糊效果 - 仅控制背景层的清晰度
+    const bgBlur = enableBackgroundBlur.value ? backgroundBlurAmount.value : 0;
+    
+    // 毛玻璃效果 - BewlyCat风格，使用单一强度计算所有参数
+    const params = computedGlassParams.value;
+    const glassAlphaValue = enableGlassEffect.value ? params.opacity : 1;
+    const glassBlurValue = enableGlassEffect.value ? params.blur : 0;
+    const glassSaturateValue = enableGlassEffect.value ? params.saturate : 100;
+    const glassEnabled = enableGlassEffect.value ? 1 : 0;
+    
+    // 应用CSS变量（数值不带单位，在CSS calc中处理）
+    root.style.setProperty('--global-blur', `${bgBlur}`);
     root.style.setProperty('--overlay-opacity', `${overlayOpacity}`);
-    root.style.setProperty('--glass-bg-alpha', `${glassAlpha}`);
-    root.style.setProperty('--glass-blur', `${glassBlur}`);
-    root.style.setProperty('--glass-saturate', `${glassSaturate}%`);
+    root.style.setProperty('--glass-bg-alpha', `${glassAlphaValue}`);
+    root.style.setProperty('--glass-blur', `${glassBlurValue}`);
+    root.style.setProperty('--glass-saturate', `${glassSaturateValue}`);
     root.style.setProperty('--glass-enabled', glassEnabled.toString());
+    root.style.setProperty('--glass-opacity', `${glassAlphaValue}`);
   },
   { immediate: true, deep: true }
 );
@@ -137,8 +222,13 @@ watch(
 const backgroundStyle = computed(() => {
   let bgImage = `url("${defaultBg}")`;
   if (backgroundImagePath.value) {
-    const url = convertFileSrc(backgroundImagePath.value);
-    bgImage = `url("${url}")`;
+    // Linux平台使用Base64方式，其他平台使用convertFileSrc
+    if (isLinux.value && backgroundImageBase64.value) {
+      bgImage = `url("${backgroundImageBase64.value}")`;
+    } else {
+      const url = convertFileSrc(backgroundImagePath.value);
+      bgImage = `url("${url}")`;
+    }
   }
   // 计算遮罩颜色，根据当前主题模式使用不同的基础颜色
   const maskColor = DarkMode.value ? 
@@ -147,7 +237,7 @@ const backgroundStyle = computed(() => {
   
   return {
     backgroundImage: bgImage,
-    '--global-blur': EnableBlur.value ? `${BlurAmount.value}px` : '0px',
+    '--global-blur': enableBackgroundBlur.value ? backgroundBlurAmount.value : 0,
     '--app-bg-overlay': maskColor
   };
 });
@@ -180,10 +270,20 @@ const setupSystemThemeListener = () => {
 
 // 加载保存的背景图片和主题设置
 onMounted(async () => {
+  // 第一步：检测运行平台
+  detectPlatform()
+  console.log(`运行平台检测: Linux=${isLinux.value}, Windows=${isWindows.value}, macOS=${isMacOS.value}`)
+  
   try {
     const savedPath = await invoke('get_background_image')
     if (savedPath && typeof savedPath === 'string') {
       backgroundImagePath.value = savedPath
+      
+      // Linux平台强制转换为Base64显示
+      if (isLinux.value) {
+        backgroundImageBase64.value = await convertBackgroundToBase64(savedPath)
+        console.log('Linux环境: 背景图片已转换为Base64格式')
+      }
     }
   } catch (err) {
     console.error('加载背景图片失败:', err)
@@ -267,6 +367,11 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
         borderColor: '#3a3d47',
         borderRadius: '4px',
         boxShadow1: '0 2px 8px 0 rgba(0, 0, 0, 0.2)',
+        // 输入框基础颜色
+        inputColor: '#1e1f24',
+        inputColorHover: '#25262b',
+        inputColorFocus: '#1a1b1f',
+        inputColorDisabled: '#2d2e33',
         // 可添加更多变量以覆盖其他组件
       },
       Button: {
@@ -276,6 +381,26 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
         colorHover: 'rgba(255, 255, 255, 0.08)',
         border: '1px solid #3a3d47',
         borderHover: '1px solid #3d5afe',
+      },
+      Input: {
+        // 输入框深色背景 - 暗色模式规范
+        color: '#1e1f24',
+        colorHover: '#25262b',
+        colorFocus: '#1a1b1f',
+        colorDisabled: '#2d2e33',
+        // 边框颜色
+        border: '1px solid #3a3d47',
+        borderHover: '1px solid #4a4d57',
+        borderFocus: '1px solid #3d5afe',
+        // 文本颜色 - 高对比度
+        textColor: '#ffffff',
+        textColorPlaceholder: '#6b7280',
+        // 图标颜色
+        iconColor: '#9ca3af',
+        iconColorHover: '#ffffff',
+        // 清除按钮颜色
+        clearColor: '#6b7280',
+        clearColorHover: '#ffffff',
       },
     }
   } else {
@@ -302,6 +427,26 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
         colorHover: 'rgba(255, 255, 255, 0.9)',
         border: '1px solid #e2e8f0',
         borderHover: '1px solid #3d5afe',
+      },
+      Input: {
+        // 亮色模式输入框 - 浅色背景
+        color: 'rgba(255, 255, 255, 0.9)',
+        colorHover: 'rgba(255, 255, 255, 0.95)',
+        colorFocus: '#ffffff',
+        colorDisabled: '#f1f5f9',
+        // 边框颜色
+        border: '1px solid #e2e8f0',
+        borderHover: '1px solid #cbd5e1',
+        borderFocus: '1px solid #3d5afe',
+        // 文本颜色 - 高对比度
+        textColor: '#1e293b',
+        textColorPlaceholder: '#94a3b8',
+        // 图标颜色
+        iconColor: '#64748b',
+        iconColorHover: '#1e293b',
+        // 清除按钮颜色
+        clearColor: '#94a3b8',
+        clearColorHover: '#1e293b',
       },
     }
   }
@@ -407,42 +552,42 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
 /* 深色模式下顶部栏和底部栏样式 */
 html.dark-mode .top-deck {
   background: rgba(15, 17, 21, var(--glass-bg-alpha, 1)) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
 }
 
 html.dark-mode .control-deck {
   background: rgba(15, 17, 21, var(--glass-bg-alpha, 1)) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
 }
 
 /* 浅色模式顶部栏和底部栏样式 */
 html.light-mode .top-deck {
   background: rgba(255, 255, 255, var(--glass-bg-alpha, 1)) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
 }
 
 html.light-mode .control-deck {
   background: rgba(255, 255, 255, var(--glass-bg-alpha, 1)) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
 }
 
 /* 设置页设置项深色模式样式 */
 html.dark-mode .setting-item {
   background: rgba(15, 17, 21, var(--glass-bg-alpha, 1)) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
 }
 
 html.light-mode .setting-item {
   background: rgba(255, 255, 255, var(--glass-bg-alpha, 1)) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
 }
 
 html.dark-mode .setting-item:hover {
@@ -481,8 +626,8 @@ html.light-mode .setting-item:hover {
   position: absolute;
   inset: 0;
   background: var(--app-bg-overlay);
-  backdrop-filter: blur(var(--global-blur));
-  -webkit-backdrop-filter: blur(var(--global-blur));
+  backdrop-filter: blur(calc(var(--global-blur) * 1px));
+  -webkit-backdrop-filter: blur(calc(var(--global-blur) * 1px));
   transition:
     background var(--animation-duration) ease,
     backdrop-filter var(--animation-duration) ease;
