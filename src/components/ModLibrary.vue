@@ -923,7 +923,7 @@ onUnmounted(() => {
   height: 44px;
   display: flex;
   align-items: center;
-  width: 280px;
+  width: 220px;
 }
 
 .search-container :deep(.n-input) {
@@ -962,20 +962,82 @@ onUnmounted(() => {
   border-radius: 12px;
 }
 
-/* 搜索建议下拉面板 - 默认深色主题 */
+/* 搜索框容器 - 毛玻璃效果 */
+html.dark-mode .search-container {
+  position: relative;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  width: 220px;
+}
+
+html.dark-mode .search-container :deep(.n-input) {
+  border-radius: 12px;
+  height: 44px;
+}
+
+html.dark-mode .search-container :deep(.n-input .n-input__wrapper) {
+  background: rgba(30, 35, 45, 0.6) !important;
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 8) * 1px)) saturate(140%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 8) * 1px)) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+html.dark-mode .search-container :deep(.n-input .n-input__wrapper)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(255, 255, 255, 0.15) 100%);
+  border-radius: 12px 12px 0 0;
+  pointer-events: none;
+}
+
+html.dark-mode .search-container :deep(.n-input .n-input__wrapper:hover) {
+  border-color: rgba(61, 90, 254, 0.6);
+  box-shadow: 0 6px 20px rgba(61, 90, 254, 0.15);
+  transform: translateY(-1px);
+}
+
+html.dark-mode .search-container :deep(.n-input.n-input--focused .n-input__wrapper) {
+  background: rgba(35, 40, 52, 0.7) !important;
+  border-color: #3d5afe;
+  box-shadow: 0 0 0 3px rgba(61, 90, 254, 0.12), 0 8px 24px rgba(61, 90, 254, 0.2);
+  transform: translateY(-1px);
+}
+
+/* 搜索建议下拉面板 - 暗色模式增强悬浮感 */
 html.dark-mode .search-suggestions {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 12px);
   left: 0;
   right: 0;
   z-index: 100;
-  background: rgba(30, 31, 36, 0.95);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid #3a3d47;
+  background: rgba(30, 35, 45, 0.65) !important;
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 12) * 1px)) saturate(150%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 12) * 1px)) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   padding: 8px 0;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+html.dark-mode .search-suggestions::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(255, 255, 255, 0.12) 100%);
+  border-radius: 12px 12px 0 0;
+  pointer-events: none;
 }
 
 html.dark-mode .suggestion-header {
@@ -1019,23 +1081,79 @@ html.dark-mode .suggestion-item.active .n-icon {
   color: #3d5afe;
 }
 
-/* 亮色主题适配 */
-html:not(.dark-mode) .search-suggestions {
+/* 亮色模式 - 搜索框和搜索建议毛玻璃效果 */
+html.light-mode .search-container {
+  position: relative;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  width: 220px;
+}
+
+html.light-mode .search-container :deep(.n-input .n-input__wrapper) {
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 8) * 1px)) saturate(130%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 8) * 1px)) saturate(130%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+html.light-mode .search-container :deep(.n-input .n-input__wrapper)::before {
+  content: '';
   position: absolute;
-  top: calc(100% + 8px);
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0.8) 100%);
+  border-radius: 12px 12px 0 0;
+  pointer-events: none;
+}
+
+html.light-mode .search-container :deep(.n-input .n-input__wrapper:hover) {
+  border-color: rgba(61, 90, 254, 0.5);
+  box-shadow: 0 6px 20px rgba(61, 90, 254, 0.1);
+  transform: translateY(-1px);
+}
+
+html.light-mode .search-container :deep(.n-input.n-input--focused .n-input__wrapper) {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border-color: #3d5afe;
+  box-shadow: 0 0 0 3px rgba(61, 90, 254, 0.1), 0 8px 24px rgba(61, 90, 254, 0.15);
+  transform: translateY(-1px);
+}
+
+html.light-mode .search-suggestions {
+  position: absolute;
+  top: calc(100% + 12px);
   left: 0;
   right: 0;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 12) * 1px)) saturate(140%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 12) * 1px)) saturate(140%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 12px;
   padding: 8px 0;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
 }
 
-html:not(.dark-mode) .suggestion-header {
+html.light-mode .search-suggestions::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.5) 50%, rgba(255, 255, 255, 0.9) 100%);
+  border-radius: 12px 12px 0 0;
+  pointer-events: none;
+}
+
+html.light-mode .suggestion-header {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1045,11 +1163,11 @@ html:not(.dark-mode) .suggestion-header {
   font-weight: 500;
 }
 
-html:not(.dark-mode) .suggestion-header .n-icon {
+html.light-mode .suggestion-header .n-icon {
   color: #f59e0b;
 }
 
-html:not(.dark-mode) .suggestion-item {
+html.light-mode .suggestion-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1060,19 +1178,19 @@ html:not(.dark-mode) .suggestion-item {
   transition: background 0.2s ease;
 }
 
-html:not(.dark-mode) .suggestion-item:hover,
-html:not(.dark-mode) .suggestion-item.active {
+html.light-mode .suggestion-item:hover,
+html.light-mode .suggestion-item.active {
   background: rgba(61, 90, 254, 0.08);
   color: #1e293b;
 }
 
-html:not(.dark-mode) .suggestion-item .n-icon {
+html.light-mode .suggestion-item .n-icon {
   color: #94a3b8;
   transition: color 0.2s ease;
 }
 
-html:not(.dark-mode) .suggestion-item:hover .n-icon,
-html:not(.dark-mode) .suggestion-item.active .n-icon {
+html.light-mode .suggestion-item:hover .n-icon,
+html.light-mode .suggestion-item.active .n-icon {
   color: #3d5afe;
 }
 
