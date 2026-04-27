@@ -208,7 +208,6 @@ watch(
     const glassEnabled = enableGlassEffect.value ? 1 : 0;
     
     // 应用CSS变量（数值不带单位，在CSS calc中处理）
-    root.style.setProperty('--global-blur', `${bgBlur}`);
     root.style.setProperty('--overlay-opacity', `${overlayOpacity}`);
     root.style.setProperty('--glass-bg-alpha', `${glassAlphaValue}`);
     root.style.setProperty('--glass-blur', `${glassBlurValue}`);
@@ -235,9 +234,14 @@ const backgroundStyle = computed(() => {
     `rgba(0, 0, 0, ${BackgroundMask.value ? MaskOpacity.value / 100 : 0})` : 
     `rgba(255, 255, 255, ${BackgroundMask.value ? (85 + MaskOpacity.value * 0.15) / 100 : 0})`;
   
+  // 背景模糊效果 - 使用filter实现，而不是backdrop-filter
+  const blurFilter = enableBackgroundBlur.value && backgroundBlurAmount.value > 0 
+    ? `blur(${backgroundBlurAmount.value}px)` 
+    : 'none';
+  
   return {
     backgroundImage: bgImage,
-    '--global-blur': enableBackgroundBlur.value ? backgroundBlurAmount.value : 0,
+    filter: blurFilter,
     '--app-bg-overlay': maskColor
   };
 });
@@ -626,11 +630,8 @@ html.light-mode .setting-item:hover {
   position: absolute;
   inset: 0;
   background: var(--app-bg-overlay);
-  backdrop-filter: blur(calc(var(--global-blur) * 1px));
-  -webkit-backdrop-filter: blur(calc(var(--global-blur) * 1px));
   transition:
-    background var(--animation-duration) ease,
-    backdrop-filter var(--animation-duration) ease;
+    background var(--animation-duration) ease;
 }
 
 /* ================= 侧边栏 ================= */

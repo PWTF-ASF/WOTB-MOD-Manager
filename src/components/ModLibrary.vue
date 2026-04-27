@@ -1018,14 +1018,15 @@ html.dark-mode .search-suggestions {
   top: calc(100% + 12px);
   left: 0;
   right: 0;
-  z-index: 100;
-  background: rgba(30, 35, 45, 0.65) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 12) * 1px)) saturate(150%);
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 12) * 1px)) saturate(150%);
+  z-index: 1000;
+  background: rgba(30, 35, 45, calc(0.65 * var(--glass-enabled, 1) + 0.95 * (1 - var(--glass-enabled, 1)))) !important;
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 12) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1% + 100% * (1 - var(--glass-enabled, 1))));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 12) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1% + 100% * (1 - var(--glass-enabled, 1))));
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   padding: 8px 0;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  transition: backdrop-filter 0.4s ease, background 0.4s ease;
 }
 
 html.dark-mode .search-suggestions::before {
@@ -1131,14 +1132,15 @@ html.light-mode .search-suggestions {
   top: calc(100% + 12px);
   left: 0;
   right: 0;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.72) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 12) * 1px)) saturate(140%);
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 12) * 1px)) saturate(140%);
+  z-index: 1000;
+  background: rgba(255, 255, 255, calc(0.72 * var(--glass-enabled, 1) + 0.95 * (1 - var(--glass-enabled, 1)))) !important;
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 12) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 140) * 1% + 100% * (1 - var(--glass-enabled, 1))));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 12) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 140) * 1% + 100% * (1 - var(--glass-enabled, 1))));
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 12px;
   padding: 8px 0;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+  transition: backdrop-filter 0.4s ease, background 0.4s ease;
 }
 
 html.light-mode .search-suggestions::before {

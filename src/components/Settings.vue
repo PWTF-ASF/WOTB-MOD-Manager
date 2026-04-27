@@ -500,13 +500,10 @@ const resetToDefaults = async () => {
   padding: 40px;
   box-sizing: border-box;
   overflow-y: auto;
-  backdrop-filter: blur(var(--global-blur));
-  -webkit-backdrop-filter: blur(var(--global-blur));
   color: var(--text-main);
   transition:
     background 0.3s var(--animation-timing),
     color 0.3s var(--animation-timing);
-  animation: page-slide-in 0.4s var(--animation-timing) backwards;
   position: relative;
 }
 
@@ -524,7 +521,6 @@ const resetToDefaults = async () => {
 .content-wrapper {
   max-width: 800px;
   margin: 0 auto;
-  animation: slide-up-fade 0.5s var(--animation-timing) 0.1s backwards;
 }
 
 /* ================= 标题样式 ================= */
@@ -565,15 +561,6 @@ const resetToDefaults = async () => {
 /* ================= 设置组 ================= */
 .setting-group {
   margin-bottom: 50px;
-  animation: slide-up-fade 0.5s var(--animation-timing) backwards;
-}
-
-.setting-group:nth-child(1) {
-  animation-delay: 0.15s;
-}
-
-.setting-group:nth-child(2) {
-  animation-delay: 0.2s;
 }
 
 .group-title {
@@ -603,7 +590,9 @@ const resetToDefaults = async () => {
 
 /* ================= 设置项 ================= */
 .setting-item {
-  background: rgba(15, 17, 21, 0.75);
+  background: rgba(15, 17, 21, 0.65);
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 8) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1%));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 8) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1%));
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.15),
@@ -617,11 +606,12 @@ const resetToDefaults = async () => {
     transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
     box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1),
     background 0.4s ease,
-    border-color 0.4s ease;
+    border-color 0.4s ease,
+    backdrop-filter 0.4s ease;
   border-radius: 16px;
   position: relative;
+  z-index: 1;
   overflow: hidden;
-  animation: fade-scale-in 0.4s var(--animation-timing) backwards;
 }
 
 .setting-item > * {
@@ -661,26 +651,6 @@ const resetToDefaults = async () => {
   border-radius: 16px 16px 0 0;
 }
 
-.setting-item:nth-child(1) {
-  animation-delay: 0.25s;
-}
-
-.setting-item:nth-child(2) {
-  animation-delay: 0.3s;
-}
-
-.setting-item:nth-child(3) {
-  animation-delay: 0.35s;
-}
-
-.setting-item:nth-child(4) {
-  animation-delay: 0.4s;
-}
-
-.setting-item:nth-child(5) {
-  animation-delay: 0.45s;
-}
-
 .setting-item:hover {
   border-color: rgba(61, 90, 254, 0.7);
   box-shadow:
@@ -702,6 +672,8 @@ const resetToDefaults = async () => {
 
 :global(html.dark-mode) .setting-item {
   background: rgba(15, 17, 21, 0.78) !important;
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 8) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1%));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 8) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1%));
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.18),
@@ -710,6 +682,8 @@ const resetToDefaults = async () => {
 
 :global(html.light-mode) .setting-item {
   background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 8) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1%));
+  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 8) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1%));
   border: 1px solid rgba(255, 255, 255, 0.9) !important;
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.06),
@@ -885,44 +859,6 @@ const resetToDefaults = async () => {
   gap: 12px;
   border-top: 1px solid var(--border);
   padding-top: 24px;
-  animation: slide-up-fade 0.5s var(--animation-timing) 0.25s backwards;
-}
-
-/* ================= 动画 ================= */
-@keyframes page-slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes slide-up-fade {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fade-scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 /* ================= 滚动条美化 ================= */
