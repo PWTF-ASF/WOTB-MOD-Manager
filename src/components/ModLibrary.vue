@@ -1,30 +1,33 @@
 <template>
   <div class="mod-library">
-    <!-- 顶部栏（重构后） -->
+    <!-- ===== 顶部栏：新拟态凸起面板 ===== -->
     <header class="top-deck">
       <div class="search-container" ref="searchContainerRef">
-        <n-input 
-          v-model:value="searchQuery" 
-          size="tiny" 
-          clearable 
-          placeholder="搜索模组..."
-          :readonly="false"
-          @focus="showSuggestions = true"
-          @keydown="handleSuggestionKeydown"
-        >
-          <template #suffix>
-            <n-icon :component="SearchOutline" />
-          </template>
-        </n-input>
-        
+        <div class="neu-inset-box">
+          <n-input
+            v-model:value="searchQuery"
+            size="tiny"
+            clearable
+            placeholder="搜索模组..."
+            :readonly="false"
+            @focus="showSuggestions = true"
+            @keydown="handleSuggestionKeydown"
+            class="neu-search-input"
+          >
+            <template #suffix>
+              <n-icon :component="SearchOutline" />
+            </template>
+          </n-input>
+        </div>
+
         <!-- 搜索建议下拉面板 -->
         <div v-if="showSuggestions && searchSuggestions.length > 0" class="search-suggestions">
           <div class="suggestion-header">
             <n-icon :component="FlameOutline" size="14" />
             <span>热门搜索</span>
           </div>
-          <div 
-            v-for="(item, index) in searchSuggestions" 
+          <div
+            v-for="(item, index) in searchSuggestions"
             :key="item"
             class="suggestion-item"
             :class="{ active: index === selectedSuggestionIndex }"
@@ -40,167 +43,153 @@
       <div class="category-wrapper">
         <nav ref="navRef" class="category-nav" @wheel="handleWheel" @mousedown="handleMouseDown"
           @mousemove="handleMouseMove" @mouseup="handleMouseUp" @mouseleave="handleMouseUp">
-          <n-button v-for="cat in categories" :key="cat.type"
-            :type="currentCategory === cat.type ? 'primary' : 'default'" size="small" class="nav-item"
-            @click="selectCategory(cat.type)">
+          <button
+            v-for="cat in categories" :key="cat.type"
+            class="neu-pill"
+            :class="{ active: currentCategory === cat.type }"
+            @click="selectCategory(cat.type)"
+          >
             {{ cat.name }}
-          </n-button>
+          </button>
         </nav>
       </div>
 
       <div class="right-group">
-        <n-button class="layout-toggle" @click="toggleLayout" :title="isGridLayout ? '切换为列表布局' : '切换为网格布局'"
-          size="large">
-          <template #icon>
-            <n-icon :component="isGridLayout ? ListOutline : GridOutline" />
-          </template>
-        </n-button>
+        <button class="neu-icon-btn" @click="toggleLayout"
+          :title="isGridLayout ? '切换为列表布局' : '切换为网格布局'">
+          <n-icon :component="isGridLayout ? ListOutline : GridOutline" size="20" />
+        </button>
       </div>
     </header>
 
-    <!-- 中间卡片列表区域（保持不变） -->
-    <main class="modules-grid" :class="{ 'grid-layout': isGridLayout, 'list-layout': !isGridLayout }">
+    <!-- ===== Mod 卡片网格 ===== -->
+    <main class="modules-grid">
       <!-- 网格布局 -->
       <div v-if="isGridLayout" class="grid-container">
-        <n-card v-for="mod in filtermodlist" :key="mod.id" class="mod-card grid-card"
-          :class="{ 'active-card': mod.active }" size="small" hoverable>
-          <template #header>
+        <div v-for="mod in filtermodlist" :key="mod.id" class="neu-card"
+          :class="{ active: mod.active }">
+          <!-- 顶栏 -->
+          <div class="neu-card-header">
             <n-checkbox v-model:checked="mod.selected" size="small" />
-          </template>
-          <template #header-extra>
-            <n-button text class="edit-btn" @click.stop="handleEditMod(mod)">
-              <n-icon size="14">
-                <PencilOutline />
-              </n-icon>
-            </n-button>
-            <n-button text class="win-close-btn" @click.stop="handleDeleteMod(mod.id)">
-              <n-icon size="14">
-                <CloseOutline />
-              </n-icon>
-            </n-button>
-          </template>
+            <div class="neu-card-actions">
+              <button class="neu-icon-btn-xs" @click.stop="handleEditMod(mod)" title="重命名">
+                <n-icon size="13"><PencilOutline /></n-icon>
+              </button>
+              <button class="neu-icon-btn-xs" @click.stop="handleDeleteMod(mod.id)" title="删除">
+                <n-icon size="13"><CloseOutline /></n-icon>
+              </button>
+            </div>
+          </div>
 
-          <div class="grid-card-content">
-            <!-- 图标区域：可点击 -->
-            <div class="mod-icon clickable-icon" @click.stop="openIconModal(mod)">
-              <img v-if="getModIconUrl(mod)" :src="getModIconUrl(mod)" alt="icon" class="mod-icon-img"
+          <!-- 卡片主体 -->
+          <div class="neu-card-body">
+            <div class="neu-icon-box" @click.stop="openIconModal(mod)">
+              <img v-if="getModIconUrl(mod)" :src="getModIconUrl(mod)" alt="icon" class="neu-icon-img"
                 @error="onIconLoadError(mod)" />
-              <n-icon v-else size="40" :depth="2">
+              <n-icon v-else size="36" :depth="2">
                 <DocumentOutline />
               </n-icon>
             </div>
-            <div class="mod-header">
-              <span class="mod-title">{{ mod.displayName }}</span>
-              <n-tag size="small" :bordered="false" @click.stop="handleEditCategory(mod)">
+            <div class="neu-card-info">
+              <span class="neu-mod-name">{{ mod.displayName }}</span>
+              <n-tag size="tiny" :bordered="false" class="neu-tag"
+                @click.stop="handleEditCategory(mod)">
                 {{ formatType(mod.type) }}
               </n-tag>
             </div>
-            <div class="mod-meta">
+            <div class="neu-card-meta">
               <span>2.1 MB</span>
-              <span class="mod-date">{{ formatDate(mod.installDate) }}</span>
+              <span class="dot">·</span>
+              <span>{{ formatDate(mod.installDate) }}</span>
             </div>
-            <div class="mod-desc">必要的前置依赖文件</div>
           </div>
-          <template #action>
-            <div class="card-action">
+
+          <!-- 卡底 -->
+          <div class="neu-card-footer">
+            <div class="neu-toggle-row">
+              <span class="neu-toggle-label">已启用</span>
               <n-switch v-model:value="mod.active" size="small" />
-              <div class="status-indicator" :class="{ inactive: mod.active }" />
             </div>
-          </template>
-        </n-card>
+            <div class="neu-status-dot" :class="{ on: mod.active }" />
+          </div>
+        </div>
       </div>
 
-      <!-- 列表布局（类似改动）... -->
+      <!-- 列表布局 -->
       <div v-else class="list-container">
-        <n-card v-for="mod in filtermodlist" :key="mod.id" class="mod-card list-card"
-          :class="{ 'active-card': mod.active }" size="small" hoverable>
-          <!-- 头部省略... -->
-          <div class="list-layout-content">
-            <div class="mod-icon clickable-icon" @click.stop="openIconModal(mod)">
-              <img v-if="getModIconUrl(mod)" :src="getModIconUrl(mod)" alt="icon" class="mod-icon-img-small"
-                @error="onIconLoadError(mod)" />
-              <n-icon v-else size="24" :depth="2">
-                <DocumentOutline />
-              </n-icon>
-            </div>
-            <div class="mod-info">
-              <div class="mod-header">
-                <span class="mod-title">{{ mod.displayName }}</span>
-                <n-tag size="small" :bordered="false" @click.stop="handleEditCategory(mod)">
-                  {{ formatType(mod.type) }}
-                </n-tag>
-              </div>
-              <div class="mod-desc">必要的前置依赖文件 · 2.1 MB · {{ formatDate(mod.installDate) }}</div>
-            </div>
-            <div class="card-action">
-              <n-switch v-model:value="mod.active" size="small" />
-              <div class="status-indicator" :class="{ inactive: mod.active }" />
-            </div>
+        <div v-for="mod in filtermodlist" :key="mod.id" class="neu-list-item"
+          :class="{ active: mod.active }">
+          <n-checkbox v-model:checked="mod.selected" size="small" />
+          <div class="neu-list-icon" @click.stop="openIconModal(mod)">
+            <img v-if="getModIconUrl(mod)" :src="getModIconUrl(mod)" alt="icon" class="neu-list-img"
+              @error="onIconLoadError(mod)" />
+            <n-icon v-else size="20" :depth="2"><DocumentOutline /></n-icon>
           </div>
-        </n-card>
+          <div class="neu-list-info">
+            <span class="neu-list-name">{{ mod.displayName }}</span>
+            <span class="neu-list-desc">{{ formatType(mod.type) }} · 2.1 MB · {{ formatDate(mod.installDate) }}</span>
+          </div>
+          <div class="neu-list-actions">
+            <n-switch v-model:value="mod.active" size="small" />
+            <div class="neu-status-dot" :class="{ on: mod.active }" />
+          </div>
+        </div>
       </div>
     </main>
 
-    <!-- 底部控制台（保持不变） -->
+    <!-- ===== 底部控制台：新拟态凸起面板 ===== -->
     <footer class="control-deck">
       <div class="deck-left">
-        <n-space vertical :size="12">
-          <n-space :size="8">
-            <n-button @click="selectAll" size="small" secondary>
-              <template #icon><n-icon :component="CheckboxOutline" /></template>
-              {{ isAllSelected ? '取消全选' : '全选' }}
-            </n-button>
-            <n-button type="success" @click="handleBatchToggle(true)" size="small" secondary>
-              <template #icon><n-icon :component="CheckmarkOutline" /></template>
-              启用
-            </n-button>
-            <n-button type="warning" @click="handleBatchToggle(false)" size="small" secondary>
-              <template #icon><n-icon :component="CloseOutline" /></template>
-              禁用
-            </n-button>
-          </n-space>
-          <n-space :size="8">
-            <n-button type="primary" @click="handleDeployMods" size="small" secondary>
-              <template #icon><n-icon :component="RocketOutline" /></template>
-              部署
-            </n-button>
-            <n-button type="info" @click="handleAddMod" size="small" secondary>
-              <template #icon><n-icon :component="AddOutline" /></template>
-              添加
-            </n-button>
-            <n-button type="error" @click="handleBatchDelete" size="small" secondary>
-              <template #icon><n-icon :component="TrashOutline" /></template>
-              删除
-            </n-button>
-          </n-space>
-        </n-space>
+        <div class="neu-btn-group">
+          <button class="neu-action-btn" @click="selectAll">
+            <n-icon :component="CheckboxOutline" size="16" />
+            <span>{{ isAllSelected ? '取消全选' : '全选' }}</span>
+          </button>
+          <button class="neu-action-btn" @click="handleBatchToggle(true)">
+            <n-icon :component="CheckmarkOutline" size="16" />
+            <span>启用</span>
+          </button>
+          <button class="neu-action-btn" @click="handleBatchToggle(false)">
+            <n-icon :component="CloseOutline" size="16" />
+            <span>禁用</span>
+          </button>
+        </div>
+        <div class="neu-btn-group">
+          <button class="neu-action-btn accent" @click="handleDeployMods">
+            <n-icon :component="RocketOutline" size="16" />
+            <span>部署</span>
+          </button>
+          <button class="neu-action-btn" @click="handleAddMod">
+            <n-icon :component="AddOutline" size="16" />
+            <span>添加</span>
+          </button>
+          <button class="neu-action-btn danger" @click="handleBatchDelete">
+            <n-icon :component="TrashOutline" size="16" />
+            <span>删除</span>
+          </button>
+        </div>
       </div>
 
       <div class="deck-right">
-        <n-button class="launch-btn" :loading="isLaunching" type="info" @click="handleLaunchGame" size="large"
-          :disabled="isLaunching">
-          <div class="launch-text">
-            <span class="launch-title">{{ isLaunching ? '正在启动...' : '启动游戏' }}</span>
-            <span class="launch-sub">READY TO LAUNCH</span>
-          </div>
-        </n-button>
+        <button class="neu-launch-btn" :disabled="isLaunching" @click="handleLaunchGame">
+          <span class="launch-title">{{ isLaunching ? '正在启动...' : '启动游戏' }}</span>
+          <span class="launch-sub">READY TO LAUNCH</span>
+        </button>
       </div>
     </footer>
 
-    <!-- 图标预览/自定义模态框 -->
-    <!-- 图标预览/自定义模态框 -->
-    <n-modal v-model:show="showIconModal" preset="card" :title="currentMod ? currentMod.displayName : 'Mod 图标'"
-      style="width: 400px">
+    <!-- ===== 图标预览模态框 ===== -->
+    <n-modal v-model:show="showIconModal" preset="card"
+      :title="currentMod ? currentMod.displayName : 'Mod 图标'"
+      style="width: 400px" :mask-closable="false">
       <div class="icon-modal-content">
-        <div class="preview-area" style="position: relative;">
-          <!-- 加载指示器 -->
+        <div class="neu-preview-area">
           <div v-if="loadingIcon" class="preview-loading">
             <n-spin size="medium" />
           </div>
-          <!-- 图片元素：有图标 URL 时渲染，用 v-show 控制显示 -->
-          <img v-if="currentMod && currentIconPreviewUrl" :src="currentIconPreviewUrl" alt="预览图标" class="preview-img"
+          <img v-if="currentMod && currentIconPreviewUrl" :src="currentIconPreviewUrl"
+            alt="预览图标" class="preview-img"
             @load="onIconLoadSuccess" @error="onIconPreviewError" v-show="!loadingIcon" />
-          <!-- 无图标时显示默认图标 -->
           <n-icon v-else size="80" :depth="2">
             <DocumentOutline />
           </n-icon>
@@ -210,7 +199,8 @@
             <template #icon><n-icon :component="AddOutline" /></template>
             更换图标
           </n-button>
-          <n-button v-if="currentMod && currentMod.iconPath" @click="clearCurrentModIcon" :loading="uploadingIcon">
+          <n-button v-if="currentMod && currentMod.iconPath"
+            @click="clearCurrentModIcon" :loading="uploadingIcon">
             移除图标
           </n-button>
         </div>
@@ -229,9 +219,6 @@ import {
   NButton,
   NCheckbox,
   NSwitch,
-  NCard,
-  NStatistic,
-  NSpace,
   NTag,
   NIcon,
   NModal,
@@ -693,35 +680,25 @@ const uploadIconForCurrentMod = async () => {
     })
     console.log('后端返回的图标路径:', newIconPath)
 
-    // 强制刷新当前 Mod 图标路径
-    currentMod.value.iconPath = newIconPath
-    const targetMod = modlist.value.find(m => m.id === currentMod.value.id)
-    if (targetMod) targetMod.iconPath = newIconPath
-
-    // 强制刷新整个列表，确保所有数据一致（可选）
+    // 刷新列表获取最新数据
     await refreshModList()
 
-    // 如果模态框还开着，手动重置加载状态并强制重绘图片
+    // 重新获取当前 Mod 的最新引用
+    const updatedMod = modlist.value.find(m => m.name === currentMod.value.name)
+    if (updatedMod) {
+      currentMod.value = updatedMod
+    }
+
+    // 设置加载状态，让 @load/@error 事件负责结束
     loadingIcon.value = true
-    // 延迟一点，让 Vue 响应式更新完成
-    setTimeout(() => {
-      loadingIcon.value = false
-    }, 100)
 
     window.alert('图标已更新')
   } catch (err) {
     console.error('上传图标失败:', err)
     window.alert(`上传图标失败: ${err}`)
+    loadingIcon.value = false
   } finally {
-    // 上传成功后...
-    await refreshModList()
-    // 重新获取当前 Mod 的最新引用（refreshModList 后列表已更新）
-    const updatedMod = modlist.value.find(m => m.name === currentMod.value.name)
-    if (updatedMod) {
-      currentMod.value = updatedMod
-    }
-    // 重置加载状态
-    loadingIcon.value = true   // 触发图片重新加载
+    uploadingIcon.value = false
   }
 }
 
@@ -731,21 +708,26 @@ const clearCurrentModIcon = async () => {
   try {
     uploadingIcon.value = true
     await invoke('clear_mod_icon', { modName: currentMod.value.name })
-    currentMod.value.iconPath = null
-    const targetMod = modlist.value.find(m => m.id === currentMod.value.id)
-    if (targetMod) targetMod.iconPath = null
-    window.alert('图标已移除')
-  } catch (err) {
-    console.error('移除图标失败:', err)
-    window.alert(`移除图标失败: ${err}`)
-  } finally {
-    // 清除成功后...
+
+    // 刷新列表获取最新数据
     await refreshModList()
+
+    // 重新获取当前 Mod 的最新引用
     const updatedMod = modlist.value.find(m => m.name === currentMod.value.name)
     if (updatedMod) {
       currentMod.value = updatedMod
     }
-    loadingIcon.value = false  // 无图标，直接显示默认图标
+
+    // 无图标，直接显示默认图标
+    loadingIcon.value = false
+
+    window.alert('图标已移除')
+  } catch (err) {
+    console.error('移除图标失败:', err)
+    window.alert(`移除图标失败: ${err}`)
+    loadingIcon.value = false
+  } finally {
+    uploadingIcon.value = false
   }
 }
 
@@ -773,30 +755,714 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* 新增图标样式 */
-.clickable-icon {
+/* ===========================
+   新拟态 (Neumorphism) 暗黑模式 3.0
+   =========================== */
+
+/* ---- 主容器 ---- */
+.mod-library {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* ---- 顶部栏：凸起面板 ---- */
+.top-deck {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: 80px;
+  background: var(--neu-raised);
+  box-shadow:
+    -8px -4px 16px var(--neu-shadow-light),
+    8px 4px 16px var(--neu-shadow-dark),
+    0 2px 8px rgba(0, 0, 0, 0.2);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-shrink: 0;
+  border-radius: 0 0 var(--neu-radius) var(--neu-radius);
+  margin: 0 4px;
+}
+
+/* ---- 搜索框容器 ---- */
+.search-container {
+  position: relative;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  width: 220px;
+  flex-shrink: 0;
+}
+
+/* 搜索框凹槽 */
+.neu-inset-box {
+  width: 100%;
+  height: 44px;
+  border-radius: var(--neu-radius-sm);
+  background: var(--neu-inset);
+  box-shadow:
+    inset 3px 3px 8px var(--neu-shadow-dark),
+    inset -3px -3px 8px var(--neu-shadow-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  transition: box-shadow 0.3s ease;
+}
+
+.neu-inset-box:focus-within {
+  box-shadow:
+    inset 3px 3px 10px var(--neu-shadow-dark),
+    inset -3px -3px 10px var(--neu-shadow-light),
+    0 0 0 2px var(--neu-shadow-accent);
+}
+
+/* Naive UI 输入框在凹槽中透明 */
+.neu-search-input {
+  width: 100%;
+}
+
+.neu-search-input :deep(.n-input) {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  height: 36px;
+}
+
+.neu-search-input :deep(.n-input__wrapper) {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  height: 36px;
+}
+
+.neu-search-input :deep(.n-input__input) {
+  height: 36px !important;
+  line-height: 36px !important;
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+.neu-search-input :deep(.n-input__suffix) {
+  height: 36px !important;
+  color: var(--text-dim);
+}
+
+.neu-search-input :deep(.n-input__placeholder) {
+  color: var(--text-dim);
+}
+
+/* ---- 分类导航 ---- */
+.category-wrapper {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  margin: 0 16px;
+  mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+}
+
+.category-nav {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  cursor: grab;
+  align-items: center;
+  height: 100%;
+  padding: 4px 0;
+}
+
+.category-nav::-webkit-scrollbar { display: none; }
+.category-nav.grabbing { cursor: grabbing; }
+
+/* 新拟态分类按钮 */
+.neu-pill {
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 18px;
+  background: var(--neu-raised);
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  transition: transform 0.1s ease;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+  box-shadow:
+    -4px -4px 8px var(--neu-shadow-light),
+    4px 4px 8px var(--neu-shadow-dark);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
 }
 
-.clickable-icon:hover {
-  transform: scale(1.02);
+.neu-pill:hover {
+  color: var(--text-main);
+  box-shadow:
+    -5px -5px 10px var(--neu-shadow-light),
+    5px 5px 10px var(--neu-shadow-dark);
+  transform: translateY(-1px);
 }
 
-.mod-icon-img {
+.neu-pill:active {
+  transform: translateY(0);
+}
+
+.neu-pill.active {
+  color: var(--accent);
+  background: var(--neu-inset);
+  box-shadow:
+    inset 2px 2px 6px var(--neu-shadow-dark),
+    inset -2px -2px 6px var(--neu-shadow-light);
+}
+
+/* ---- 布局切换按钮 ---- */
+.right-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.neu-icon-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--neu-radius-sm);
+  background: var(--neu-raised);
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    -4px -4px 8px var(--neu-shadow-light),
+    4px 4px 8px var(--neu-shadow-dark);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neu-icon-btn:hover {
+  color: var(--accent);
+  box-shadow:
+    -5px -5px 10px var(--neu-shadow-light),
+    5px 5px 10px var(--neu-shadow-dark);
+  transform: translateY(-1px);
+}
+
+.neu-icon-btn:active {
+  box-shadow:
+    inset 2px 2px 6px var(--neu-shadow-dark),
+    inset -2px -2px 6px var(--neu-shadow-light);
+  color: var(--accent);
+  transform: translateY(0);
+}
+
+/* ---- 卡片网格区域 ---- */
+.modules-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  margin-bottom: 90px;
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+/* ---- 新拟态卡片 ---- */
+.neu-card {
+  background: var(--neu-raised);
+  border-radius: var(--neu-radius);
+  box-shadow:
+    -8px -8px 16px var(--neu-shadow-light),
+    8px 8px 16px var(--neu-shadow-dark);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  padding: 0;
+}
+
+.neu-card:hover {
+  box-shadow:
+    -10px -10px 20px var(--neu-shadow-light),
+    10px 10px 20px var(--neu-shadow-dark);
+  transform: translateY(-2px);
+}
+
+.neu-card.active {
+  box-shadow:
+    -8px -8px 16px var(--neu-shadow-light),
+    8px 8px 16px var(--neu-shadow-dark),
+    0 0 0 1px var(--neu-shadow-accent);
+}
+
+/* 卡片顶栏 */
+.neu-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 4px;
+}
+
+.neu-card-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.neu-icon-btn-xs {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 8px;
+  background: var(--neu-raised);
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    -2px -2px 4px var(--neu-shadow-light),
+    2px 2px 4px var(--neu-shadow-dark);
+  transition: all 0.2s ease;
+}
+
+.neu-icon-btn-xs:hover {
+  color: var(--accent);
+  box-shadow:
+    -3px -3px 6px var(--neu-shadow-light),
+    3px 3px 6px var(--neu-shadow-dark);
+}
+
+.neu-icon-btn-xs:active {
+  box-shadow:
+    inset 1px 1px 3px var(--neu-shadow-dark),
+    inset -1px -1px 3px var(--neu-shadow-light);
+}
+
+/* 卡片主体 */
+.neu-card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 16px 8px;
+  gap: 8px;
+}
+
+/* 图标容器 */
+.neu-icon-box {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: var(--neu-inset);
+  box-shadow:
+    inset 2px 2px 6px var(--neu-shadow-dark),
+    inset -2px -2px 6px var(--neu-shadow-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  overflow: hidden;
+}
+
+.neu-icon-box:hover {
+  box-shadow:
+    inset 2px 2px 8px var(--neu-shadow-dark),
+    inset -2px -2px 8px var(--neu-shadow-light),
+    0 0 0 2px var(--neu-shadow-accent);
+}
+
+.neu-icon-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 16px;
+  border-radius: 18px;
 }
 
-.mod-icon-img-small {
-  width: 24px;
-  height: 24px;
+.neu-card-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.neu-mod-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.neu-tag {
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.neu-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.neu-card-meta .dot {
+  opacity: 0.4;
+}
+
+/* 卡片底栏 */
+.neu-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px 12px;
+}
+
+.neu-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.neu-toggle-label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* 状态指示点 */
+.neu-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--neu-inset);
+  box-shadow:
+    inset 1px 1px 3px var(--neu-shadow-dark),
+    inset -1px -1px 3px var(--neu-shadow-light);
+  transition: all 0.3s ease;
+}
+
+.neu-status-dot.on {
+  background: var(--accent);
+  box-shadow:
+    0 0 8px var(--accent-glow),
+    inset 1px 1px 3px rgba(255, 255, 255, 0.3),
+    inset -1px -1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* ---- 列表布局 ---- */
+.list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.neu-list-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  background: var(--neu-raised);
+  border-radius: var(--neu-radius-sm);
+  box-shadow:
+    -4px -4px 8px var(--neu-shadow-light),
+    4px 4px 8px var(--neu-shadow-dark);
+  transition: all 0.25s ease;
+}
+
+.neu-list-item:hover {
+  box-shadow:
+    -6px -6px 12px var(--neu-shadow-light),
+    6px 6px 12px var(--neu-shadow-dark);
+  transform: translateX(2px);
+}
+
+.neu-list-item.active {
+  box-shadow:
+    -4px -4px 8px var(--neu-shadow-light),
+    4px 4px 8px var(--neu-shadow-dark),
+    0 0 0 1px var(--neu-shadow-accent);
+}
+
+.neu-list-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--neu-radius-sm);
+  background: var(--neu-inset);
+  box-shadow:
+    inset 2px 2px 4px var(--neu-shadow-dark),
+    inset -2px -2px 4px var(--neu-shadow-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.neu-list-img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  border-radius: 4px;
 }
 
+.neu-list-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.neu-list-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.neu-list-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.neu-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* ---- 底部控制台 ---- */
+.control-deck {
+  height: 90px;
+  background: var(--neu-raised);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  position: fixed;
+  bottom: 0;
+  left: 90px;
+  right: 0;
+  z-index: 30;
+  box-shadow:
+    -4px -8px 16px var(--neu-shadow-light),
+    4px -8px 16px var(--neu-shadow-dark);
+  border-radius: var(--neu-radius) var(--neu-radius) 0 0;
+  margin: 0 4px;
+}
+
+.deck-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.neu-btn-group {
+  display: flex;
+  gap: 8px;
+}
+
+/* 新拟态操作按钮 */
+.neu-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 16px;
+  background: var(--neu-raised);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow:
+    -3px -3px 6px var(--neu-shadow-light),
+    3px 3px 6px var(--neu-shadow-dark);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neu-action-btn:hover {
+  color: var(--text-main);
+  box-shadow:
+    -4px -4px 8px var(--neu-shadow-light),
+    4px 4px 8px var(--neu-shadow-dark);
+  transform: translateY(-1px);
+}
+
+.neu-action-btn:active {
+  box-shadow:
+    inset 2px 2px 5px var(--neu-shadow-dark),
+    inset -2px -2px 5px var(--neu-shadow-light);
+  color: var(--text-dim);
+  transform: translateY(0);
+}
+
+.neu-action-btn.accent {
+  color: var(--accent);
+}
+
+.neu-action-btn.accent:hover {
+  color: var(--accent);
+  box-shadow:
+    -4px -4px 8px var(--neu-shadow-light),
+    4px 4px 8px var(--neu-shadow-dark),
+    0 0 12px var(--neu-shadow-accent);
+}
+
+.neu-action-btn.danger {
+  color: #f43f5e;
+}
+
+.neu-action-btn.danger:hover {
+  color: #f43f5e;
+}
+
+/* 启动按钮 */
+.neu-launch-btn {
+  height: 60px;
+  padding: 0 36px;
+  border: none;
+  border-radius: 30px;
+  background: linear-gradient(135deg, var(--accent) 0%, #536dfe 100%);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+  gap: 1px;
+  box-shadow:
+    -6px -6px 12px var(--neu-shadow-light),
+    6px 6px 12px var(--neu-shadow-dark),
+    0 4px 16px rgba(61, 90, 254, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.neu-launch-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 30px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.neu-launch-btn:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow:
+    -8px -8px 16px var(--neu-shadow-light),
+    8px 8px 16px var(--neu-shadow-dark),
+    0 8px 24px rgba(61, 90, 254, 0.4);
+}
+
+.neu-launch-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow:
+    -4px -4px 8px var(--neu-shadow-light),
+    4px 4px 8px var(--neu-shadow-dark),
+    0 2px 8px rgba(61, 90, 254, 0.3);
+}
+
+.neu-launch-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.neu-launch-btn .launch-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.neu-launch-btn .launch-sub {
+  font-size: 9px;
+  opacity: 0.8;
+  letter-spacing: 0.5px;
+}
+
+/* ---- 搜索建议 ---- */
+.search-suggestions {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  border-radius: var(--neu-radius-sm);
+  padding: 6px 0;
+  background: var(--neu-raised);
+  box-shadow:
+    -6px -6px 12px var(--neu-shadow-light),
+    6px 6px 12px var(--neu-shadow-dark),
+    0 8px 24px rgba(0, 0, 0, 0.3);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.suggestion-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.suggestion-header .n-icon { color: #f59e0b; }
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-main);
+  transition: background 0.15s ease;
+  margin: 0 6px;
+  border-radius: 8px;
+}
+
+.suggestion-item:hover,
+.suggestion-item.active {
+  background: var(--neu-inset);
+  box-shadow:
+    inset 1px 1px 3px var(--neu-shadow-dark),
+    inset -1px -1px 3px var(--neu-shadow-light);
+}
+
+.suggestion-item .n-icon {
+  color: var(--text-dim);
+  transition: color 0.15s ease;
+}
+
+.suggestion-item:hover .n-icon,
+.suggestion-item.active .n-icon {
+  color: var(--accent);
+}
+
+/* ---- 图标预览模态框 ---- */
 .icon-modal-content {
   display: flex;
   flex-direction: column;
@@ -805,30 +1471,29 @@ onUnmounted(() => {
   padding: 16px 0;
 }
 
-.preview-area {
+.neu-preview-area {
   position: relative;
   width: 200px;
   height: 200px;
-  background: var(--glass-effect);
-  border-radius: 16px;
+  border-radius: var(--neu-radius);
+  background: var(--neu-inset);
+  box-shadow:
+    inset 4px 4px 12px var(--neu-shadow-dark),
+    inset -4px -4px 12px var(--neu-shadow-light);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--border);
   overflow: hidden;
 }
 
 .preview-loading {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.5);
-  border-radius: 16px;
+  border-radius: var(--neu-radius);
   z-index: 1;
 }
 
@@ -843,663 +1508,5 @@ onUnmounted(() => {
 .modal-actions {
   display: flex;
   gap: 12px;
-}
-
-.mod-library {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: transparent;
-  position: relative;
-}
-
-/* 顶部栏（sticky） */
-.top-deck {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  height: 80px;
-  background: rgba(255, 255, 255, var(--glass-bg-alpha, 1)) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  flex-shrink: 0;
-  transition: background 0.3s ease, backdrop-filter 0.3s ease;
-}
-
-:global(html.dark-mode) .top-deck {
-  background: rgba(15, 17, 21, var(--glass-bg-alpha, 1)) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
-}
-
-.category-wrapper {
-  flex: 1;
-  min-width: 0;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
-}
-
-.category-nav {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  cursor: grab;
-  align-items: center;
-  height: 100%;
-}
-
-.category-nav::-webkit-scrollbar {
-  display: none;
-}
-
-.category-nav.grabbing {
-  cursor: grabbing;
-}
-
-.nav-item {
-  flex-shrink: 0;
-}
-
-.right-group {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-shrink: 0;
-}
-
-/* ================= 顶部栏组件统一样式：高度 + 圆角 ================= */
-/* 搜索框 */
-.search-container {
-  position: relative;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  width: 220px;
-}
-
-.search-container :deep(.n-input) {
-  border-radius: 12px;
-  height: 44px;
-}
-
-.search-container :deep(.n-input-wrapper) {
-  border-radius: 12px;
-  height: 44px;
-}
-
-.search-container :deep(.n-input .n-input__input) {
-  height: 44px !important;
-  line-height: 44px !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-}
-
-.search-container :deep(.n-input .n-input__input-el) {
-  height: 44px !important;
-  line-height: 44px !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-.search-container :deep(.n-input__suffix) {
-  display: flex !important;
-  align-items: center !important;
-  height: 44px !important;
-}
-
-.search-container :deep(.n-input-state-border) {
-  border-radius: 12px;
-}
-
-/* 搜索框容器 - 毛玻璃效果 */
-html.dark-mode .search-container {
-  position: relative;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  width: 220px;
-}
-
-html.dark-mode .search-container :deep(.n-input) {
-  border-radius: 12px;
-  height: 44px;
-}
-
-html.dark-mode .search-container :deep(.n-input .n-input__wrapper) {
-  background: rgba(30, 35, 45, 0.6) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 8) * 1px)) saturate(140%);
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 8) * 1px)) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-html.dark-mode .search-container :deep(.n-input .n-input__wrapper)::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(255, 255, 255, 0.15) 100%);
-  border-radius: 12px 12px 0 0;
-  pointer-events: none;
-}
-
-html.dark-mode .search-container :deep(.n-input .n-input__wrapper:hover) {
-  border-color: rgba(61, 90, 254, 0.6);
-  box-shadow: 0 6px 20px rgba(61, 90, 254, 0.15);
-  transform: translateY(-1px);
-}
-
-html.dark-mode .search-container :deep(.n-input.n-input--focused .n-input__wrapper) {
-  background: rgba(35, 40, 52, 0.7) !important;
-  border-color: #3d5afe;
-  box-shadow: 0 0 0 3px rgba(61, 90, 254, 0.12), 0 8px 24px rgba(61, 90, 254, 0.2);
-  transform: translateY(-1px);
-}
-
-/* 搜索建议下拉面板 - 暗色模式增强悬浮感 */
-html.dark-mode .search-suggestions {
-  position: absolute;
-  top: calc(100% + 12px);
-  left: 0;
-  right: 0;
-  z-index: 1000;
-  background: rgba(30, 35, 45, calc(0.65 * var(--glass-enabled, 1) + 0.95 * (1 - var(--glass-enabled, 1)))) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 12) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1% + 100% * (1 - var(--glass-enabled, 1))));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 12) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1% + 100% * (1 - var(--glass-enabled, 1))));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  padding: 8px 0;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-  transition: backdrop-filter 0.4s ease, background 0.4s ease;
-}
-
-html.dark-mode .search-suggestions::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(255, 255, 255, 0.12) 100%);
-  border-radius: 12px 12px 0 0;
-  pointer-events: none;
-}
-
-html.dark-mode .suggestion-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  font-size: 12px;
-  color: #9ca3af;
-  font-weight: 500;
-}
-
-html.dark-mode .suggestion-header .n-icon {
-  color: #f59e0b;
-}
-
-html.dark-mode .suggestion-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #e5e7eb;
-  transition: background 0.2s ease;
-}
-
-html.dark-mode .suggestion-item:hover,
-html.dark-mode .suggestion-item.active {
-  background: rgba(61, 90, 254, 0.15);
-  color: #ffffff;
-}
-
-html.dark-mode .suggestion-item .n-icon {
-  color: #6b7280;
-  transition: color 0.2s ease;
-}
-
-html.dark-mode .suggestion-item:hover .n-icon,
-html.dark-mode .suggestion-item.active .n-icon {
-  color: #3d5afe;
-}
-
-/* 亮色模式 - 搜索框和搜索建议毛玻璃效果 */
-html.light-mode .search-container {
-  position: relative;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  width: 220px;
-}
-
-html.light-mode .search-container :deep(.n-input .n-input__wrapper) {
-  background: rgba(255, 255, 255, 0.7) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 8) * 1px)) saturate(130%);
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * (var(--glass-blur, 0) + 8) * 1px)) saturate(130%);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-html.light-mode .search-container :deep(.n-input .n-input__wrapper)::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0.8) 100%);
-  border-radius: 12px 12px 0 0;
-  pointer-events: none;
-}
-
-html.light-mode .search-container :deep(.n-input .n-input__wrapper:hover) {
-  border-color: rgba(61, 90, 254, 0.5);
-  box-shadow: 0 6px 20px rgba(61, 90, 254, 0.1);
-  transform: translateY(-1px);
-}
-
-html.light-mode .search-container :deep(.n-input.n-input--focused .n-input__wrapper) {
-  background: rgba(255, 255, 255, 0.8) !important;
-  border-color: #3d5afe;
-  box-shadow: 0 0 0 3px rgba(61, 90, 254, 0.1), 0 8px 24px rgba(61, 90, 254, 0.15);
-  transform: translateY(-1px);
-}
-
-html.light-mode .search-suggestions {
-  position: absolute;
-  top: calc(100% + 12px);
-  left: 0;
-  right: 0;
-  z-index: 1000;
-  background: rgba(255, 255, 255, calc(0.72 * var(--glass-enabled, 1) + 0.95 * (1 - var(--glass-enabled, 1)))) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 12) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 140) * 1% + 100% * (1 - var(--glass-enabled, 1))));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 12) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 140) * 1% + 100% * (1 - var(--glass-enabled, 1))));
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 12px;
-  padding: 8px 0;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
-  transition: backdrop-filter 0.4s ease, background 0.4s ease;
-}
-
-html.light-mode .search-suggestions::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.5) 50%, rgba(255, 255, 255, 0.9) 100%);
-  border-radius: 12px 12px 0 0;
-  pointer-events: none;
-}
-
-html.light-mode .suggestion-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  font-size: 12px;
-  color: #64748b;
-  font-weight: 500;
-}
-
-html.light-mode .suggestion-header .n-icon {
-  color: #f59e0b;
-}
-
-html.light-mode .suggestion-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #1e293b;
-  transition: background 0.2s ease;
-}
-
-html.light-mode .suggestion-item:hover,
-html.light-mode .suggestion-item.active {
-  background: rgba(61, 90, 254, 0.08);
-  color: #1e293b;
-}
-
-html.light-mode .suggestion-item .n-icon {
-  color: #94a3b8;
-  transition: color 0.2s ease;
-}
-
-html.light-mode .suggestion-item:hover .n-icon,
-html.light-mode .suggestion-item.active .n-icon {
-  color: #3d5afe;
-}
-
-/* 分类导航按钮 */
-.nav-item {
-  flex-shrink: 0;
-  border-radius: 12px;
-  height: 44px;
-}
-
-.nav-item :deep(.n-button) {
-  border-radius: 12px;
-  height: 44px !important;
-  line-height: 44px;
-}
-
-/* 布局切换按钮 */
-.layout-toggle {
-  border-radius: 12px;
-  height: 44px;
-}
-
-.layout-toggle :deep(.n-button) {
-  border-radius: 12px;
-  height: 44px !important;
-  width: 44px;
-}
-
-/* 卡片区域 - 占据剩余高度，底部留出footer空间 */
-.modules-grid {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
-  margin-bottom: 90px;
-  /* 为fixed footer留出空间 */
-}
-
-/* 网格容器：纯 CSS Grid 响应式 */
-.grid-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-/* 网格卡片样式 - 增加信息密度 */
-.grid-card .grid-card-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 6px;
-  padding: 12px 8px;
-}
-
-.grid-card .mod-icon {
-  width: 64px;
-  height: 64px;
-  background: var(--glass-effect);
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.grid-card .mod-meta {
-  font-size: 11px;
-  color: var(--text-dim);
-  display: flex;
-  gap: 8px;
-}
-
-.grid-card .mod-date {
-  opacity: 0.8;
-}
-
-.grid-card .mod-desc {
-  font-size: 11px;
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-/* 列表卡片样式 */
-.list-card .list-layout-content {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-}
-
-.list-card .mod-icon {
-  flex-shrink: 0;
-}
-
-.list-card .mod-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.list-card .mod-desc {
-  font-size: 12px;
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.list-card .card-action {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-/* 通用卡片样式 - 优化标题与标签布局 */
-.mod-card {
-  transition: all 0.2s;
-  background: var(--bg-card) !important;
-  border: 1px solid var(--border) !important;
-}
-
-.mod-card:hover {
-  background: var(--bg-card-hover) !important;
-  border-color: var(--accent) !important;
-  box-shadow: 0 8px 24px var(--accent-glow) !important;
-}
-
-.mod-card.active-card {
-  border-left: 4px solid var(--accent) !important;
-}
-
-.mod-card :deep(.n-card-header) {
-  padding: 8px 12px;
-  background: transparent !important;
-}
-
-.mod-card :deep(.n-card__action) {
-  padding: 8px 12px;
-  background: transparent !important;
-}
-
-/* 确保 Naive UI 卡片在暗色模式下正确显示 */
-:deep(.n-card) {
-  background: var(--bg-card) !important;
-  border: 1px solid var(--border) !important;
-  color: var(--text-main) !important;
-}
-
-:deep(.n-card:hover) {
-  background: var(--bg-card-hover) !important;
-  border-color: var(--accent) !important;
-  box-shadow: 0 8px 24px var(--accent-glow) !important;
-}
-
-:deep(.n-card-header) {
-  background: transparent !important;
-  color: var(--text-main) !important;
-}
-
-:deep(.n-card-footer) {
-  background: transparent !important;
-  color: var(--text-main) !important;
-}
-
-.mod-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-
-.mod-title {
-  font-weight: 600;
-  font-size: 14px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-  min-width: 0;
-}
-
-.mod-header :deep(.n-tag) {
-  flex-shrink: 0;
-}
-
-.card-action {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.status-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-dim);
-}
-
-.status-indicator.inactive {
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
-}
-
-/* 底部控制台（fixed，适配侧边栏宽度） */
-.control-deck {
-  height: 90px;
-  background: rgba(255, 255, 255, var(--glass-bg-alpha, 1)) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
-  border-top: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  position: fixed;
-  bottom: 0;
-  left: 90px;
-  /* 与侧边栏宽度一致 */
-  right: 0;
-  z-index: 30;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-:global(html.dark-mode) .control-deck {
-  background: rgba(15, 17, 21, var(--glass-bg-alpha, 1)) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 100)));
-}
-
-.deck-left {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.button-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: nowrap;
-}
-
-.launch-btn {
-  height: 60px;
-  padding: 0 40px;
-  background: linear-gradient(135deg, var(--accent) 0%, #536dfe 100%);
-  border: none;
-  color: white;
-  clip-path: polygon(12px 0, 100% 0, 100% 100%, 0 100%, 0 12px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.launch-text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  line-height: 1.2;
-  gap: 2px;
-}
-
-.launch-title {
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.launch-sub {
-  font-size: 10px;
-  opacity: 0.8;
-  letter-spacing: 0.5px;
-}
-
-/* 新增：启动游戏按钮交互效果 */
-.launch-btn:not(:disabled):hover {
-  filter: brightness(1.1);
-  transform: scale(1.02);
-  transition: all 0.2s ease;
-}
-
-.launch-btn:not(:disabled):active {
-  transform: scale(0.98);
-  filter: brightness(0.9);
-  transition: all 0.1s ease;
-}
-
-.launch-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* 适配明暗模式变量 */
-:deep(.dark-mode) {
-  --border: rgba(255, 255, 255, 0.12);
-  --text-dim: rgba(255, 255, 255, 0.6);
-  --glass-effect: rgba(255, 255, 255, 0.05);
-  --glass-effect-hover: rgba(255, 255, 255, 0.08);
-  --deck-bg: rgba(15, 17, 21, 0.95);
-}
-
-:deep(.light-mode) {
-  --border: rgba(0, 0, 0, 0.12);
-  --text-dim: rgba(0, 0, 0, 0.6);
-  --glass-effect: rgba(255, 255, 255, 0.8);
-  --glass-effect-hover: rgba(255, 255, 255, 0.9);
-  --deck-bg: rgba(255, 255, 255, 0.95);
 }
 </style>

@@ -96,28 +96,13 @@ const ThemeMode = ref<'light' | 'dark' | 'system'>('system') // 主题模式：�
 const enableBackgroundBlur = ref(true)
 const backgroundBlurAmount = ref(10) // 模糊度，范围 0-20px
 
-// 毛玻璃效果相关变量 - BewlyCat单一强度控制模式
-const enableGlassEffect = ref(true)
-const glassIntensity = ref(50) // 单一强度控制 0-100
-
-// 通过单一强度值计算各项玻璃参数 (BewlyCat风格曲线映射)
-const computedGlassParams = computed(() => {
-  const intensity = glassIntensity.value
-  const t = intensity / 100
-  
-  return {
-    opacity: 0.9 - t * 0.3,              // 0.9 → 0.6 (通透 → 磨砂)
-    blur: 4 + t * 24,                    // 4px → 28px
-    saturate: 140 + t * 80               // 140% → 220%
-  }
-})
+// 背景显示模式
+const backgroundMode = ref('cover')
 
 // ================= 默认值配置 =================
 const defaultVisualSettings = {
   enableBackgroundBlur: true,
   backgroundBlurAmount: 10,
-  enableGlassEffect: true,
-  glassIntensity: 50,
   backgroundMask: true,
   maskOpacity: 20
 }
@@ -133,9 +118,8 @@ provide('backgroundImagePath', backgroundImagePath)
 provide('enableBackgroundBlur', enableBackgroundBlur)
 provide('backgroundBlurAmount', backgroundBlurAmount)
 
-// 提供毛玻璃效果相关变量 - BewlyCat单一强度模式
-provide('enableGlassEffect', enableGlassEffect)
-provide('glassIntensity', glassIntensity)
+// 提供背景显示模式
+provide('backgroundMode', backgroundMode)
 
 // 提供平台检测信息 (Linux适配)
 provide('isLinux', isLinux)
@@ -184,36 +168,17 @@ provide('setBackgroundImage', setBackgroundImage)
 function resetVisualSettings() {
   enableBackgroundBlur.value = defaultVisualSettings.enableBackgroundBlur
   backgroundBlurAmount.value = defaultVisualSettings.backgroundBlurAmount
-  enableGlassEffect.value = defaultVisualSettings.enableGlassEffect
-  glassIntensity.value = defaultVisualSettings.glassIntensity
   BackgroundMask.value = defaultVisualSettings.backgroundMask
   MaskOpacity.value = defaultVisualSettings.maskOpacity
 }
 
 // 将变量应用到全局
 watch(
-  [enableBackgroundBlur, backgroundBlurAmount, BackgroundMask, MaskOpacity, enableGlassEffect, glassIntensity],
+  [BackgroundMask, MaskOpacity],
   () => {
     const root = document.documentElement;
     const overlayOpacity = BackgroundMask.value ? MaskOpacity.value / 100 : 0;
-    
-    // 背景模糊效果 - 仅控制背景层的清晰度
-    const bgBlur = enableBackgroundBlur.value ? backgroundBlurAmount.value : 0;
-    
-    // 毛玻璃效果 - BewlyCat风格，使用单一强度计算所有参数
-    const params = computedGlassParams.value;
-    const glassAlphaValue = enableGlassEffect.value ? params.opacity : 1;
-    const glassBlurValue = enableGlassEffect.value ? params.blur : 0;
-    const glassSaturateValue = enableGlassEffect.value ? params.saturate : 100;
-    const glassEnabled = enableGlassEffect.value ? 1 : 0;
-    
-    // 应用CSS变量（数值不带单位，在CSS calc中处理）
     root.style.setProperty('--overlay-opacity', `${overlayOpacity}`);
-    root.style.setProperty('--glass-bg-alpha', `${glassAlphaValue}`);
-    root.style.setProperty('--glass-blur', `${glassBlurValue}`);
-    root.style.setProperty('--glass-saturate', `${glassSaturateValue}`);
-    root.style.setProperty('--glass-enabled', glassEnabled.toString());
-    root.style.setProperty('--glass-opacity', `${glassAlphaValue}`);
   },
   { immediate: true, deep: true }
 );
@@ -239,8 +204,20 @@ const backgroundStyle = computed(() => {
     ? `blur(${backgroundBlurAmount.value}px)` 
     : 'none';
   
+  // 根据背景模式设置 background-size 和 background-repeat
+  const mode = backgroundMode.value;
+  let bgSize = 'cover';
+  let bgRepeat = 'no-repeat';
+  if (mode === 'contain') bgSize = 'contain';
+  else if (mode === 'fill') bgSize = '100% 100%';
+  else if (mode === 'tile') { bgSize = 'auto'; bgRepeat = 'repeat'; }
+
   return {
     backgroundImage: bgImage,
+    backgroundSize: bgSize,
+    backgroundRepeat: bgRepeat,
+    backgroundPosition: 'center',
+    backgroundAttachment: 'fixed',
     filter: blurFilter,
     '--app-bg-overlay': maskColor
   };
@@ -494,11 +471,19 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   --bg-card-hover: rgba(255, 255, 255, 0.08);
   --bg-input: rgba(255, 255, 255, 0.05);
   --bg-input-focus: rgba(255, 255, 255, 0.1);
+  --card-bg: #1a1a24;
 
-  /* 毛玻璃效果 */
-  --glass-effect: rgba(255, 255, 255, 0.05);
-  --glass-effect-hover: rgba(255, 255, 255, 0.08);
-  --glass-effect-focus: rgba(255, 255, 255, 0.12);
+  /* --- 新拟态 (Neumorphism) --- */
+  --neu-base: #1a1d23;
+  --neu-raised: #1e2128;
+  --neu-inset: #161920;
+  --neu-shadow-light: rgba(255, 255, 255, 0.04);
+  --neu-shadow-mid: rgba(255, 255, 255, 0.02);
+  --neu-shadow-dark: rgba(0, 0, 0, 0.5);
+  --neu-shadow-accent: rgba(61, 90, 254, 0.12);
+  --neu-radius: 16px;
+  --neu-radius-sm: 12px;
+  --neu-radius-lg: 24px;
 
   /* 滚动条 */
   --scroll-track: rgba(255, 255, 255, 0.05);
@@ -535,11 +520,19 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   --bg-card-hover: rgba(255, 255, 255, 0.9);
   --bg-input: rgba(255, 255, 255, 0.9);
   --bg-input-focus: rgba(255, 255, 255, 0.98);
+  --card-bg: #ffffff;
 
-  /* 毛玻璃效果 */
-  --glass-effect: rgba(255, 255, 255, 0.8);
-  --glass-effect-hover: rgba(255, 255, 255, 0.9);
-  --glass-effect-focus: rgba(255, 255, 255, 0.95);
+  /* --- 新拟态 (Neumorphism) --- */
+  --neu-base: #eef0f3;
+  --neu-raised: #f0f2f5;
+  --neu-inset: #e8eaf0;
+  --neu-shadow-light: rgba(255, 255, 255, 0.8);
+  --neu-shadow-mid: rgba(255, 255, 255, 0.5);
+  --neu-shadow-dark: rgba(174, 181, 196, 0.6);
+  --neu-shadow-accent: rgba(61, 90, 254, 0.1);
+  --neu-radius: 16px;
+  --neu-radius-sm: 12px;
+  --neu-radius-lg: 24px;
 
   /* 滚动条 */
   --scroll-track: rgba(0, 0, 0, 0.05);
@@ -553,58 +546,14 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   --switch-border-checked: rgba(61, 90, 254, 0.8);
 }
 
-/* 深色模式下顶部栏和底部栏样式 */
-html.dark-mode .top-deck {
-  background: rgba(15, 17, 21, var(--glass-bg-alpha, 1)) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
-}
-
-html.dark-mode .control-deck {
-  background: rgba(15, 17, 21, var(--glass-bg-alpha, 1)) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
-}
-
-/* 浅色模式顶部栏和底部栏样式 */
-html.light-mode .top-deck {
-  background: rgba(255, 255, 255, var(--glass-bg-alpha, 1)) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
-}
-
-html.light-mode .control-deck {
-  background: rgba(255, 255, 255, var(--glass-bg-alpha, 1)) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
-}
-
-/* 设置页设置项深色模式样式 */
-html.dark-mode .setting-item {
-  background: rgba(15, 17, 21, var(--glass-bg-alpha, 1)) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
-}
-
-html.light-mode .setting-item {
-  background: rgba(255, 255, 255, var(--glass-bg-alpha, 1)) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 0) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 180) * 1%));
-}
-
-html.dark-mode .setting-item:hover {
-  background: rgba(15, 17, 21, var(--glass-bg-alpha, 1)) !important;
-}
-
-html.light-mode .setting-item:hover {
-  background: rgba(255, 255, 255, var(--glass-bg-alpha, 1)) !important;
-}
 </style>
 
 <style scoped>
-/* ================= 布局容器 ================= */
+/* ===========================
+   新拟态 (Neumorphism) 暗黑模式 3.0
+   =========================== */
+
+/* ---- 布局容器 ---- */
 .command-center {
   display: flex;
   width: 100vw;
@@ -613,7 +562,7 @@ html.light-mode .setting-item:hover {
   animation: fade-scale-in 0.5s var(--animation-timing);
 }
 
-/* ================= 背景层 ================= */
+/* ---- 背景层（保持不变） ---- */
 .background {
   position: absolute;
   inset: 0;
@@ -630,40 +579,26 @@ html.light-mode .setting-item:hover {
   position: absolute;
   inset: 0;
   background: var(--app-bg-overlay);
-  transition:
-    background var(--animation-duration) ease;
+  transition: background var(--animation-duration) ease;
 }
 
-/* ================= 侧边栏 ================= */
+/* ---- 侧边栏：新拟态凸起面板 ---- */
 .sidebar {
   width: var(--sidebar-width);
-  background-color: var(--aside-bg);
-  border-right: 1px solid var(--border);
+  background: var(--neu-raised);
   display: flex;
   flex-direction: column;
   align-items: center;
   padding-top: var(--sidebar-padding);
   z-index: 10;
-  transition:
-    background-color var(--animation-duration) ease,
-    border-color var(--animation-duration) ease;
-  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1);
   position: relative;
-  overflow: hidden;
+  box-shadow:
+    4px 0 12px rgba(0, 0, 0, 0.2),
+    -2px 0 8px var(--neu-shadow-light);
+  transition: background var(--animation-duration) ease;
 }
 
-.sidebar::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  opacity: 0.5;
-}
-
-/* 侧边栏 Logo */
+/* ---- Logo ---- */
 .logo-box {
   margin-bottom: 40px;
   text-align: center;
@@ -671,17 +606,25 @@ html.light-mode .setting-item:hover {
 }
 
 .logo-icon {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--neu-inset);
+  box-shadow:
+    inset 2px 2px 6px var(--neu-shadow-dark),
+    inset -2px -2px 6px var(--neu-shadow-light);
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 5px;
-  transition: transform 0.3s ease;
+  transition: all 0.3s ease;
+  padding: 8px;
 }
 
 .logo-icon:hover {
-  transform: scale(1.1);
+  box-shadow:
+    inset 2px 2px 8px var(--neu-shadow-dark),
+    inset -2px -2px 8px var(--neu-shadow-light);
 }
 
 .logo-icon img {
@@ -699,12 +642,13 @@ html.light-mode .setting-item:hover {
   transition: color var(--animation-duration);
 }
 
-/* 导航链接 */
+/* ---- 导航链接：新拟态凸起按钮 ---- */
 .nav-links {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
+  padding: 0 10px;
 }
 
 .nav-item {
@@ -713,25 +657,28 @@ html.light-mode .setting-item:hover {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  padding: 12px 0;
+  padding: 10px 0;
   color: var(--text-dim);
-  transition: all var(--animation-duration) var(--animation-timing);
-  border-left: 3px solid transparent;
-  position: relative;
   min-height: var(--nav-item-height);
+  border-radius: var(--neu-radius-sm);
+  background: var(--neu-raised);
+  box-shadow:
+    -3px -3px 6px var(--neu-shadow-light),
+    3px 3px 6px var(--neu-shadow-dark);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   animation: slide-up-fade 0.6s var(--animation-timing) backwards;
+  position: relative;
 }
 
-.nav-item:nth-child(1) {
-  animation-delay: 0.15s;
-}
-.nav-item:nth-child(2) {
-  animation-delay: 0.2s;
-}
+.nav-item:nth-child(1) { animation-delay: 0.15s; }
+.nav-item:nth-child(2) { animation-delay: 0.2s; }
 
 .nav-item:hover {
   color: var(--text-main);
-  background: var(--hover-bg);
+  box-shadow:
+    -4px -4px 8px var(--neu-shadow-light),
+    4px 4px 8px var(--neu-shadow-dark);
+  transform: translateY(-1px);
 }
 
 .nav-item:hover .icon img {
@@ -740,17 +687,19 @@ html.light-mode .setting-item:hover {
 
 .nav-item.active {
   color: var(--accent);
-  background: linear-gradient(90deg, rgba(var(--accent-rgb, 61, 90, 254), 0.1) 0%, transparent 100%);
-  border-left-color: var(--accent);
+  background: var(--neu-inset);
+  box-shadow:
+    inset 2px 2px 6px var(--neu-shadow-dark),
+    inset -2px -2px 6px var(--neu-shadow-light);
 }
 
 .nav-item.active .icon img {
-  filter: drop-shadow(0 0 8px var(--accent-glow));
+  filter: drop-shadow(0 0 6px var(--accent-glow));
 }
 
 .nav-item .icon {
   font-size: 20px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -777,7 +726,7 @@ html.light-mode .setting-item:hover {
   transition: all var(--animation-duration);
 }
 
-/* 侧边栏底部 */
+/* ---- 侧边栏底部 ---- */
 .sidebar-footer {
   margin-top: auto;
   padding-bottom: var(--sidebar-padding);
@@ -792,20 +741,33 @@ html.light-mode .setting-item:hover {
 
 .debug-toggle {
   cursor: pointer;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 20px;
   font-size: 9px;
   font-weight: 600;
   user-select: none;
-  transition: all var(--animation-duration);
-  background: var(--glass-effect);
+  background: var(--neu-raised);
+  color: var(--text-dim);
+  box-shadow:
+    -3px -3px 6px var(--neu-shadow-light),
+    3px 3px 6px var(--neu-shadow-dark);
+  transition: all 0.25s ease;
 }
 
 .debug-toggle:hover {
-  background: var(--glass-effect-hover);
-  border-color: var(--accent);
   color: var(--text-main);
+  box-shadow:
+    -4px -4px 8px var(--neu-shadow-light),
+    4px 4px 8px var(--neu-shadow-dark);
+  transform: translateY(-1px);
+}
+
+.debug-toggle:active {
+  box-shadow:
+    inset 2px 2px 5px var(--neu-shadow-dark),
+    inset -2px -2px 5px var(--neu-shadow-light);
+  color: var(--accent);
 }
 
 .version {
@@ -819,7 +781,7 @@ html.light-mode .setting-item:hover {
   opacity: 1;
 }
 
-/* ================= 主视口 ================= */
+/* ---- 主视口 ---- */
 .main-viewport {
   flex: 1;
   display: flex;
@@ -830,7 +792,7 @@ html.light-mode .setting-item:hover {
   animation: fade-scale-in 0.5s var(--animation-timing) 0.1s backwards;
 }
 
-/* ================= 响应式设计 ================= */
+/* ---- 响应式 ---- */
 @media (max-width: 768px) {
   :root {
     --sidebar-width: 70px;
@@ -846,13 +808,19 @@ html.light-mode .setting-item:hover {
   }
 
   .logo-icon {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
+    padding: 6px;
   }
 
   .nav-item .icon img {
     width: 18px;
     height: 18px;
+  }
+
+  .nav-item {
+    padding: 8px 0;
+    min-height: 60px;
   }
 }
 
@@ -871,19 +839,19 @@ html.light-mode .setting-item:hover {
   }
 }
 
-/* ================= 主题切换动画 ================= */
+/* ---- 全局过渡 ---- */
 .command-center,
 .sidebar,
 .nav-item,
 .logo-text,
 .debug-toggle,
 .version {
-  transition-property: background-color, color, border-color, box-shadow, transform;
+  transition-property: background-color, color, box-shadow, transform;
   transition-duration: var(--animation-duration);
   transition-timing-function: var(--animation-timing);
 }
 
-/* ================= 性能优化 ================= */
+/* ---- 性能优化 ---- */
 .sidebar,
 .nav-item,
 .logo-icon,
@@ -892,7 +860,7 @@ html.light-mode .setting-item:hover {
   transform: translateZ(0);
 }
 
-/* ================= 加载状态 ================= */
+/* ---- 加载状态 ---- */
 .command-center.loading {
   opacity: 0.5;
   pointer-events: none;
@@ -902,7 +870,7 @@ html.light-mode .setting-item:hover {
   content: '';
   position: absolute;
   inset: 0;
-  background: var(--aside-bg);
+  background: var(--neu-base);
   opacity: 0.7;
   z-index: 100;
   animation: pulse-subtle 2s ease-in-out infinite;

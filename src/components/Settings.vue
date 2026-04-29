@@ -32,42 +32,6 @@
         </div>
       </section>
 
-      <!-- 设置组：毛玻璃效果 -->
-      <section class="setting-group">
-        <h3 class="group-title">毛玻璃效果 / GLASS EFFECT</h3>
-
-        <div class="setting-item">
-          <div class="text-info">
-            <span class="label">启用毛玻璃效果</span>
-            <span class="desc">为界面元素添加BewlyCat风格半透明磨砂质感，营造通透轻盈的视觉层次。</span>
-          </div>
-          <n-switch v-model:value="enableGlassEffect" size="small" />
-        </div>
-
-        <div class="setting-item vertical glass-intensity-item">
-          <div class="text-info">
-            <span class="label">效果强度</span>
-            <span class="desc">单一滑块控制毛玻璃整体通透度，值越大磨砂质感越强烈。</span>
-          </div>
-          <div class="intensity-slider-wrapper">
-            <div class="slider-track">
-              <n-slider
-                v-model:value="glassIntensity"
-                :min="0"
-                :max="100"
-                :step="1"
-                size="small"
-                :disabled="!enableGlassEffect"
-              />
-            </div>
-            <div class="intensity-labels">
-              <span class="label-min">通透</span>
-              <span class="label-max">磨砂</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <!-- 设置组：其他外观设置 -->
       <section class="setting-group">
         <h3 class="group-title">其他外观 / GENERAL VISUALS</h3>
@@ -81,15 +45,35 @@
           <div class="background-control-row">
             <div class="background-preview" v-if="backgroundPreviewUrl">
               <img :src="backgroundPreviewUrl" alt="背景预览" class="preview-thumb" />
-              <n-button size="small" type="error" @click="handleRemoveBackground" :loading="updatingBg">
-                移除
-              </n-button>
+              <div class="bg-btn-group">
+                <n-button size="small" secondary @click="handleSelectBackground" :loading="updatingBg">
+                  更换
+                </n-button>
+                <n-button size="small" type="error" @click="handleRemoveBackground" :loading="updatingBg">
+                  移除
+                </n-button>
+              </div>
             </div>
             <div class="bg-actions" v-else>
               <n-button size="small" secondary @click="handleSelectBackground" :loading="updatingBg">
                 选择图片
               </n-button>
               <span class="desc-sm">未设置，使用默认背景</span>
+            </div>
+          </div>
+
+          <!-- 背景模式 -->
+          <div class="mode-selector-row">
+            <span class="toggle-label">背景模式</span>
+            <div class="mode-buttons">
+              <button
+                v-for="mode in backgroundModes" :key="mode.value"
+                class="neu-mode-btn"
+                :class="{ active: backgroundMode === mode.value }"
+                @click="backgroundMode = mode.value"
+              >
+                {{ mode.label }}
+              </button>
             </div>
           </div>
 
@@ -109,6 +93,13 @@
               :disabled="!backgroundMask"
             />
             <span class="slider-value">{{ maskOpacity }}%</span>
+          </div>
+
+          <!-- 重置背景 -->
+          <div class="reset-bg-row">
+            <n-button size="tiny" quaternary @click="handleResetBackground">
+              恢复默认背景
+            </n-button>
           </div>
         </div>
 
@@ -187,10 +178,6 @@ import { RefreshOutline } from '@vicons/ionicons5'
 const enableBackgroundBlur = inject('enableBackgroundBlur') as Ref<boolean>
 const backgroundBlurAmount = inject('backgroundBlurAmount') as Ref<number>
 
-// 注入全局状态 - 毛玻璃效果 (BewlyCat单一强度控制)
-const enableGlassEffect = inject('enableGlassEffect') as Ref<boolean>
-const glassIntensity = inject('glassIntensity') as Ref<number>
-
 // 注入平台信息 (Linux适配)
 const isLinux = inject('isLinux') as Ref<boolean>
 
@@ -201,6 +188,24 @@ const themeMode = inject('ThemeMode') as Ref<'light' | 'dark' | 'system'>
 const backgroundImagePath = inject<Ref<string | null>>('backgroundImagePath')
 const setBackgroundImage = inject<(path: string | null) => Promise<void>>('setBackgroundImage')
 const resetVisualSettings = inject('resetVisualSettings') as () => void
+
+// 背景模式
+const backgroundModes = [
+  { value: 'cover', label: '铺满' },
+  { value: 'contain', label: '适应' },
+  { value: 'fill', label: '拉伸' },
+  { value: 'tile', label: '平铺' },
+]
+const backgroundMode = inject('backgroundMode') as Ref<string>
+
+// 恢复默认背景
+const handleResetBackground = async () => {
+  if (confirm('确定恢复为默认背景图片吗？')) {
+    if (setBackgroundImage) {
+      await setBackgroundImage(null)
+    }
+  }
+}
 
 // 本地状态
 const config = reactive({
@@ -349,151 +354,11 @@ const resetToDefaults = async () => {
 </script>
 
 <style scoped>
-.background-preview {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: 8px;
-}
+/* ===========================
+   新拟态 (Neumorphism) 暗黑模式 3.0
+   =========================== */
 
-.preview-thumb {
-  width: 120px;
-  height: 68px;
-  object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--glass-effect);
-}
-
-.bg-actions {
-  display: flex;
-  align-items: center;
-  margin-top: 8px;
-}
-
-/* 滑块容器 */
-.slider-container {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  gap: 16px;
-  margin-top: 8px;
-}
-
-.slider-container :deep(.n-slider) {
-  flex: 1;
-}
-
-.slider-value {
-  font-size: 13px;
-  color: var(--text-dim);
-  min-width: 50px;
-  text-align: right;
-  font-weight: 600;
-}
-
-/* BewlyCat风格 - 毛玻璃强度滑块样式 */
-.intensity-slider-wrapper {
-  width: 100%;
-  margin-top: 12px;
-}
-
-.slider-track {
-  width: 100%;
-  padding: 8px 0;
-}
-
-.slider-track :deep(.n-slider) {
-  --n-rail-color: linear-gradient(90deg, rgba(61, 90, 254, 0.2) 0%, rgba(61, 90, 254, 0.8) 100%);
-  --n-fill-color: rgba(61, 90, 254, 0.9);
-  --n-fill-color-hover: rgba(61, 90, 254, 1);
-}
-
-.slider-track :deep(.n-slider-handle) {
-  background: white;
-  border: 2px solid rgba(61, 90, 254, 0.8);
-  box-shadow:
-    0 2px 8px rgba(61, 90, 254, 0.3),
-    0 0 12px rgba(61, 90, 254, 0.2);
-  transition:
-    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-    background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.slider-track :deep(.n-slider-handle:hover) {
-  transform: scale(1.2);
-  box-shadow:
-    0 4px 16px rgba(61, 90, 254, 0.4),
-    0 0 20px rgba(61, 90, 254, 0.3);
-}
-
-.intensity-labels {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 4px;
-  padding: 0 4px;
-}
-
-.intensity-labels span {
-  font-size: 11px;
-  color: var(--text-dim);
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-
-.intensity-labels .label-min {
-  color: var(--accent);
-  opacity: 0.7;
-}
-
-.intensity-labels .label-max {
-  color: var(--accent);
-  opacity: 0.9;
-}
-
-.glass-intensity-item {
-  transition:
-    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    background 0.4s ease,
-    border-color 0.4s ease;
-}
-
-.glass-intensity-item:hover {
-  transform: translateX(6px);
-}
-
-/* 主题选项 */
-.theme-options {
-  margin-top: 8px;
-  width: 100%;
-}
-
-.theme-options :deep(.n-radio-group) {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-
-.theme-options :deep(.n-radio) {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  transition:
-    transform 0.3s var(--animation-timing),
-    opacity 0.3s var(--animation-timing),
-    color 0.3s var(--animation-timing);
-}
-
-.theme-options :deep(.n-radio:hover) {
-  color: var(--accent);
-}
-
-/* ================= 页面容器 ================= */
+/* ---- 页面容器 ---- */
 .settings-container {
   width: 100%;
   height: 100%;
@@ -501,21 +366,7 @@ const resetToDefaults = async () => {
   box-sizing: border-box;
   overflow-y: auto;
   color: var(--text-main);
-  transition:
-    background 0.3s var(--animation-timing),
-    color 0.3s var(--animation-timing);
   position: relative;
-}
-
-.settings-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  opacity: 0.3;
 }
 
 .content-wrapper {
@@ -523,30 +374,20 @@ const resetToDefaults = async () => {
   margin: 0 auto;
 }
 
-/* ================= 标题样式 ================= */
+/* ---- 标题 ---- */
 .page-title {
   font-family: 'Rajdhani', sans-serif;
   font-size: 32px;
   font-weight: 800;
   text-transform: uppercase;
-  border-bottom: 3px solid var(--accent);
   padding-bottom: 12px;
   margin-bottom: 40px;
   letter-spacing: 3px;
   color: var(--text-main);
-  position: relative;
   display: flex;
   align-items: flex-end;
   gap: 12px;
-}
-
-.page-title::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-  margin-bottom: 5px;
-  opacity: 0.3;
+  border-bottom: 2px solid var(--accent);
 }
 
 .sub-title {
@@ -558,7 +399,7 @@ const resetToDefaults = async () => {
   opacity: 0.8;
 }
 
-/* ================= 设置组 ================= */
+/* ---- 设置组 ---- */
 .setting-group {
   margin-bottom: 50px;
 }
@@ -588,121 +429,27 @@ const resetToDefaults = async () => {
   box-shadow: 0 0 8px var(--accent-glow);
 }
 
-/* ================= 设置项 ================= */
+/* ---- 设置项：新拟态凸起卡片 ---- */
 .setting-item {
-  background: rgba(15, 17, 21, 0.65);
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 8) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1%));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 8) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1%));
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--neu-raised);
   box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.15),
-    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    -8px -8px 16px var(--neu-shadow-light),
+    8px 8px 16px var(--neu-shadow-dark);
   padding: 24px;
   margin-bottom: 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition:
-    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    background 0.4s ease,
-    border-color 0.4s ease,
-    backdrop-filter 0.4s ease;
-  border-radius: 16px;
-  position: relative;
-  z-index: 1;
-  overflow: hidden;
-}
-
-.setting-item > * {
-  position: relative;
-  z-index: 10;
-}
-
-.setting-item::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: radial-gradient(ellipse at 15% -10%, rgba(255, 255, 255, 0.18) 0%, transparent 55%);
-  pointer-events: none;
-  z-index: 1;
-  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.setting-item::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.35) 15%,
-    rgba(255, 255, 255, 0.35) 85%,
-    transparent 100%
-  );
-  pointer-events: none;
-  z-index: 2;
-  border-radius: 16px 16px 0 0;
+  border-radius: var(--neu-radius);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .setting-item:hover {
-  border-color: rgba(61, 90, 254, 0.7);
   box-shadow:
-    0 16px 48px rgba(61, 90, 254, 0.2),
-    0 0 0 1px rgba(61, 90, 254, 0.4) inset;
-  transform: translateX(6px);
-}
-
-:global(html.dark-mode) .setting-item:hover {
-  background: rgba(18, 22, 29, 0.88) !important;
-}
-
-:global(html.light-mode) .setting-item:hover {
-  background: rgba(255, 255, 255, 0.82) !important;
-  box-shadow:
-    0 16px 48px rgba(61, 90, 254, 0.12),
-    0 0 0 1px rgba(61, 90, 254, 0.6) inset;
-}
-
-:global(html.dark-mode) .setting-item {
-  background: rgba(15, 17, 21, 0.78) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 8) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1%));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 8) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1%));
-  border: 1px solid rgba(255, 255, 255, 0.14) !important;
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.18),
-    0 0 0 1px rgba(255, 255, 255, 0.06) inset !important;
-}
-
-:global(html.light-mode) .setting-item {
-  background: rgba(255, 255, 255, 0.75) !important;
-  backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 8) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1%));
-  -webkit-backdrop-filter: blur(calc(var(--glass-enabled, 1) * var(--glass-blur, 8) * 1px)) saturate(calc(var(--glass-enabled, 1) * var(--glass-saturate, 150) * 1%));
-  border: 1px solid rgba(255, 255, 255, 0.9) !important;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.06),
-    0 0 0 1px rgba(255, 255, 255, 0.95) inset,
-    0 2px 8px rgba(0, 0, 0, 0.04) !important;
-}
-
-:global(html.light-mode) .setting-item::before {
-  background: radial-gradient(ellipse at 15% -10%, rgba(255, 255, 255, 0.7) 0%, transparent 55%);
-}
-
-:global(html.light-mode) .setting-item::after {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.85) 15%,
-    rgba(255, 255, 255, 0.85) 85%,
-    transparent 100%
-  );
+    -10px -10px 20px var(--neu-shadow-light),
+    10px 10px 20px var(--neu-shadow-dark),
+    0 0 0 1px var(--neu-shadow-accent);
+  transform: translateX(4px);
 }
 
 .setting-item.vertical {
@@ -718,28 +465,50 @@ const resetToDefaults = async () => {
   width: 100%;
 }
 
-.background-blur-item {
-  transition:
-    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    background 0.4s ease,
-    border-color 0.4s ease;
+/* ---- 滑块容器 ---- */
+.slider-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 16px;
+  margin-top: 8px;
 }
 
-.background-blur-item:hover {
-  transform: translateX(6px);
+.slider-container :deep(.n-slider) {
+  flex: 1;
 }
 
-.background-setting-item {
-  transition:
-    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    background 0.4s ease,
-    border-color 0.4s ease;
+.slider-value {
+  font-size: 13px;
+  color: var(--text-dim);
+  min-width: 50px;
+  text-align: right;
+  font-weight: 600;
 }
 
-.background-setting-item:hover {
-  transform: translateX(6px);
+/* ---- 背景预览 ---- */
+.background-preview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.preview-thumb {
+  width: 120px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: var(--neu-radius-sm);
+  background: var(--neu-inset);
+  box-shadow:
+    inset 2px 2px 6px var(--neu-shadow-dark),
+    inset -2px -2px 6px var(--neu-shadow-light);
+}
+
+.bg-actions {
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
 }
 
 .background-control-row {
@@ -749,6 +518,66 @@ const resetToDefaults = async () => {
   width: 100%;
 }
 
+.bg-btn-group {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---- 背景模式选择 ---- */
+.mode-selector-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 4px 0;
+}
+
+.mode-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.neu-mode-btn {
+  height: 30px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 15px;
+  background: var(--neu-raised);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow:
+    -2px -2px 4px var(--neu-shadow-light),
+    2px 2px 4px var(--neu-shadow-dark);
+  transition: all 0.2s ease;
+}
+
+.neu-mode-btn:hover {
+  color: var(--text-main);
+  box-shadow:
+    -3px -3px 6px var(--neu-shadow-light),
+    3px 3px 6px var(--neu-shadow-dark);
+}
+
+.neu-mode-btn.active {
+  color: var(--accent);
+  background: var(--neu-inset);
+  box-shadow:
+    inset 2px 2px 4px var(--neu-shadow-dark),
+    inset -2px -2px 4px var(--neu-shadow-light);
+}
+
+/* ---- 恢复默认背景 ---- */
+.reset-bg-row {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* ---- 背景遮罩 ---- */
 .mask-toggle-row {
   display: flex;
   justify-content: space-between;
@@ -766,24 +595,42 @@ const resetToDefaults = async () => {
 
 .slider-label {
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--text-dim);
   font-weight: 500;
   min-width: 80px;
 }
 
 .toggle-label {
   font-size: 13px;
-  color: var(--text-primary);
+  color: var(--text-main);
   font-weight: 500;
 }
 
-.desc-sm {
-  font-size: 12px;
-  color: var(--text-dim);
-  margin-left: 12px;
+/* ---- 主题选项 ---- */
+.theme-options {
+  margin-top: 8px;
+  width: 100%;
 }
 
-/* 文本信息 */
+.theme-options :deep(.n-radio-group) {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.theme-options :deep(.n-radio) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.3s var(--animation-timing);
+}
+
+.theme-options :deep(.n-radio:hover) {
+  color: var(--accent);
+}
+
+/* ---- 文本 ---- */
 .text-info {
   display: flex;
   flex-direction: column;
@@ -812,6 +659,12 @@ const resetToDefaults = async () => {
   max-width: 500px;
 }
 
+.desc-sm {
+  font-size: 12px;
+  color: var(--text-dim);
+  opacity: 0.8;
+}
+
 .label-row {
   display: flex;
   align-items: baseline;
@@ -819,49 +672,78 @@ const resetToDefaults = async () => {
   gap: 8px;
 }
 
-.desc-sm {
-  font-size: 12px;
-  color: var(--text-dim);
-  opacity: 0.8;
-}
-
-/* 输入框和按钮行 */
+/* ---- 输入行 ---- */
 .input-row {
   display: flex;
   width: 100%;
   gap: 12px;
 }
 
-/* 适配 Naive UI 组件在明暗模式下的样式 */
+/* ---- Naive UI 组件新拟态适配 ---- */
 :deep(.n-input) {
-  --n-border: var(--border);
+  --n-border: transparent;
   --n-border-hover: var(--accent);
   --n-border-focus: var(--accent);
-  --n-color: var(--bg-input);
-  --n-color-focus: var(--bg-input-focus);
+  --n-color: var(--neu-inset);
+  --n-color-focus: var(--neu-inset);
   --n-text-color: var(--text-main);
+  --n-box-shadow-focus: 0 0 0 2px var(--neu-shadow-accent);
+  --n-border-radius: var(--neu-radius-sm);
+}
+
+:deep(.n-input .n-input__wrapper) {
+  box-shadow:
+    inset 2px 2px 5px var(--neu-shadow-dark),
+    inset -2px -2px 5px var(--neu-shadow-light) !important;
+  transition: box-shadow 0.3s ease;
+}
+
+:deep(.n-input .n-input__wrapper:hover) {
+  box-shadow:
+    inset 2px 2px 6px var(--neu-shadow-dark),
+    inset -2px -2px 6px var(--neu-shadow-light),
+    0 0 0 1px var(--neu-shadow-accent) !important;
 }
 
 :deep(.n-button) {
-  --n-border: var(--border);
-  --n-border-hover: var(--accent);
-  --n-color: var(--glass-effect);
-  --n-color-hover: var(--glass-effect-hover);
-  --n-text-color: var(--text-main);
-  --n-text-color-hover: var(--text-accent);
+  --n-border: transparent;
+  --n-border-hover: transparent;
+  --n-color: var(--neu-raised);
+  --n-color-hover: var(--neu-raised);
+  --n-text-color: var(--text-dim);
+  --n-text-color-hover: var(--text-main);
+  --n-border-radius: var(--neu-radius-sm);
+  box-shadow:
+    -3px -3px 6px var(--neu-shadow-light),
+    3px 3px 6px var(--neu-shadow-dark) !important;
+  transition: all 0.2s ease !important;
 }
 
-/* ================= 底部操作区 ================= */
+:deep(.n-button:hover) {
+  box-shadow:
+    -4px -4px 8px var(--neu-shadow-light),
+    4px 4px 8px var(--neu-shadow-dark) !important;
+  transform: translateY(-1px);
+}
+
+:deep(.n-button:active) {
+  box-shadow:
+    inset 2px 2px 5px var(--neu-shadow-dark),
+    inset -2px -2px 5px var(--neu-shadow-light) !important;
+  transform: translateY(0);
+}
+
+/* ---- 底部操作区 ---- */
 .action-footer {
   margin-top: 60px;
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  border-top: 1px solid var(--border);
   padding-top: 24px;
+  border-top: 1px solid var(--border);
 }
 
-/* ================= 滚动条美化 ================= */
+/* ---- 滚动条 ---- */
 .settings-container::-webkit-scrollbar {
   width: 8px;
 }
@@ -882,96 +764,29 @@ const resetToDefaults = async () => {
   background: var(--accent);
 }
 
-/* ================= 响应式设计 ================= */
+/* ---- 响应式 ---- */
 @media (max-width: 900px) {
-  .settings-container {
-    padding: 30px;
-  }
-
-  .content-wrapper {
-    max-width: 100%;
-  }
-
-  .page-title {
-    font-size: 28px;
-  }
-
-  .setting-item {
-    padding: 20px;
-  }
+  .settings-container { padding: 30px; }
+  .content-wrapper { max-width: 100%; }
+  .page-title { font-size: 28px; }
+  .setting-item { padding: 20px; }
 }
 
 @media (max-width: 768px) {
-  .settings-container {
-    padding: 20px;
-  }
-
-  .page-title {
-    font-size: 24px;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .page-title::after {
-    display: none;
-  }
-
-  .sub-title {
-    font-size: 12px;
-  }
-
-  .label-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-
-  .desc-sm {
-    margin-left: 0;
-  }
-
-  .input-row {
-    flex-direction: column;
-  }
-
-  .action-footer {
-    justify-content: center;
-  }
+  .settings-container { padding: 20px; }
+  .page-title { font-size: 24px; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .sub-title { font-size: 12px; }
+  .label-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .desc-sm { margin-left: 0; }
+  .input-row { flex-direction: column; }
+  .action-footer { justify-content: center; }
 }
 
 @media (max-width: 480px) {
-  .settings-container {
-    padding: 16px;
-  }
-
-  .setting-item {
-    padding: 16px;
-  }
-
-  .text-info {
-    gap: 4px;
-  }
-
-  .label {
-    font-size: 14px;
-  }
-
-  .desc {
-    font-size: 12px;
-  }
-}
-
-/* ================= 明暗模式特定的背景 ================= */
-:global(.light-mode) .settings-container {
-  background: rgba(255, 255, 255, 0.95);
-}
-
-:global(.light-mode) .setting-item {
-  background: rgba(255, 255, 255, 0.9);
-}
-
-:global(.light-mode) .setting-item:hover {
-  background: rgba(255, 255, 255, 0.95);
+  .settings-container { padding: 16px; }
+  .setting-item { padding: 16px; }
+  .text-info { gap: 4px; }
+  .label { font-size: 14px; }
+  .desc { font-size: 12px; }
 }
 </style>
