@@ -1,16 +1,10 @@
-import { useNotification } from 'naive-ui'
+import { useNotification, useDialog } from 'naive-ui'
 import type { NotificationApiInjection } from 'naive-ui/es/notification/src/NotificationProvider'
+import type { DialogApiInjection } from 'naive-ui/es/dialog/src/DialogProvider'
 
 /**
  * 通知组合式函数
  * 封装 Naive UI 的 useNotification，提供便捷的通知方法
- *
- * 使用方式:
- *   const notify = useNotify()
- *   notify.success('操作成功')
- *   notify.error('操作失败')
- *   notify.warning('请注意')
- *   notify.info('这是一条提示')
  */
 export function useNotify() {
   let notification: NotificationApiInjection | null = null
@@ -56,4 +50,44 @@ export function useNotify() {
     info: (content: string, options?: { duration?: number; title?: string }) =>
       createNotification('info', content, options),
   }
+}
+
+/**
+ * 确认对话框组合式函数
+ * 封装 Naive UI 的 useDialog，返回 Promise<boolean>
+ */
+export function useConfirm() {
+  let dialog: DialogApiInjection | null = null
+
+  try {
+    dialog = useDialog()
+  } catch {
+    console.warn('useDialog 不可用，请确保 NDialogProvider 已包裹应用')
+  }
+
+  const confirm = (
+    content: string,
+    options?: { title?: string; okLabel?: string; cancelLabel?: string; kind?: 'warning' | 'error' | 'info' }
+  ): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (!dialog) {
+        resolve(window.confirm(content))
+        return
+      }
+
+      const kind = options?.kind || 'warning'
+
+      dialog[kind]({
+        title: options?.title || '确认',
+        content,
+        positiveText: options?.okLabel || '确定',
+        negativeText: options?.cancelLabel || '取消',
+        onPositiveClick: () => resolve(true),
+        onNegativeClick: () => resolve(false),
+        onClose: () => resolve(false),
+      })
+    })
+  }
+
+  return { confirm }
 }

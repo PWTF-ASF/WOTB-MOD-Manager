@@ -1,6 +1,7 @@
 <template>
   <n-config-provider :theme-overrides="themeOverrides" :locale="zhCN" :date-locale="dateZhCN">
     <n-notification-provider>
+    <n-dialog-provider>
     <div class="command-center">
       <!-- 背景图：使用 CSS 变量控制，浅色模式下可降低透明度或更换 -->
       <div class="background" :style="backgroundStyle"></div>
@@ -48,6 +49,7 @@
         <Settings v-else-if="NavLinksId === 2" />
       </main>
     </div>
+    </n-dialog-provider>
     </n-notification-provider>
   </n-config-provider>
 </template>
@@ -56,7 +58,7 @@
 import { ref, watch, provide, computed, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { zhCN, dateZhCN, NConfigProvider, NButton, NNotificationProvider } from 'naive-ui'
+import { zhCN, dateZhCN, NConfigProvider, NButton, NNotificationProvider, NDialogProvider } from 'naive-ui'
 import type { GlobalThemeOverrides } from 'naive-ui'
 import defaultBg from '@/assets/123517794_p0.jpg'
 

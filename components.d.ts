@@ -11,8 +11,8 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-    GreetComponent: typeof import('./src/components/GreetComponent.vue')['default']
     ModLibrary: typeof import('./src/components/ModLibrary.vue')['default']
+    NeumorphicSearchBox: typeof import('./src/components/NeumorphicSearchBox.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     Settings: typeof import('./src/components/Settings.vue')['default']

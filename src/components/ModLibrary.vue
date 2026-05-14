@@ -1,43 +1,22 @@
 <template>
-  <div class="mod-library">
+  <div class="mod-library" @dragover.prevent="onDragOver" @dragleave="onDragLeave" @drop.prevent="onDrop">
+    <!-- 拖拽导入覆盖层 -->
+    <Teleport to="body">
+      <div v-if="isDraggingOver" class="drop-overlay">
+        <div class="drop-zone">
+          <n-icon :component="AddOutline" size="48" />
+          <span>释放文件以导入模组</span>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- ===== 顶部栏：新拟态凸起面板 ===== -->
     <header class="top-deck">
-      <div class="search-container" ref="searchContainerRef">
-        <div class="neu-inset-box">
-          <n-input
-            v-model:value="searchQuery"
-            size="tiny"
-            clearable
-            placeholder="搜索模组..."
-            :readonly="false"
-            @focus="showSuggestions = true"
-            @keydown="handleSuggestionKeydown"
-            class="neu-search-input"
-          >
-            <template #suffix>
-              <n-icon :component="SearchOutline" />
-            </template>
-          </n-input>
-        </div>
-
-        <!-- 搜索建议下拉面板 -->
-        <div v-if="showSuggestions && searchSuggestions.length > 0" class="search-suggestions">
-          <div class="suggestion-header">
-            <n-icon :component="FlameOutline" size="14" />
-            <span>热门搜索</span>
-          </div>
-          <div
-            v-for="(item, index) in searchSuggestions"
-            :key="item"
-            class="suggestion-item"
-            :class="{ active: index === selectedSuggestionIndex }"
-            @click="selectSuggestion(item)"
-            @mouseenter="selectedSuggestionIndex = index"
-          >
-            <n-icon :component="SearchOutline" size="14" />
-            <span>{{ item }}</span>
-          </div>
-        </div>
+      <div class="search-container">
+        <NeumorphicSearchBox
+          v-model="searchQuery"
+          placeholder="搜索模组..."
+        />
       </div>
 
       <div class="category-wrapper">
@@ -98,8 +77,6 @@
               </n-tag>
             </div>
             <div class="neu-card-meta">
-              <span>2.1 MB</span>
-              <span class="dot">·</span>
               <span>{{ formatDate(mod.installDate) }}</span>
             </div>
           </div>
@@ -127,7 +104,7 @@
           </div>
           <div class="neu-list-info">
             <span class="neu-list-name">{{ mod.displayName }}</span>
-            <span class="neu-list-desc">{{ formatType(mod.type) }} · 2.1 MB · {{ formatDate(mod.installDate) }}</span>
+            <span class="neu-list-desc">{{ formatType(mod.type) }} · {{ formatDate(mod.installDate) }}</span>
           </div>
           <div class="neu-list-actions">
             <n-switch v-model:value="mod.active" size="small" />
@@ -211,11 +188,10 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-import { convertFileSrc } from '@tauri-apps/api/core'
+import { invoke, convertFileSrc } from '@tauri-apps/api/core'
+import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { open, ask } from '@tauri-apps/plugin-dialog'
 import {
-  NInput,
   NButton,
   NCheckbox,
   NSwitch,
@@ -224,9 +200,10 @@ import {
   NModal,
   NSpin
 } from 'naive-ui'
+import NeumorphicSearchBox from './NeumorphicSearchBox.vue'
+import { useNotify, useConfirm } from '@/composables/useNotification'
 import {
   DocumentOutline,
-  SearchOutline,
   ListOutline,
   GridOutline,
   CloseOutline,
@@ -236,10 +213,12 @@ import {
   AddOutline,
   TrashOutline,
   PencilOutline,
-  FlameOutline
 } from '@vicons/ionicons5'
 
 // ================= 响应式数据 =================
+const notify = useNotify()
+const { confirm } = useConfirm()
+
 const isGridLayout = ref(true)
 const currentCategory = ref('all')
 const navRef = ref(null)
@@ -247,80 +226,8 @@ const modlist = ref([])
 const isLaunching = ref(false)
 const searchQuery = ref('')
 const loadingIcon = ref(false)      // 预览图片加载状态
-const showSuggestions = ref(false)  // 搜索建议面板显示状态
-const selectedSuggestionIndex = ref(-1)  // 键盘选中的建议项索引
-const searchContainerRef = ref(null)  // 搜索容器DOM引用
-
-// 点击外部区域关闭搜索建议
-const handleClickOutside = (event) => {
-  if (searchContainerRef.value && !searchContainerRef.value.contains(event.target)) {
-    showSuggestions.value = false
-    selectedSuggestionIndex.value = -1
-  }
-}
-
-// 热门搜索建议（从现有模组提取）
-const searchSuggestions = computed(() => {
-  // 提取所有模组名称作为建议源
-  const modNames = modlist.value
-    .slice(0, 10)
-    .map(mod => mod.displayName)
-  
-  // 热门类别关键词
-  const hotKeywords = ['3d改模', '语音包', '点亮', '高清', '去草', '反和谐', '涂装']
-  
-  // 如果有输入，过滤匹配的建议
-  const query = searchQuery.value.trim().toLowerCase()
-  if (query) {
-    return [...hotKeywords, ...modNames].filter(item => 
-      item.toLowerCase().includes(query)
-    ).slice(0, 6)
-  }
-  
-  // 默认显示热门关键词
-  return hotKeywords.slice(0, 6)
-})
-
-// ================= 搜索建议方法 =================
-// 选择搜索建议
-const selectSuggestion = (item) => {
-  searchQuery.value = item
-  showSuggestions.value = false
-  selectedSuggestionIndex.value = -1
-}
-
-// 搜索建议键盘导航
-const handleSuggestionKeydown = (e) => {
-  const suggestions = searchSuggestions.value
-  if (!suggestions.length) return
-  
-  switch (e.key) {
-    case 'ArrowDown':
-      e.preventDefault()
-      selectedSuggestionIndex.value = Math.min(
-        selectedSuggestionIndex.value + 1,
-        suggestions.length - 1
-      )
-      break
-    case 'ArrowUp':
-      e.preventDefault()
-      selectedSuggestionIndex.value = Math.max(
-        selectedSuggestionIndex.value - 1,
-        -1
-      )
-      break
-    case 'Enter':
-      if (selectedSuggestionIndex.value >= 0) {
-        e.preventDefault()
-        selectSuggestion(suggestions[selectedSuggestionIndex.value])
-      }
-      break
-    case 'Escape':
-      showSuggestions.value = false
-      selectedSuggestionIndex.value = -1
-      break
-  }
-}
+const isDraggingOver = ref(false)   // 拖拽导入状态
+let dragCounter = 0                 // 拖拽进出计数
 
 // 图标预览模态框相关
 const showIconModal = ref(false)      // 控制模态框显示
@@ -367,10 +274,6 @@ const filtermodlist = computed(() => {
   }
   return result
 })
-
-const totalmods = computed(() => modlist.value.length)
-
-const activemods = computed(() => modlist.value.filter(m => m.active).length)
 
 const isAllSelected = computed(() => {
   return modlist.value.length > 0 && modlist.value.every(mod => mod.selected)
@@ -442,7 +345,7 @@ const handleBatchToggle = enable => {
 const handleBatchDelete = async () => {
   const selectedMods = modlist.value.filter(mod => mod.selected)
   if (selectedMods.length === 0) {
-    window.alert('请先选择要删除的Mod')
+    notify.warning('请先选择要删除的Mod')
     return
   }
   const confirmDelete = await ask(`确定要删除选中的 ${selectedMods.length} 个Mod吗？`, {
@@ -457,29 +360,80 @@ const handleBatchDelete = async () => {
       await invoke('delete_mod_file', { modName: mod.name })
     }
     await refreshModList()
-    window.alert(`已成功删除 ${selectedMods.length} 个Mod`)
+    notify.success(`已成功删除 ${selectedMods.length} 个Mod`)
   } catch (error) {
     console.error('批量删除失败:', error)
-    window.alert(`批量删除失败: ${error}`)
+    notify.error(`批量删除失败: ${error}`)
   }
 }
 
-// 添加 Mod
+// 导入文件列表
+const importFiles = async (paths) => {
+  let successCount = 0
+  let failCount = 0
+
+  for (const path of paths) {
+    try {
+      await invoke('copy_mod_file', { src: path })
+      successCount++
+    } catch (err) {
+      console.error(`导入失败: ${path}`, err)
+      failCount++
+    }
+  }
+
+  await refreshModList()
+
+  if (failCount === 0) {
+    notify.success(successCount === 1 ? '已添加 1 个模组' : `已添加 ${successCount} 个模组`)
+  } else {
+    notify.warning(`已添加 ${successCount} 个模组，${failCount} 个导入失败`)
+  }
+}
+
+// 添加 Mod（支持批量选择）
 const handleAddMod = async () => {
   try {
     const selected = await open({
-      title: '请选择mod文件',
-      multiple: false,
+      title: '请选择mod文件（可多选）',
+      multiple: true,
       directory: false,
     })
     if (selected) {
-      await invoke('copy_mod_file', { src: selected })
-      await refreshModList()
-      window.alert('添加成功')
+      const paths = Array.isArray(selected) ? selected : [selected]
+      await importFiles(paths)
     }
   } catch (error) {
     console.error('出错了:', error)
-    window.alert(`添加Mod时出错: ${error}`)
+    notify.error(`添加Mod时出错: ${error}`)
+  }
+}
+
+// 拖拽导入
+const onDragOver = () => {
+  isDraggingOver.value = true
+}
+
+const onDragLeave = (e) => {
+  if (e.currentTarget === e.target) {
+    isDraggingOver.value = false
+  }
+}
+
+const onDrop = async (e) => {
+  isDraggingOver.value = false
+  const files = e.dataTransfer?.files
+  if (!files || files.length === 0) return
+
+  const paths = []
+  for (const file of files) {
+    if (file.path) {
+      paths.push(file.path)
+    }
+  }
+
+  if (paths.length > 0) {
+    await importFiles(paths)
   }
 }
 
@@ -517,10 +471,10 @@ const handleDeleteMod = async id => {
     if (!confirmDelete) return
     await invoke('delete_mod_file', { modName: mod.name })
     modlist.value.splice(modIndex, 1)
-    window.alert(`"${mod.modName}" 已成功删除！`)
+    notify.success(`"${mod.displayName}" 已成功删除！`)
   } catch (error) {
     console.error('删除失败:', error)
-    window.alert(`删除失败: ${error}`)
+    notify.error(`删除失败: ${error}`)
   }
 }
 
@@ -529,14 +483,15 @@ const handleDeployMods = async () => {
   try {
     const activeModNames = modlist.value.filter(mod => mod.active).map(mod => mod.name)
     if (activeModNames.length === 0) {
-      if (!window.confirm('当前未启用任何Mod，是否继续？')) return
+      const proceed = await confirm('当前未启用任何Mod，是否继续？', { kind: 'warning' })
+      if (!proceed) return
     }
     await invoke('deploy_mods', { modNames: activeModNames })
-    window.alert(`✅ 部署成功！已应用 ${activeModNames.length} 个项目。`)
+    notify.success(`部署成功！已应用 ${activeModNames.length} 个项目。`)
     await refreshModList()
   } catch (error) {
     console.error('部署失败:', error)
-    window.alert(`部署失败: ${error}`)
+    notify.error(`部署失败: ${error}`)
   }
 }
 
@@ -561,7 +516,7 @@ const handleLaunchGame = async () => {
     }
     await invoke('launch_game')
   } catch (error) {
-    window.alert(`操作失败: ${error}`)
+    notify.error(`操作失败: ${error}`)
   } finally {
     isLaunching.value = false
   }
@@ -632,7 +587,6 @@ const getModIconUrl = (mod) => {
   if (!mod.iconPath) return null
   try {
     const url = convertFileSrc(mod.iconPath)
-    console.log('生成的 asset URL:', url)
     return url
   } catch (err) {
     console.error('转换图标路径失败:', err)
@@ -651,7 +605,6 @@ const onIconLoadError = (mod) => {
 const openIconModal = (mod) => {
   currentMod.value = mod
   const iconUrl = getModIconUrl(mod)
-  console.log('打开图标模态框，当前Mod:', mod.displayName, '图标URL:', iconUrl)
   if (iconUrl) {
     loadingIcon.value = true   // 有图标才显示加载状态
   } else {
@@ -672,13 +625,11 @@ const uploadIconForCurrentMod = async () => {
     if (!selected) return
 
     uploadingIcon.value = true
-    console.log('开始上传图标，文件路径:', selected)
 
-    const newIconPath = await invoke('set_mod_icon', {
+    await invoke('set_mod_icon', {
       modName: currentMod.value.name,
       imagePath: selected
     })
-    console.log('后端返回的图标路径:', newIconPath)
 
     // 刷新列表获取最新数据
     await refreshModList()
@@ -692,10 +643,10 @@ const uploadIconForCurrentMod = async () => {
     // 设置加载状态，让 @load/@error 事件负责结束
     loadingIcon.value = true
 
-    window.alert('图标已更新')
+    notify.success('图标已更新')
   } catch (err) {
     console.error('上传图标失败:', err)
-    window.alert(`上传图标失败: ${err}`)
+    notify.error(`上传图标失败: ${err}`)
     loadingIcon.value = false
   } finally {
     uploadingIcon.value = false
@@ -721,10 +672,10 @@ const clearCurrentModIcon = async () => {
     // 无图标，直接显示默认图标
     loadingIcon.value = false
 
-    window.alert('图标已移除')
+    notify.success('图标已移除')
   } catch (err) {
     console.error('移除图标失败:', err)
-    window.alert(`移除图标失败: ${err}`)
+    notify.error(`移除图标失败: ${err}`)
     loadingIcon.value = false
   } finally {
     uploadingIcon.value = false
@@ -744,13 +695,28 @@ const onIconPreviewError = () => {
   console.warn('预览图片加载失败，路径:', currentMod.value?.iconPath)
 }
 
+let unlistenDragDrop = null
+
 onMounted(async () => {
   await refreshModList()
-  document.addEventListener('click', handleClickOutside, true)
+
+  // 注册 Tauri 拖拽导入事件
+  try {
+    unlistenDragDrop = await getCurrentWebview().onDragDropEvent((event) => {
+      if (event.payload.type === 'drop' && event.payload.paths?.length > 0) {
+        importFiles(event.payload.paths)
+      }
+      if (event.payload.type === 'leave') {
+        isDraggingOver.value = false
+      }
+    })
+  } catch {
+    // 非 Tauri 环境静默失败
+  }
 })
 
 onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside, true)
+  if (unlistenDragDrop) unlistenDragDrop()
 })
 </script>
 
@@ -795,54 +761,6 @@ onUnmounted(() => {
   align-items: center;
   width: 220px;
   flex-shrink: 0;
-}
-
-/* 搜索框凹槽 */
-.neu-inset-box {
-  width: 100%;
-  height: 44px;
-  border-radius: var(--neu-radius-sm);
-  background: var(--neu-inset);
-  box-shadow:
-    inset 3px 3px 8px var(--neu-shadow-dark),
-    inset -3px -3px 8px var(--neu-shadow-light);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 12px;
-  transition: box-shadow 0.3s ease;
-}
-
-.neu-inset-box:focus-within {
-  box-shadow:
-    inset 3px 3px 10px var(--neu-shadow-dark),
-    inset -3px -3px 10px var(--neu-shadow-light),
-    0 0 0 2px var(--neu-shadow-accent);
-}
-
-/* Naive UI 输入框在凹槽中透明 */
-.neu-search-input {
-  width: 100%;
-}
-
-.neu-search-input :deep(.n-input) {
-  --n-border: none !important;
-  --n-border-hover: none !important;
-  --n-border-focus: none !important;
-  --n-box-shadow-focus: none !important;
-}
-
-.neu-search-input :deep(.n-input__input) {
-  font-size: 13px;
-  color: var(--text-main);
-}
-
-.neu-search-input :deep(.n-input__suffix) {
-  color: var(--text-dim);
-}
-
-.neu-search-input :deep(.n-input__placeholder) {
-  color: var(--text-dim);
 }
 
 /* ---- 分类导航 ---- */
@@ -1391,66 +1309,6 @@ onUnmounted(() => {
   letter-spacing: 0.5px;
 }
 
-/* ---- 搜索建议 ---- */
-.search-suggestions {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
-  z-index: 1000;
-  border-radius: var(--neu-radius-sm);
-  padding: 6px 0;
-  background: var(--neu-raised);
-  box-shadow:
-    -6px -6px 12px var(--neu-shadow-light),
-    6px 6px 12px var(--neu-shadow-dark),
-    0 8px 24px rgba(0, 0, 0, 0.3);
-  transition: background 0.3s ease, box-shadow 0.3s ease;
-}
-
-.suggestion-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-dim);
-}
-
-.suggestion-header .n-icon { color: #f59e0b; }
-
-.suggestion-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text-main);
-  transition: background 0.15s ease;
-  margin: 0 6px;
-  border-radius: 8px;
-}
-
-.suggestion-item:hover,
-.suggestion-item.active {
-  background: var(--neu-inset);
-  box-shadow:
-    inset 1px 1px 3px var(--neu-shadow-dark),
-    inset -1px -1px 3px var(--neu-shadow-light);
-}
-
-.suggestion-item .n-icon {
-  color: var(--text-dim);
-  transition: color 0.15s ease;
-}
-
-.suggestion-item:hover .n-icon,
-.suggestion-item.active .n-icon {
-  color: var(--accent);
-}
-
 /* ---- 图标预览模态框 ---- */
 .icon-modal-content {
   display: flex;
@@ -1497,5 +1355,35 @@ onUnmounted(() => {
 .modal-actions {
   display: flex;
   gap: 12px;
+}
+
+/* ---- 拖拽导入覆盖层 ---- */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.drop-zone {
+  width: 320px;
+  padding: 48px 32px;
+  border-radius: var(--neu-radius-lg);
+  background: var(--neu-raised);
+  box-shadow:
+    -8px -8px 16px var(--neu-shadow-light),
+    8px 8px 16px var(--neu-shadow-dark),
+    0 0 0 2px var(--accent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 600;
 }
 </style>
