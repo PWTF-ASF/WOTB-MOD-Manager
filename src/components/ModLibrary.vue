@@ -826,29 +826,18 @@ onUnmounted(() => {
 }
 
 .neu-search-input :deep(.n-input) {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  height: 36px;
-}
-
-.neu-search-input :deep(.n-input__wrapper) {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  height: 36px;
+  --n-border: none !important;
+  --n-border-hover: none !important;
+  --n-border-focus: none !important;
+  --n-box-shadow-focus: none !important;
 }
 
 .neu-search-input :deep(.n-input__input) {
-  height: 36px !important;
-  line-height: 36px !important;
   font-size: 13px;
   color: var(--text-main);
 }
 
 .neu-search-input :deep(.n-input__suffix) {
-  height: 36px !important;
   color: var(--text-dim);
 }
 

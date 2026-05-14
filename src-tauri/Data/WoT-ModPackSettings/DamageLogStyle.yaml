@@ -1,0 +1,29 @@
+Header:
+  version: 161
+  ############################################
+  #                                          #
+  #  ‼️ DAMAGE LOG ICONS COLOR SELECTION ‼️  #
+  #                                          #
+  # 🟠 See the previews in the Demo folder.  #
+  #                                          #
+  #             👇 Options 👇                #
+  #                                          #
+  #         0 = Green (default)              #
+  #         1 = Orange                       #
+  #         2 = Blue                         #
+  #         3 = Red                          #
+  #         4 = Purple                       #
+  #         5 = White                        #
+  #         6 = Light Blue                   #
+  #         7 = Yellow                       #
+  #                                          #
+  ############################################
+StyleSheets:
+  - selectors:
+      - ".DamageIcon"
+    properties:
+      bg-frame: 0 # <- Change the number according to the options above.
+  - selectors:
+      - ".AssistIcon"
+    properties:
+      bg-frame: 0 # <- Change the number according to the options above.

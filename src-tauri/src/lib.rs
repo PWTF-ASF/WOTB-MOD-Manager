@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::{self, Read};
+use std::io::{self, BufWriter, Read};
 use std::path::{Path, PathBuf};
-use tauri::{command, AppHandle, Manager};
+use tauri::{command, AppHandle, Emitter, Manager};
 use zip::ZipArchive;
 
 // ================= 常量定义 =================
@@ -46,6 +46,15 @@ struct ModInfo {
     category: Option<String>,
     icon_path: Option<String>,
 }
+// ================= 部署进度结构 =================
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct DeployProgress {
+    current: usize,       // 当前处理的 mod 序号
+    total: usize,         // 总 mod 数量
+    mod_name: String,     // 当前正在部署的 mod 名称
+    status: String,       // "installing" | "done" | "error"
+}
+
 // ================= 辅助函数 (Helper Functions) =================
 
 /// 获取背景图片存储目录（在应用数据目录下）
@@ -228,11 +237,12 @@ fn install_mod_logic(app: &AppHandle, mod_name: &str) -> Result<(), String> {
             }
         }
 
-        // === 2. 覆盖逻辑 ===
+        // === 2. 覆盖逻辑（使用 64KB 缓冲写入，减少磁盘 I/O 次数） ===
         if let Some(p) = target_file.parent() {
             fs::create_dir_all(p).map_err(|e| e.to_string())?;
         }
-        let mut out = File::create(&target_file).map_err(|e| e.to_string())?;
+        let out = File::create(&target_file).map_err(|e| e.to_string())?;
+        let mut out = BufWriter::with_capacity(64 * 1024, out);
         io::copy(&mut entry, &mut out).map_err(|e| e.to_string())?;
     }
 
@@ -453,7 +463,6 @@ fn copy_mod_file(app: AppHandle, src: String) -> Result<(), String> {
 
 #[command]
 fn list_mods(app: AppHandle) -> Result<Vec<String>, String> {
-    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     let mods_dir = get_mods_dir(&app)?;
     if !mods_dir.exists() {
         return Ok(Vec::new());
@@ -479,7 +488,6 @@ fn list_mods(app: AppHandle) -> Result<Vec<String>, String> {
 /// 自动检测冲突，卸载冲突的旧 Mod，安装新 Mod
 #[command]
 async fn apply_mod_exclusive(app: AppHandle, mod_name: String) -> Result<Vec<String>, String> {
-    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     let mods_dir = get_mods_dir(&app)?; // ✅ 存储库目录
 
     // 1. 获取目标 Mod 的文件列表
@@ -536,8 +544,13 @@ async fn restore_mod(app: AppHandle, mod_name: String) -> Result<(), String> {
 /// 删除 Mod 文件
 #[command]
 async fn delete_mod_file(app: AppHandle, mod_name: String) -> Result<(), String> {
-    // 先尝试恢复原文件（如果已安装）
-    let _ = uninstall_mod_logic(&app, &mod_name);
+    // 只在 Mod 确实已部署时才恢复游戏文件，避免误删游戏原厂文件
+    let is_deployed = check_mod_applied(&app, &mod_name).unwrap_or(false);
+    if is_deployed {
+        if let Err(e) = uninstall_mod_logic(&app, &mod_name) {
+            eprintln!("[delete_mod_file] 恢复原文件失败（继续删除Mod）: {}", e);
+        }
+    }
     let mods_dir = get_mods_dir(&app)?;
     let zip_path = mods_dir.join(&mod_name);
     if zip_path.exists() {
@@ -580,24 +593,46 @@ async fn get_mod_status(app: AppHandle) -> Result<Vec<ModStatus>, String> {
 
 #[command]
 async fn deploy_mods(app: AppHandle, mod_names: Vec<String>) -> Result<(), String> {
+    let total = mod_names.len();
+    if total == 0 {
+        return Ok(());
+    }
+
     let now = Local::now();
-    for name in mod_names {
-        install_mod_logic(&app, &name)?;
-        let mut meta_map = read_mods_meta(&app)?;
-        if let Some(meta) = meta_map.get_mut(&name) {
-            // 仅当 install_date 为 None 时才设置日期
+    let mods_dir = get_mods_dir(&app)?;
+
+    // 批量优化：一次性读取元数据，避免每部署一个 Mod 都读写磁盘
+    let mut meta_map = read_mods_meta(&app)?;
+
+    for (i, name) in mod_names.iter().enumerate() {
+        // 发射安装进度事件
+        let _ = app.emit(
+            "deploy-progress",
+            DeployProgress {
+                current: i + 1,
+                total,
+                mod_name: name.clone(),
+                status: "installing".to_string(),
+            },
+        );
+
+        // 安装 Mod（内部已使用缓冲写入优化磁盘 I/O）
+        install_mod_logic(&app, name)?;
+
+        // 仅操作内存中的元数据，不再每轮读写磁盘
+        if let Some(meta) = meta_map.get_mut(name) {
             if meta.install_date.is_none() {
                 meta.install_date = Some(now);
             }
         } else {
-            let display_name = Path::new(&name)
+            let display_name = Path::new(name)
                 .file_stem()
                 .unwrap_or_default()
                 .to_str()
-                .unwrap_or(&name)
+                .unwrap_or(name)
                 .to_string();
-            let mods_dir = get_mods_dir(&app)?;
-            let category = infer_category(&mods_dir.join(&name));
+            // 只有全新 Mod 才需要推断类别
+            let category = infer_category(&mods_dir.join(name));
             let new_meta = ModMeta {
                 original_filename: name.clone(),
                 display_name,
@@ -605,10 +640,24 @@ async fn deploy_mods(app: AppHandle, mod_names: Vec<String>) -> Result<(), Strin
                 category,
                 icon_path: None,
             };
-            meta_map.insert(name, new_meta);
+            meta_map.insert(name.clone(), new_meta);
         }
-        write_mods_meta(&app, &meta_map)?;
     }
+
+    // 批量优化：所有 Mod 部署完成后，一次性写入元数据
+    write_mods_meta(&app, &meta_map)?;
+
+    // 发射完成事件
+    let _ = app.emit(
+        "deploy-progress",
+        DeployProgress {
+            current: total,
+            total,
+            mod_name: String::new(),
+            status: "done".to_string(),
+        },
+    );
+
     Ok(())
 }
 
@@ -853,7 +902,8 @@ async fn read_image_base64(path: String) -> Result<String, String> {
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
     
-    Ok(base64::encode(&buffer))
+    use base64::Engine;
+    Ok(base64::engine::general_purpose::STANDARD.encode(&buffer))
 }
 
 // ================= 入口函数 =================

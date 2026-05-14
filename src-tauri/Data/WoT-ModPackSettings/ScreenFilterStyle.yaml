@@ -1,0 +1,22 @@
+Header:
+  version: 161
+StyleSheets:
+  ############################################
+  #                                          #
+  #          ‼️ FILTER SELECTION ‼️          #
+  #                                          #
+  # 🟠 See the previews in the Demo folder.  #
+  #                                          #
+  #             👇 Options 👇                #
+  #                                          #
+  #         0 = Disabled (default)           #
+  #         1 = gray + grainy                #
+  #         2 = brownish + grainy            #
+  #         3 = black + grainy               #
+  #         4 = white + grainy               #
+  #                                          #
+  ############################################
+  - selectors:
+      - ".Filter"
+    properties:
+      bg-frame: 0 # <- Change the number according to the options above.

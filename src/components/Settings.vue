@@ -173,6 +173,7 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { NButton, NSwitch, NInput, NIcon, NSlider, NRadio, NRadioGroup } from 'naive-ui'
 import { RefreshOutline } from '@vicons/ionicons5'
+import { useNotify } from '@/composables/useNotification'
 
 // 注入全局状态 - 背景模糊效果
 const enableBackgroundBlur = inject('enableBackgroundBlur') as Ref<boolean>
@@ -188,6 +189,9 @@ const themeMode = inject('ThemeMode') as Ref<'light' | 'dark' | 'system'>
 const backgroundImagePath = inject<Ref<string | null>>('backgroundImagePath')
 const setBackgroundImage = inject<(path: string | null) => Promise<void>>('setBackgroundImage')
 const resetVisualSettings = inject('resetVisualSettings') as () => void
+
+// 通知
+const notify = useNotify()
 
 // 背景模式
 const backgroundModes = [
@@ -271,7 +275,7 @@ const handleSelectBackground = async () => {
     }
   } catch (err) {
     console.error('设置背景失败:', err)
-    alert(`设置背景失败: ${err}`)
+    notify.error(`设置背景失败: ${err}`)
   } finally {
     updatingBg.value = false
   }
@@ -286,7 +290,7 @@ const handleRemoveBackground = async () => {
     }
   } catch (err) {
     console.error('移除背景失败:', err)
-    alert(`移除背景失败: ${err}`)
+    notify.error(`移除背景失败: ${err}`)
   } finally {
     updatingBg.value = false
   }

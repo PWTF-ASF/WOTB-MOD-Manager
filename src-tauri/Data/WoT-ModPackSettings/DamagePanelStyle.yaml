@@ -1,0 +1,38 @@
+Header:
+  version: 161
+StyleSheets:
+  ############################################
+  #                                          #
+  #      ‼️ CHANGE DAMAGE PANEL TANK ‼️      #
+  #                                          #
+  # 🟠 See the previews in the Demo folder.  #
+  #                                          #
+  #             👇 Options 👇                #
+  #                                          #
+  #         0 = HT/MT/LT (default)           #
+  #         1 = TD                           #
+  #                                          #
+  ############################################
+  - selectors:
+      - ".DamagePanelTank"
+    properties:
+      bg-frame: 0 # <- Change the number according to the options above.
+Prototypes:
+  ###################################################
+  #                                                 #
+  #   ‼️ CHANGE DAMAGE PANEL TANK&PLAYER NAME ‼️    #
+  #                                                 #
+  # 🟠 Type the tank/player name, or what you want, #
+  #    inside the text: "" quotation marks below.   #
+  #                                                 #
+  ###################################################
+  - class: "UIControl"
+    name: "TankName"
+    components:
+      UITextComponent:
+        text: "tankname" # <- Type inside the quotation marks (Tank).
+  - class: "UIControl"
+    name: "PlayerName"
+    components:
+      UITextComponent:
+        text: "playername" # <- Type inside the quotation marks (Player).

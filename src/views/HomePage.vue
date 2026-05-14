@@ -1,5 +1,6 @@
 <template>
   <n-config-provider :theme-overrides="themeOverrides" :locale="zhCN" :date-locale="dateZhCN">
+    <n-notification-provider>
     <div class="command-center">
       <!-- 背景图：使用 CSS 变量控制，浅色模式下可降低透明度或更换 -->
       <div class="background" :style="backgroundStyle"></div>
@@ -47,6 +48,7 @@
         <Settings v-else-if="NavLinksId === 2" />
       </main>
     </div>
+    </n-notification-provider>
   </n-config-provider>
 </template>
 
@@ -54,7 +56,7 @@
 import { ref, watch, provide, computed, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { zhCN, dateZhCN, NConfigProvider, NButton } from 'naive-ui'
+import { zhCN, dateZhCN, NConfigProvider, NButton, NNotificationProvider } from 'naive-ui'
 import type { GlobalThemeOverrides } from 'naive-ui'
 import defaultBg from '@/assets/123517794_p0.jpg'
 
@@ -104,7 +106,35 @@ const defaultVisualSettings = {
   enableBackgroundBlur: true,
   backgroundBlurAmount: 10,
   backgroundMask: true,
-  maskOpacity: 20
+  maskOpacity: 20,
+  backgroundMode: 'cover'
+}
+
+// 保存视觉设置到 localStorage
+function saveVisualSettings() {
+  localStorage.setItem('app-background-mask', JSON.stringify(BackgroundMask.value))
+  localStorage.setItem('app-mask-opacity', JSON.stringify(MaskOpacity.value))
+  localStorage.setItem('app-enable-blur', JSON.stringify(enableBackgroundBlur.value))
+  localStorage.setItem('app-blur-amount', JSON.stringify(backgroundBlurAmount.value))
+  localStorage.setItem('app-background-mode', backgroundMode.value)
+}
+
+// 从 localStorage 加载视觉设置
+function loadVisualSettings() {
+  const savedMask = localStorage.getItem('app-background-mask')
+  if (savedMask !== null) BackgroundMask.value = JSON.parse(savedMask)
+
+  const savedOpacity = localStorage.getItem('app-mask-opacity')
+  if (savedOpacity !== null) MaskOpacity.value = JSON.parse(savedOpacity)
+
+  const savedBlur = localStorage.getItem('app-enable-blur')
+  if (savedBlur !== null) enableBackgroundBlur.value = JSON.parse(savedBlur)
+
+  const savedBlurAmount = localStorage.getItem('app-blur-amount')
+  if (savedBlurAmount !== null) backgroundBlurAmount.value = JSON.parse(savedBlurAmount)
+
+  const savedBgMode = localStorage.getItem('app-background-mode')
+  if (savedBgMode !== null) backgroundMode.value = savedBgMode
 }
 
 // ================= 提供数据 =================
@@ -170,6 +200,8 @@ function resetVisualSettings() {
   backgroundBlurAmount.value = defaultVisualSettings.backgroundBlurAmount
   BackgroundMask.value = defaultVisualSettings.backgroundMask
   MaskOpacity.value = defaultVisualSettings.maskOpacity
+  backgroundMode.value = defaultVisualSettings.backgroundMode
+  saveVisualSettings()
 }
 
 // 将变量应用到全局
@@ -254,7 +286,10 @@ onMounted(async () => {
   // 第一步：检测运行平台
   detectPlatform()
   console.log(`运行平台检测: Linux=${isLinux.value}, Windows=${isWindows.value}, macOS=${isMacOS.value}`)
-  
+
+  // 加载保存的视觉设置
+  loadVisualSettings()
+
   try {
     const savedPath = await invoke('get_background_image')
     if (savedPath && typeof savedPath === 'string') {
@@ -327,6 +362,16 @@ watch(
     updateThemeMode()
     localStorage.setItem('app-theme-mode', ThemeMode.value)
   }
+)
+
+// ================= 自动保存视觉设置 =================
+// 监听所有视觉设置变更，自动保存到 localStorage
+watch(
+  [BackgroundMask, MaskOpacity, enableBackgroundBlur, backgroundBlurAmount, backgroundMode],
+  () => {
+    saveVisualSettings()
+  },
+  { deep: true }
 )
 
 // ================= Naive UI 主题覆盖 =================
