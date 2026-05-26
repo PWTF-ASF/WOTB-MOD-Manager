@@ -23,19 +23,9 @@ jobs:
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  build:
+  build-windows:
     needs: create-release
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            bundles: deb
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            bundles: nsis
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     permissions:
       contents: write
     steps:
@@ -49,16 +39,6 @@ jobs:
         with:
           version: "10.33.4"
 
-      - name: Install Linux dependencies
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf
-
       - name: Install frontend dependencies
         run: pnpm install
 
@@ -70,4 +50,4 @@ jobs:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           releaseBody: "请在此描述更新内容。"
           releaseDraft: true
-          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+          args: --target x86_64-pc-windows-msvc --bundles nsis
