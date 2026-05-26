@@ -4,7 +4,7 @@ version     = "2.6.0"
 description = "A Tauri App"
 authors     = ["you"]
 edition     = "2021"
-repository  = "https://github.com/Uninen/tauri-vue-template"
+repository  = "https://github.com/PWTF-ASF/WOTB-MOD-Manager"
 
 [lib]
 name         = "tauri_app_lib"

@@ -39,7 +39,7 @@
           >
             {{ DarkMode ? 'Dark' : 'Light' }}
           </n-button>
-          <div class="version">v1.2.0</div>
+          <div class="version">v1.3.9</div>
         </div>
       </aside>
 

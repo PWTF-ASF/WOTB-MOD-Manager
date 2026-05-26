@@ -13,22 +13,44 @@ jobs:
       contents: write
     outputs:
       release_id: ${{ steps.create-release.outputs.id }}
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - id: create-release
+        uses: taiki-e/create-gh-release-action@v1
+        with:
+          title: ${{ github.ref_name }}
+          draft: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bundles: deb
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: "26.2.0"
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: "10.33.4"
 
-      - name: Install dependencies (Ubuntu)
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -40,20 +62,12 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
-      - name: Create GitHub Release (draft)
-        id: create-release
-        uses: taiki-e/create-gh-release-action@v1
-        with:
-          title: ${{ github.ref_name }}
-          draft: true
-          token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          releaseId: ${{ steps.create-release.outputs.id }}
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           releaseBody: "请在此描述更新内容。"
           releaseDraft: true
-          includeUpdaterJson: true
+          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
