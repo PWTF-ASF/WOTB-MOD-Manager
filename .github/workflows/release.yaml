@@ -3,14 +3,14 @@ name: "Release"
 on:
   push:
     tags:
-      - "v*"               # 推送 v1.0.0 这样的标签时触发
-  workflow_dispatch:       # 支持手动触发
+      - "v*"
+  workflow_dispatch:
 
 jobs:
   create-release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write      # 必须有写权限才能创建 Release
+      contents: write
     outputs:
       release_id: ${{ steps.create-release.outputs.id }}
 
@@ -21,18 +21,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "26.2.0"   # 与你本地版本一致
+          node-version: "26.2.0"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: "10.33.4"       # 与你本地版本一致
+          version: "10.33.4"
 
       - name: Install dependencies (Ubuntu)
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libwebkit2gtk-4.0-dev \
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
@@ -57,4 +56,4 @@ jobs:
           releaseId: ${{ steps.create-release.outputs.id }}
           releaseBody: "请在此描述更新内容。"
           releaseDraft: true
-          includeUpdaterJson: true   # 如果要用自动更新，保留此选项
+          includeUpdaterJson: true
