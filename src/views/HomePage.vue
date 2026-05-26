@@ -60,7 +60,6 @@ import { invoke } from '@tauri-apps/api/core'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { zhCN, dateZhCN, NConfigProvider, NButton, NNotificationProvider, NDialogProvider } from 'naive-ui'
 import type { GlobalThemeOverrides } from 'naive-ui'
-import defaultBg from '@/assets/123517794_p0.jpg'
 
 // ================= 图标资源 =================
 import SettingIcon from '@/assets/设置.svg'
@@ -218,26 +217,30 @@ watch(
 );
 // 计算背景样式
 const backgroundStyle = computed(() => {
-  let bgImage = `url("${defaultBg}")`;
+  const style: Record<string, string> = {};
+
+  // 仅当设置了自定义背景图片时才覆盖 backgroundImage
   if (backgroundImagePath.value) {
-    // Linux平台使用Base64方式，其他平台使用convertFileSrc
+    let bgImage: string;
     if (isLinux.value && backgroundImageBase64.value) {
       bgImage = `url("${backgroundImageBase64.value}")`;
     } else {
       const url = convertFileSrc(backgroundImagePath.value);
       bgImage = `url("${url}")`;
     }
+    style.backgroundImage = bgImage;
   }
+
   // 计算遮罩颜色，根据当前主题模式使用不同的基础颜色
-  const maskColor = DarkMode.value ? 
-    `rgba(0, 0, 0, ${BackgroundMask.value ? MaskOpacity.value / 100 : 0})` : 
+  const maskColor = DarkMode.value ?
+    `rgba(0, 0, 0, ${BackgroundMask.value ? MaskOpacity.value / 100 : 0})` :
     `rgba(255, 255, 255, ${BackgroundMask.value ? (85 + MaskOpacity.value * 0.15) / 100 : 0})`;
-  
+
   // 背景模糊效果 - 使用filter实现，而不是backdrop-filter
-  const blurFilter = enableBackgroundBlur.value && backgroundBlurAmount.value > 0 
-    ? `blur(${backgroundBlurAmount.value}px)` 
+  const blurFilter = enableBackgroundBlur.value && backgroundBlurAmount.value > 0
+    ? `blur(${backgroundBlurAmount.value}px)`
     : 'none';
-  
+
   // 根据背景模式设置 background-size 和 background-repeat
   const mode = backgroundMode.value;
   let bgSize = 'cover';
@@ -247,13 +250,13 @@ const backgroundStyle = computed(() => {
   else if (mode === 'tile') { bgSize = 'auto'; bgRepeat = 'repeat'; }
 
   return {
-    backgroundImage: bgImage,
     backgroundSize: bgSize,
     backgroundRepeat: bgRepeat,
     backgroundPosition: 'center',
     backgroundAttachment: 'fixed',
     filter: blurFilter,
-    '--app-bg-overlay': maskColor
+    '--app-bg-overlay': maskColor,
+    ...style
   };
 });
 
@@ -501,6 +504,11 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   --app-bg-overlay: rgba(0, 0, 0, 0.2);
   --deck-bg: #0f1115;
 
+  /* --- 默认背景渐变 (深色) --- */
+  --bg-gradient-start: #1a1d23;
+  --bg-gradient-mid: #0f1115;
+  --bg-gradient-end: #1a1d23;
+
   /* 文字颜色 */
   --text-main: #ffffff;
   --text-dim: #9ca3af;
@@ -549,6 +557,11 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   --aside-bg: #ffffff;
   --app-bg-overlay: rgba(255, 255, 255, 0.85);
   --deck-bg: #ffffff;
+
+  /* --- 默认背景渐变 (浅色) --- */
+  --bg-gradient-start: #e8ecf1;
+  --bg-gradient-mid: #f1f5f9;
+  --bg-gradient-end: #e8ecf1;
 
   /* 文字颜色 */
   --text-main: #1e293b;
@@ -613,12 +626,13 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
 .background {
   position: absolute;
   inset: 0;
+  background-image: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-mid) 50%, var(--bg-gradient-end) 100%);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;
   z-index: 0;
-  transition: filter 0.5s ease;
+  transition: filter 0.5s ease, background-image 0.5s ease;
 }
 
 .background::after {

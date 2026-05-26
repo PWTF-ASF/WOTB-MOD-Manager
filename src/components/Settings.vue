@@ -58,7 +58,7 @@
               <n-button size="small" secondary @click="handleSelectBackground" :loading="updatingBg">
                 选择图片
               </n-button>
-              <span class="desc-sm">未设置，使用默认背景</span>
+              <span class="desc-sm">未设置，使用主题默认渐变背景</span>
             </div>
           </div>
 
@@ -98,7 +98,7 @@
           <!-- 重置背景 -->
           <div class="reset-bg-row">
             <n-button size="tiny" quaternary @click="handleResetBackground">
-              恢复默认背景
+              恢复默认渐变背景
             </n-button>
           </div>
         </div>
@@ -202,9 +202,9 @@ const backgroundModes = [
 ]
 const backgroundMode = inject('backgroundMode') as Ref<string>
 
-// 恢复默认背景
+// 恢复默认渐变背景
 const handleResetBackground = async () => {
-  if (confirm('确定恢复为默认背景图片吗？')) {
+  if (confirm('确定恢复为默认渐变背景吗？')) {
     if (setBackgroundImage) {
       await setBackgroundImage(null)
     }
@@ -573,7 +573,7 @@ const resetToDefaults = async () => {
     inset -2px -2px 4px var(--neu-shadow-light);
 }
 
-/* ---- 恢复默认背景 ---- */
+/* ---- 恢复默认渐变背景 ---- */
 .reset-bg-row {
   display: flex;
   justify-content: flex-end;
