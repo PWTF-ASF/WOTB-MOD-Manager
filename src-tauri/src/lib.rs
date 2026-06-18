@@ -9,6 +9,8 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Read};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tauri::{command, AppHandle, Emitter, Manager};
 use zip::ZipArchive;
 
@@ -53,6 +55,16 @@ struct DeployProgress {
     total: usize,         // 总 mod 数量
     mod_name: String,     // 当前正在部署的 mod 名称
     status: String,       // "installing" | "done" | "error"
+}
+
+// ================= 初始化进度结构 =================
+#[derive(Serialize, Clone)]
+struct InitProgress {
+    step: u32,
+    total: u32,
+    message: String,
+    status: String, // "running" | "done" | "error"
+    error: Option<String>,
 }
 
 // ================= 辅助函数 (Helper Functions) =================
@@ -439,7 +451,7 @@ fn copy_mod_file(app: AppHandle, src: String) -> Result<(), String> {
 
     // 添加元数据
     let mut meta_map = read_mods_meta(&app)?;
-    let original_filename = file_name.to_str().unwrap().to_string();
+    let original_filename = file_name.to_string_lossy().to_string();
     if !meta_map.contains_key(&original_filename) {
         let display_name = Path::new(&original_filename)
             .file_stem()
@@ -604,6 +616,9 @@ async fn deploy_mods(app: AppHandle, mod_names: Vec<String>) -> Result<(), Strin
     // 批量优化：一次性读取元数据，避免每部署一个 Mod 都读写磁盘
     let mut meta_map = read_mods_meta(&app)?;
 
+    let mut success_count = 0;
+    let mut error_messages: Vec<String> = Vec::new();
+
     for (i, name) in mod_names.iter().enumerate() {
         // 发射安装进度事件
         let _ = app.emit(
@@ -617,30 +632,53 @@ async fn deploy_mods(app: AppHandle, mod_names: Vec<String>) -> Result<(), Strin
         );
 
         // 安装 Mod（内部已使用缓冲写入优化磁盘 I/O）
-        install_mod_logic(&app, name)?;
-
-        // 仅操作内存中的元数据，不再每轮读写磁盘
-        if let Some(meta) = meta_map.get_mut(name) {
-            if meta.install_date.is_none() {
-                meta.install_date = Some(now);
+        match install_mod_logic(&app, name) {
+            Ok(()) => {
+                success_count += 1;
+                // 仅操作内存中的元数据
+                if let Some(meta) = meta_map.get_mut(name) {
+                    if meta.install_date.is_none() {
+                        meta.install_date = Some(now);
+                    }
+                } else {
+                    let display_name = Path::new(name)
+                        .file_stem()
+                        .unwrap_or_default()
+                        .to_str()
+                        .unwrap_or(name)
+                        .to_string();
+                    let category = infer_category(&mods_dir.join(name));
+                    let new_meta = ModMeta {
+                        original_filename: name.clone(),
+                        display_name,
+                        install_date: Some(now),
+                        category,
+                        icon_path: None,
+                    };
+                    meta_map.insert(name.clone(), new_meta);
+                }
+                let _ = app.emit(
+                    "deploy-progress",
+                    DeployProgress {
+                        current: i + 1,
+                        total,
+                        mod_name: name.clone(),
+                        status: "done".to_string(),
+                    },
+                );
             }
-        } else {
-            let display_name = Path::new(name)
-                .file_stem()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap_or(name)
-                .to_string();
-            // 只有全新 Mod 才需要推断类别
-            let category = infer_category(&mods_dir.join(name));
-            let new_meta = ModMeta {
-                original_filename: name.clone(),
-                display_name,
-                install_date: Some(now),
-                category,
-                icon_path: None,
-            };
-            meta_map.insert(name.clone(), new_meta);
+            Err(e) => {
+                error_messages.push(format!("{}: {}", name, e));
+                let _ = app.emit(
+                    "deploy-progress",
+                    DeployProgress {
+                        current: i + 1,
+                        total,
+                        mod_name: name.clone(),
+                        status: "error".to_string(),
+                    },
+                );
+            }
         }
     }
 
@@ -657,6 +695,15 @@ async fn deploy_mods(app: AppHandle, mod_names: Vec<String>) -> Result<(), Strin
             status: "done".to_string(),
         },
     );
+
+    if !error_messages.is_empty() {
+        return Err(format!(
+            "{} 个成功, {} 个失败: {}",
+            success_count,
+            error_messages.len(),
+            error_messages.join("; ")
+        ));
+    }
 
     Ok(())
 }
@@ -749,8 +796,11 @@ async fn migrate_mod_repo(app: AppHandle, new_path: String) -> Result<(), String
                 let dest = new_mods_dir.join(&file_name);
                 // 避免覆盖已有文件
                 if !dest.exists() {
-                    fs::copy(entry.path(), &dest).map_err(|e| e.to_string())?;
-                    fs::remove_file(entry.path()).map_err(|e| e.to_string())?;
+                    // try atomic rename first; fall back to copy+remove for cross-volume
+                    if fs::rename(entry.path(), &dest).is_err() {
+                        fs::copy(entry.path(), &dest).map_err(|e| e.to_string())?;
+                        fs::remove_file(entry.path()).map_err(|e| e.to_string())?;
+                    }
                 }
             }
         }
@@ -906,6 +956,48 @@ async fn read_image_base64(path: String) -> Result<String, String> {
     Ok(base64::engine::general_purpose::STANDARD.encode(&buffer))
 }
 
+/// 轻量级冲突检测：仅比较已部署 Mod 的文件列表是否有交集（不做 Hash 校验）
+fn detect_conflicts_lightweight(app: &AppHandle) -> Result<usize, String> {
+    let mods_dir = get_mods_dir(app)?;
+    if !mods_dir.exists() {
+        return Ok(0);
+    }
+
+    let meta_map = read_mods_meta(app)?;
+
+    let deployed_mods: Vec<String> = meta_map
+        .iter()
+        .filter(|(_, meta)| meta.install_date.is_some())
+        .map(|(name, _)| name.clone())
+        .collect();
+
+    if deployed_mods.len() < 2 {
+        return Ok(0);
+    }
+
+    let mut mod_file_lists: Vec<(String, HashSet<PathBuf>)> = Vec::new();
+    for mod_name in &deployed_mods {
+        let zip_path = mods_dir.join(mod_name);
+        if !zip_path.exists() {
+            continue;
+        }
+        if let Ok(files) = get_zip_file_list(&zip_path, mod_name) {
+            mod_file_lists.push((mod_name.clone(), files));
+        }
+    }
+
+    let mut conflict_count = 0usize;
+    for i in 0..mod_file_lists.len() {
+        for j in (i + 1)..mod_file_lists.len() {
+            if !mod_file_lists[i].1.is_disjoint(&mod_file_lists[j].1) {
+                conflict_count += 1;
+            }
+        }
+    }
+
+    Ok(conflict_count)
+}
+
 // ================= 入口函数 =================
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -914,7 +1006,250 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
-        // .plugin(tauri_plugin_prevent_default::init()) // 根据你的配置可选
+        .setup(|app| {
+            let splash = app
+                .get_webview_window("splash")
+                .expect("splash window not found");
+            let main_window = app
+                .get_webview_window("main")
+                .expect("main window not found");
+
+            let handle = app.handle().clone();
+            let total: u32 = 4;
+
+            // Prevent user from closing splash before init completes
+            let init_done = Arc::new(AtomicBool::new(false));
+            let init_done_for_event = init_done.clone();
+            splash.on_window_event(move |event| {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    if !init_done_for_event.load(Ordering::Relaxed) {
+                        api.prevent_close();
+                    }
+                }
+            });
+
+            let splash_async = splash.clone();
+            let main_async = main_window.clone();
+
+            tauri::async_runtime::spawn(async move {
+                let splash = splash_async;
+                let main_window = main_async;
+                let mut had_error = false;
+
+                // ── Step 1: 扫描 Mod 文件目录 ──
+                {
+                    let _ = handle.emit(
+                        "init-progress",
+                        InitProgress {
+                            step: 1,
+                            total,
+                            message: "扫描 Mod 文件目录".into(),
+                            status: "running".into(),
+                            error: None,
+                        },
+                    );
+                    match get_mods_dir(&handle) {
+                        Ok(dir) => {
+                            let count = if dir.exists() {
+                                fs::read_dir(&dir)
+                                    .map(|rd| {
+                                        rd.filter_map(|e| e.ok())
+                                            .filter(|e| {
+                                                e.path()
+                                                    .extension()
+                                                    .map_or(false, |ext| {
+                                                        ext.eq_ignore_ascii_case("zip")
+                                                    })
+                                            })
+                                            .count()
+                                    })
+                                    .unwrap_or(0)
+                            } else {
+                                0
+                            };
+                            let _ = handle.emit(
+                                "init-progress",
+                                InitProgress {
+                                    step: 1,
+                                    total,
+                                    message: format!("扫描 Mod 文件目录 (找到 {} 个 Mod)", count),
+                                    status: "done".into(),
+                                    error: None,
+                                },
+                            );
+                        }
+                        Err(e) => {
+                            had_error = true;
+                            let _ = handle.emit(
+                                "init-progress",
+                                InitProgress {
+                                    step: 1,
+                                    total,
+                                    message: "扫描 Mod 文件目录 失败".into(),
+                                    status: "error".into(),
+                                    error: Some(e),
+                                },
+                            );
+                        }
+                    }
+                }
+
+                // ── Step 2: 读取已安装的 Mod 列表 ──
+                {
+                    let _ = handle.emit(
+                        "init-progress",
+                        InitProgress {
+                            step: 2,
+                            total,
+                            message: "读取已安装的 Mod 列表".into(),
+                            status: "running".into(),
+                            error: None,
+                        },
+                    );
+                    match read_mods_meta(&handle) {
+                        Ok(meta_map) => {
+                            let deployed_count = meta_map
+                                .values()
+                                .filter(|m| m.install_date.is_some())
+                                .count();
+                            let _ = handle.emit(
+                                "init-progress",
+                                InitProgress {
+                                    step: 2,
+                                    total,
+                                    message: format!(
+                                        "读取已安装的 Mod 列表 ({} 个已部署，{} 个总计)",
+                                        deployed_count,
+                                        meta_map.len()
+                                    ),
+                                    status: "done".into(),
+                                    error: None,
+                                },
+                            );
+                        }
+                        Err(e) => {
+                            had_error = true;
+                            let _ = handle.emit(
+                                "init-progress",
+                                InitProgress {
+                                    step: 2,
+                                    total,
+                                    message: "读取已安装的 Mod 列表 失败".into(),
+                                    status: "error".into(),
+                                    error: Some(e),
+                                },
+                            );
+                        }
+                    }
+                }
+
+                // ── Step 3: 检测 Mod 冲突 ──
+                {
+                    let _ = handle.emit(
+                        "init-progress",
+                        InitProgress {
+                            step: 3,
+                            total,
+                            message: "检测 Mod 冲突".into(),
+                            status: "running".into(),
+                            error: None,
+                        },
+                    );
+                    match detect_conflicts_lightweight(&handle) {
+                        Ok(conflict_count) => {
+                            let msg = if conflict_count == 0 {
+                                "检测 Mod 冲突 (未发现冲突)".into()
+                            } else {
+                                format!("检测 Mod 冲突 (发现 {} 组冲突)", conflict_count)
+                            };
+                            let _ = handle.emit(
+                                "init-progress",
+                                InitProgress {
+                                    step: 3,
+                                    total,
+                                    message: msg,
+                                    status: "done".into(),
+                                    error: None,
+                                },
+                            );
+                        }
+                        Err(e) => {
+                            had_error = true;
+                            let _ = handle.emit(
+                                "init-progress",
+                                InitProgress {
+                                    step: 3,
+                                    total,
+                                    message: "检测 Mod 冲突 失败".into(),
+                                    status: "error".into(),
+                                    error: Some(e),
+                                },
+                            );
+                        }
+                    }
+                }
+
+                // ── Step 4: 加载用户设置 ──
+                {
+                    let _ = handle.emit(
+                        "init-progress",
+                        InitProgress {
+                            step: 4,
+                            total,
+                            message: "加载用户设置".into(),
+                            status: "running".into(),
+                            error: None,
+                        },
+                    );
+                    let game_path = get_game_path(handle.clone()).ok().flatten();
+                    let repo_path = get_mod_repo_path(handle.clone()).ok().flatten();
+                    if game_path.is_some() || repo_path.is_some() {
+                        let _ = handle.emit(
+                            "init-progress",
+                            InitProgress {
+                                step: 4,
+                                total,
+                                message: "加载用户设置 完成".into(),
+                                status: "done".into(),
+                                error: None,
+                            },
+                        );
+                    } else {
+                        let _ = handle.emit(
+                            "init-progress",
+                            InitProgress {
+                                step: 4,
+                                total,
+                                message: "加载用户设置 完成 (首次运行，请配置游戏路径)".into(),
+                                status: "done".into(),
+                                error: None,
+                            },
+                        );
+                    }
+                }
+
+                // ── Final: close splash, show main ──
+                // Mark init as done so the close-prevention allows the splash to close
+                init_done.store(true, Ordering::Relaxed);
+
+                // Brief pause so user can see all "done" states
+                std::thread::sleep(std::time::Duration::from_millis(500));
+
+                // Show main first (renders behind alwaysOnTop splash), then close splash
+                // so there's no gap where no window is visible
+                let _ = main_window.show();
+                std::thread::sleep(std::time::Duration::from_millis(80));
+                let _ = splash.close();
+                let _ = main_window.set_focus();
+
+                // Log any non-fatal errors
+                if had_error {
+                    eprintln!("[init] 初始化过程中出现错误，但应用已启动。");
+                }
+            });
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             get_game_path,
@@ -922,18 +1257,18 @@ pub fn run() {
             launch_game,
             copy_mod_file,
             list_mods,
-            apply_mod_exclusive, // 智能安装
-            restore_mod,         // 卸载
-            delete_mod_file,     // 删除
-            get_mod_status,      // 状态检查
+            apply_mod_exclusive,
+            restore_mod,
+            delete_mod_file,
+            get_mod_status,
             deploy_mods,
             get_mods_with_status,
-            get_mod_repo_path, // 新增
+            get_mod_repo_path,
             set_mod_repo_path,
             migrate_mod_repo,
             rename_mod,
             update_mod_category,
-            set_mod_icon, // 新增
+            set_mod_icon,
             clear_mod_icon,
             set_background_image,
             get_background_image,
@@ -942,4 +1277,63 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_mod_path_data_prefix() {
+        let path = Path::new("Data/3d/Tanks/some_file.dds");
+        let result = normalize_mod_path("test_mod", path);
+        assert_eq!(result, PathBuf::from("Data/3d/Tanks/some_file.dds"));
+    }
+
+    #[test]
+    fn test_normalize_mod_path_adds_data_prefix() {
+        let path = Path::new("3d/Tanks/some_file.dds");
+        let result = normalize_mod_path("test_mod", path);
+        assert_eq!(result, PathBuf::from("Data/3d/Tanks/some_file.dds"));
+    }
+
+    #[test]
+    fn test_normalize_mod_path_gfx_adds_data_prefix() {
+        let path = Path::new("Gfx/UI/icon.dds");
+        let result = normalize_mod_path("test_mod", path);
+        assert_eq!(result, PathBuf::from("Data/Gfx/UI/icon.dds"));
+    }
+
+    #[test]
+    fn test_normalize_mod_path_unknown_adds_data_prefix() {
+        let path = Path::new("some_random_folder/file.txt");
+        let result = normalize_mod_path("test_mod", path);
+        assert_eq!(result, PathBuf::from("Data/some_random_folder/file.txt"));
+    }
+
+    #[test]
+    fn test_normalize_mod_path_already_has_data_prefix_case_insensitive() {
+        // Only exact "Data" prefix matches; mixed case gets prefix added
+        let path = Path::new("data/3d/Tanks/some_file.dds");
+        let result = normalize_mod_path("test_mod", path);
+        assert_eq!(result, PathBuf::from("Data/data/3d/Tanks/some_file.dds"));
+    }
+
+    #[test]
+    fn test_init_progress_serialization() {
+        let progress = InitProgress {
+            step: 1,
+            total: 4,
+            message: "test 消息".into(),
+            status: "running".into(),
+            error: None,
+        };
+        let json = serde_json::to_string(&progress).expect("serialize");
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("parse");
+        assert_eq!(parsed["step"], 1);
+        assert_eq!(parsed["total"], 4);
+        assert_eq!(parsed["message"], "test 消息");
+        assert_eq!(parsed["status"], "running");
+        assert_eq!(parsed["error"], serde_json::Value::Null);
+    }
 }

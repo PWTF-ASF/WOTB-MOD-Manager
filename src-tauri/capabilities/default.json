@@ -12,7 +12,7 @@
       "allow": [
         { "path": "$APPDATA/**" },
         { "path": "$CONFIG/**" },
-        { "path": "**" } 
+        { "path": "$HOME/**" }
       ]
     }
   ]

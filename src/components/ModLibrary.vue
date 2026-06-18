@@ -10,8 +10,64 @@
       </div>
     </Teleport>
 
+    <!-- ===== 部署进度覆盖层 ===== -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div v-if="showDeployOverlay" class="deploy-overlay">
+          <div class="deploy-modal">
+            <h3 class="deploy-title">部署进度</h3>
+            <div class="deploy-progress-bar">
+              <div class="deploy-progress-fill" :style="{ width: deployTotal > 0 ? Math.round(deployCurrent / deployTotal * 100) + '%' : '0%' }" />
+            </div>
+            <div class="deploy-stats">
+              <span>{{ deployCurrent }} / {{ deployTotal }}</span>
+              <span v-if="deployCurrentName && !isDeploying" class="deploy-done-label">完成</span>
+              <span v-else-if="deployCurrentName" class="deploy-active-label">正在部署: {{ deployCurrentName }}</span>
+            </div>
+
+            <!-- 部署项列表 -->
+            <div class="deploy-items">
+              <div
+                v-for="item in deployResults" :key="item.name"
+                class="deploy-item"
+                :class="item.status"
+              >
+                <span class="deploy-item-icon">
+                  <template v-if="item.status === 'done'">&#x2713;</template>
+                  <template v-else-if="item.status === 'error'">&#x2717;</template>
+                  <template v-else-if="item.status === 'installing'">
+                    <span class="mini-spinner"></span>
+                  </template>
+                  <template v-else>&#x2022;</template>
+                </span>
+                <span class="deploy-item-name">{{ item.name }}</span>
+                <span class="deploy-item-status">
+                  {{ item.status === 'done' ? '成功' : item.status === 'error' ? '失败' : item.status === 'installing' ? '部署中...' : '等待中' }}
+                </span>
+              </div>
+            </div>
+
+            <!-- 错误信息 -->
+            <div v-if="deployErrors.length > 0" class="deploy-errors">
+              <div v-for="(err, i) in deployErrors" :key="i" class="deploy-error-item">{{ err }}</div>
+            </div>
+
+            <div class="deploy-actions">
+              <n-button
+                v-if="!isDeploying"
+                type="primary"
+                size="small"
+                @click="showDeployOverlay = false"
+              >{{ deployErrors.length > 0 ? '知道了' : '完成' }}</n-button>
+              <n-button v-else size="small" disabled>部署中...</n-button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- ===== 顶部栏：新拟态凸起面板 ===== -->
-    <header class="top-deck">
+    <header v-if="modlist.length > 0" class="top-deck">
       <div class="search-container">
         <NeumorphicSearchBox
           v-model="searchQuery"
@@ -43,8 +99,23 @@
 
     <!-- ===== Mod 卡片网格 ===== -->
     <main class="modules-grid">
+      <!-- 加载状态 -->
+      <div v-if="isLoading" class="state-container">
+        <n-spin size="large" />
+        <span class="state-text">正在加载 Mod 列表...</span>
+      </div>
+
+      <!-- 错误状态 -->
+      <div v-else-if="loadError" class="state-container error">
+        <n-icon size="32" :component="CloseOutline" />
+        <span class="state-text">{{ loadError }}</span>
+        <n-button size="small" secondary @click="refreshModList">重试</n-button>
+      </div>
+
+      <WelcomeMenu v-else-if="modlist.length === 0" @mods-added="refreshModList" />
+
       <!-- 网格布局 -->
-      <div v-if="isGridLayout" class="grid-container">
+      <div v-if="isGridLayout && !isLoading && !loadError && modlist.length > 0" class="grid-container">
         <div v-for="mod in filtermodlist" :key="mod.id" class="neu-card"
           :class="{ active: mod.active }">
           <!-- 顶栏 -->
@@ -93,7 +164,7 @@
       </div>
 
       <!-- 列表布局 -->
-      <div v-else class="list-container">
+      <div v-if="!isGridLayout && !isLoading && !loadError && modlist.length > 0" class="list-container">
         <div v-for="mod in filtermodlist" :key="mod.id" class="neu-list-item"
           :class="{ active: mod.active }">
           <n-checkbox v-model:checked="mod.selected" size="small" />
@@ -115,7 +186,7 @@
     </main>
 
     <!-- ===== 底部控制台：新拟态凸起面板 ===== -->
-    <footer class="control-deck">
+    <footer v-if="modlist.length > 0" class="control-deck">
       <div class="deck-left">
         <div class="neu-btn-group">
           <button class="neu-action-btn" @click="selectAll">
@@ -132,9 +203,9 @@
           </button>
         </div>
         <div class="neu-btn-group">
-          <button class="neu-action-btn accent" @click="handleDeployMods">
+          <button class="neu-action-btn accent" @click="handleDeployMods" :disabled="isDeploying">
             <n-icon :component="RocketOutline" size="16" />
-            <span>部署</span>
+            <span>{{ isDeploying ? '部署中...' : '部署' }}</span>
           </button>
           <button class="neu-action-btn" @click="handleAddMod">
             <n-icon :component="AddOutline" size="16" />
@@ -183,13 +254,47 @@
         </div>
       </div>
     </n-modal>
+
+    <!-- ===== 编辑 Modal（重命名/修改分类） ===== -->
+    <n-modal v-model:show="showEditModal" preset="card"
+      :title="editModalTitle" style="width: 420px" :mask-closable="false">
+      <div class="edit-modal-content">
+        <n-input
+          v-model:value="editValue"
+          :placeholder="editType === 'rename' ? '输入新的显示名称' : '输入类别代码 (model/voice/ui/lightIcon/script/map)'"
+          @keyup.enter="confirmEdit"
+          autofocus
+        />
+        <div class="modal-actions">
+          <n-button type="primary" @click="confirmEdit" :loading="editLoading">确定</n-button>
+          <n-button @click="showEditModal = false">取消</n-button>
+        </div>
+      </div>
+    </n-modal>
   </div>
 </template>
 
-<script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated, inject } from 'vue'
+import type { Ref } from 'vue'
+
+interface ModItem {
+  id: string
+  name: string
+  displayName: string
+  active: boolean
+  type: string
+  selected: boolean
+  installDate: string | null
+  iconPath: string | null
+}
+
+// 缓存失效信号（来自 HomePage 的 provide）
+const modListVersion = inject<Ref<number>>('modListVersion', ref(0))
+let lastSeenVersion = 0
 import { invoke, convertFileSrc } from '@tauri-apps/api/core'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
+import { listen } from '@tauri-apps/api/event'
 import { open, ask } from '@tauri-apps/plugin-dialog'
 import {
   NButton,
@@ -198,9 +303,11 @@ import {
   NTag,
   NIcon,
   NModal,
-  NSpin
+  NSpin,
+  NInput
 } from 'naive-ui'
 import NeumorphicSearchBox from './NeumorphicSearchBox.vue'
+import WelcomeMenu from './WelcomeMenu.vue'
 import { useNotify, useConfirm } from '@/composables/useNotification'
 import {
   DocumentOutline,
@@ -221,9 +328,18 @@ const { confirm } = useConfirm()
 
 const isGridLayout = ref(true)
 const currentCategory = ref('all')
-const navRef = ref(null)
-const modlist = ref([])
+const navRef = ref<HTMLElement | null>(null)
+const modlist = ref<ModItem[]>([])
 const isLaunching = ref(false)
+const isDeploying = ref(false)
+const showDeployOverlay = ref(false)
+const deployCurrent = ref(0)
+const deployTotal = ref(0)
+const deployCurrentName = ref('')
+const deployResults = ref<Array<{ name: string; status: string }>>([])
+const deployErrors = ref<string[]>([])
+const isLoading = ref(false)
+const loadError = ref(null)
 const searchQuery = ref('')
 const loadingIcon = ref(false)      // 预览图片加载状态
 const isDraggingOver = ref(false)   // 拖拽导入状态
@@ -231,8 +347,19 @@ let dragCounter = 0                 // 拖拽进出计数
 
 // 图标预览模态框相关
 const showIconModal = ref(false)      // 控制模态框显示
-const currentMod = ref(null)          // 当前选中的 Mod
+const currentMod = ref<ModItem | null>(null)          // 当前选中的 Mod
 const uploadingIcon = ref(false)      // 上传/移除图标时的加载状态
+
+// 编辑模态框相关（重命名 / 修改分类）
+const showEditModal = ref(false)
+const editingMod = ref<ModItem | null>(null)
+const editValue = ref('')
+const editType = ref('rename') // 'rename' | 'category'
+const editLoading = ref(false)
+
+const editModalTitle = computed(() =>
+  editType.value === 'rename' ? '重命名 Mod' : '修改分类'
+)
 
 // 鼠标拖拽逻辑
 let isDragging = false
@@ -289,38 +416,38 @@ const toggleLayout = () => {
   isGridLayout.value = !isGridLayout.value
 }
 
-const formatType = type => TYPE_MAP[type] || '未知类型'
+const formatType = (type: string) => TYPE_MAP[type as keyof typeof TYPE_MAP] || '未知类型'
 
 // 横向滚轮
-const handleWheel = e => {
+const handleWheel = (e: WheelEvent) => {
   if (e.deltaY !== 0) {
     e.preventDefault()
-    navRef.value.scrollLeft += e.deltaY
+    navRef.value!.scrollLeft += e.deltaY
   }
 }
 
 // 拖拽滚动
-const handleMouseDown = e => {
+const handleMouseDown = (e: MouseEvent) => {
   isDragging = true
-  navRef.value.classList.add('grabbing')
-  startX = e.pageX - navRef.value.offsetLeft
-  scrollLeft = navRef.value.scrollLeft
+  navRef.value!.classList.add('grabbing')
+  startX = e.pageX - navRef.value!.offsetLeft
+  scrollLeft = navRef.value!.scrollLeft
 }
 
-const handleMouseMove = e => {
+const handleMouseMove = (e: MouseEvent) => {
   if (!isDragging) return
   e.preventDefault()
-  const x = e.pageX - navRef.value.offsetLeft
+  const x = e.pageX - navRef.value!.offsetLeft
   const walk = (x - startX) * 1.5
-  navRef.value.scrollLeft = scrollLeft - walk
+  navRef.value!.scrollLeft = scrollLeft - walk
 }
 
 const handleMouseUp = () => {
   isDragging = false
-  navRef.value.classList.remove('grabbing')
+  navRef.value!.classList.remove('grabbing')
 }
 
-const selectCategory = type => {
+const selectCategory = (type: string) => {
   currentCategory.value = type
 }
 
@@ -333,7 +460,7 @@ const selectAll = () => {
 }
 
 // 批量启用/禁用
-const handleBatchToggle = enable => {
+const handleBatchToggle = (enable: boolean) => {
   modlist.value
     .filter(mod => mod.selected)
     .forEach(mod => {
@@ -368,7 +495,7 @@ const handleBatchDelete = async () => {
 }
 
 // 导入文件列表
-const importFiles = async (paths) => {
+const importFiles = async (paths: string[]) => {
   let successCount = 0
   let failCount = 0
 
@@ -439,27 +566,32 @@ const onDrop = async (e) => {
 
 // 修改 refreshModList 以包含 iconPath
 const refreshModList = async () => {
+  isLoading.value = true
+  loadError.value = null
   try {
     const modStatuses = await invoke('get_mods_with_status')
-    modlist.value = modStatuses.map((info, index) => ({
-      id: index + 1,
+    modlist.value = modStatuses.map((info) => ({
+      id: info.name, // use filename as stable unique key
       name: info.name,
       displayName: info.display_name,
       active: info.applied,
       type: info.category || 'unknown',
       selected: false,
       installDate: info.install_date,
-      iconPath: info.icon_path || null,   // 新增
+      iconPath: info.icon_path || null,
     }))
   } catch (error) {
     console.error('刷新mod列表失败:', error)
+    loadError.value = `获取 Mod 列表失败: ${error}`
+  } finally {
+    isLoading.value = false
   }
 }
 
 // 删除单个 Mod
-const handleDeleteMod = async id => {
+const handleDeleteMod = async (id: string) => {
   try {
-    const modIndex = modlist.value.findIndex(mod => mod.id === id)
+    const modIndex = modlist.value.findIndex((mod: ModItem) => mod.id === id)
     if (modIndex === -1) return
     const mod = modlist.value[modIndex]
     const confirmDelete = await ask(`确定要删除 "${mod.displayName}" 吗？`, {
@@ -480,18 +612,58 @@ const handleDeleteMod = async id => {
 
 // 部署 Mod
 const handleDeployMods = async () => {
-  try {
-    const activeModNames = modlist.value.filter(mod => mod.active).map(mod => mod.name)
-    if (activeModNames.length === 0) {
-      const proceed = await confirm('当前未启用任何Mod，是否继续？', { kind: 'warning' })
-      if (!proceed) return
+  if (isDeploying.value) return
+  const activeModNames = modlist.value.filter(mod => mod.active).map(mod => mod.name)
+  if (activeModNames.length === 0) {
+    const proceed = await confirm('当前未启用任何Mod，是否继续？', { kind: 'warning' })
+    if (!proceed) return
+  }
+
+  isDeploying.value = true
+  showDeployOverlay.value = true
+  deployCurrent.value = 0
+  deployTotal.value = activeModNames.length
+  deployCurrentName.value = ''
+  deployResults.value = activeModNames.map(name => ({ name, status: 'pending' }))
+  deployErrors.value = []
+
+  const unlisten = await listen<{ current: number; total: number; mod_name: string; status: string }>(
+    'deploy-progress',
+    (event) => {
+      const { current, total, mod_name, status } = event.payload
+      deployCurrent.value = current
+      deployTotal.value = total
+      deployCurrentName.value = mod_name
+      // update per-item status
+      if (status === 'installing' || status === 'done' || status === 'error') {
+        const found = deployResults.value.find(r => r.name === mod_name)
+        if (found) found.status = status
+      }
     }
+  )
+
+  try {
     await invoke('deploy_mods', { modNames: activeModNames })
-    notify.success(`部署成功！已应用 ${activeModNames.length} 个项目。`)
+    const errorCount = deployResults.value.filter(r => r.status === 'error').length
+    if (errorCount > 0) {
+      const successCount = deployResults.value.filter(r => r.status === 'done').length
+      notify.warning(`部署完成: ${successCount} 成功, ${errorCount} 失败`)
+      deployErrors.value = deployResults.value
+        .filter(r => r.status === 'error')
+        .map(r => `${r.name}: 安装失败`)
+    } else {
+      notify.success(`部署成功！已应用 ${activeModNames.length} 个项目。`)
+    }
     await refreshModList()
   } catch (error) {
     console.error('部署失败:', error)
+    deployErrors.value.push(`部署过程出错: ${error}`)
     notify.error(`部署失败: ${error}`)
+  } finally {
+    unlisten()
+    isDeploying.value = false
+    // Keep overlay visible for a moment so user can review results
+    setTimeout(() => { showDeployOverlay.value = false }, deployErrors.value.length > 0 ? 5000 : 1500)
   }
 }
 
@@ -522,68 +694,69 @@ const handleLaunchGame = async () => {
   }
 }
 
-// 重命名处理函数（带乐观更新）
-const handleEditMod = async (mod) => {
-  const newName = prompt('请输入新的显示名称', mod.displayName)
-  if (!newName || newName === mod.displayName) return
-
-  // 保存旧名称以便回滚
-  const oldDisplayName = mod.displayName
-
-  // 立即更新本地显示（乐观更新）
-  mod.displayName = newName
-
-  try {
-    // 调用后端重命名
-    await invoke('rename_mod', {
-      originalFilename: mod.name,
-      newDisplayName: newName
-    })
-    // 后端成功后，可选重新从后端获取全量数据以保证一致性
-    await refreshModList()
-  } catch (err) {
-    // 后端失败，回滚显示名称
-    mod.displayName = oldDisplayName
-    alert(`重命名失败: ${err}`)
+// 打开编辑模态框
+const openEditModal = (mod: ModItem, type: string) => {
+  editingMod.value = mod
+  editType.value = type
+  if (type === 'rename') {
+    editValue.value = mod.displayName
+  } else {
+    editValue.value = mod.type === 'unknown' ? '' : mod.type
   }
+  showEditModal.value = true
 }
 
+// 确认编辑
+const confirmEdit = async () => {
+  const mod = editingMod.value
+  if (!mod || !editValue.value.trim()) return
+
+  editLoading.value = true
+  if (editType.value === 'rename') {
+    const newName = editValue.value.trim()
+    if (newName === mod.displayName) { showEditModal.value = false; editLoading.value = false; return }
+    const oldDisplayName = mod.displayName
+    mod.displayName = newName
+    try {
+      await invoke('rename_mod', { originalFilename: mod.name, newDisplayName: newName })
+      await refreshModList()
+      showEditModal.value = false
+    } catch (err) {
+      mod.displayName = oldDisplayName
+      notify.error(`重命名失败: ${err}`)
+    }
+  } else {
+    const category = editValue.value.trim()
+    const oldCategory = mod.type
+    mod.type = category || 'unknown'
+    try {
+      await invoke('update_mod_category', { originalFilename: mod.name, category: category || null })
+      await refreshModList()
+      showEditModal.value = false
+    } catch (err) {
+      mod.type = oldCategory
+      notify.error(`修改分类失败: ${err}`)
+    }
+  }
+  editLoading.value = false
+}
+
+// 重命名处理函数 — 打开模态框
+const handleEditMod = (mod: ModItem) => openEditModal(mod, 'rename')
+
 //日期格式化函数
-const formatDate = (dateStr) => {
+const formatDate = (dateStr: string | null) => {
   if (!dateStr) return '未安装'
   const date = new Date(dateStr)
   return date.toLocaleDateString()
 }
 
-//类别修改函数
-const handleEditCategory = async (mod) => {
-  const newCategory = prompt(
-    `请输入类别代码 (model/voice/ui/lightIcon/script/map) 或留空表示未知`,
-    mod.type === 'unknown' ? '' : mod.type
-  )
-  if (newCategory === null) return
-
-  const category = newCategory.trim() === '' ? null : newCategory.trim()
-  if (category === mod.type) return
-
-  const oldCategory = mod.type
-  // 乐观更新
-  mod.type = category || 'unknown'
-  try {
-    await invoke('update_mod_category', {
-      originalFilename: mod.name,
-      category: category
-    })
-    await refreshModList() // 可选，确保与后端一致
-  } catch (err) {
-    mod.type = oldCategory
-    alert(`修改类别失败: ${err}`)
-  }
-}
+//类别修改函数 — 打开模态框
+const handleEditCategory = (mod: ModItem) => openEditModal(mod, 'category')
 
 
 // 获取 Mod 图标的完整访问 URL
-const getModIconUrl = (mod) => {
+const getModIconUrl = (mod: ModItem) => {
   if (!mod.iconPath) return null
   try {
     const url = convertFileSrc(mod.iconPath)
@@ -595,14 +768,14 @@ const getModIconUrl = (mod) => {
 }
 
 // 图标加载失败时清除路径
-const onIconLoadError = (mod) => {
+const onIconLoadError = (mod: ModItem) => {
   console.warn('卡片图标加载失败，路径:', mod.iconPath)
   // 只记录错误，不清除路径，避免丢失用户上传的图标路径
   // mod.iconPath = null
 }
 
 // 打开图标预览模态框
-const openIconModal = (mod) => {
+const openIconModal = (mod: ModItem) => {
   currentMod.value = mod
   const iconUrl = getModIconUrl(mod)
   if (iconUrl) {
@@ -695,12 +868,9 @@ const onIconPreviewError = () => {
   console.warn('预览图片加载失败，路径:', currentMod.value?.iconPath)
 }
 
-let unlistenDragDrop = null
+let unlistenDragDrop: (() => void) | null = null
 
-onMounted(async () => {
-  await refreshModList()
-
-  // 注册 Tauri 拖拽导入事件
+const setupDragListener = async () => {
   try {
     unlistenDragDrop = await getCurrentWebview().onDragDropEvent((event) => {
       if (event.payload.type === 'drop' && event.payload.paths?.length > 0) {
@@ -713,10 +883,39 @@ onMounted(async () => {
   } catch {
     // 非 Tauri 环境静默失败
   }
+}
+
+const teardownDragListener = () => {
+  if (unlistenDragDrop) {
+    unlistenDragDrop()
+    unlistenDragDrop = null
+  }
+}
+
+// 首次挂载：加载数据 + 注册拖拽
+onMounted(async () => {
+  await refreshModList()
+  lastSeenVersion = modListVersion.value
+  setupDragListener()
 })
 
+// 每次切回该标签页：检查是否需要刷新 + 重新注册拖拽
+onActivated(() => {
+  if (modListVersion.value > lastSeenVersion) {
+    refreshModList()
+    lastSeenVersion = modListVersion.value
+  }
+  setupDragListener()
+})
+
+// 切走时：卸载拖拽监听（避免在设置页误触拖拽导入）
+onDeactivated(() => {
+  teardownDragListener()
+})
+
+// 应用关闭时最终清理
 onUnmounted(() => {
-  if (unlistenDragDrop) unlistenDragDrop()
+  teardownDragListener()
 })
 </script>
 
@@ -1385,5 +1584,228 @@ onUnmounted(() => {
   color: var(--accent);
   font-size: 15px;
   font-weight: 600;
+}
+
+/* ---- 状态容器（加载 / 错误 / 空） ---- */
+.state-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 80px 24px;
+  text-align: center;
+  min-height: 300px;
+}
+
+.state-text {
+  font-size: 15px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.state-hint {
+  font-size: 13px;
+  color: var(--text-dim);
+  opacity: 0.7;
+  max-width: 320px;
+  line-height: 1.6;
+}
+
+.state-container.error .state-text {
+  color: #e0556a;
+}
+
+.state-container.empty .state-text {
+  color: var(--text-dim);
+}
+
+/* ---- 编辑模态框 ---- */
+.edit-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 12px 0;
+}
+
+/* ---- 部署进度覆盖层 ---- */
+.deploy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.deploy-modal {
+  width: 480px;
+  max-height: 70vh;
+  padding: 32px;
+  border-radius: var(--neu-radius-lg);
+  background: var(--neu-raised);
+  box-shadow:
+    -10px -10px 20px var(--neu-shadow-light),
+    10px 10px 20px var(--neu-shadow-dark),
+    0 8px 32px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow: hidden;
+}
+
+.deploy-title {
+  font-family: 'Rajdhani', 'Segoe UI', 'Arial Black', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.deploy-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--neu-inset);
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow:
+    inset 2px 2px 4px var(--neu-shadow-dark),
+    inset -2px -2px 4px var(--neu-shadow-light);
+}
+
+.deploy-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #536dfe);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.deploy-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.deploy-active-label {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.deploy-done-label {
+  color: #7ecb8a;
+  font-weight: 600;
+}
+
+/* 部署项列表 */
+.deploy-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.deploy-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--neu-inset);
+  font-size: 13px;
+  transition: background 0.2s;
+}
+
+.deploy-item.done {
+  background: rgba(126, 203, 138, 0.06);
+}
+
+.deploy-item.error {
+  background: rgba(224, 85, 106, 0.08);
+}
+
+.deploy-item.installing {
+  background: rgba(91, 141, 239, 0.08);
+}
+
+.deploy-item-icon {
+  width: 20px;
+  text-align: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.deploy-item.done .deploy-item-icon { color: #7ecb8a; }
+.deploy-item.error .deploy-item-icon { color: #e0556a; }
+.deploy-item.installing .deploy-item-icon { color: var(--accent); }
+.deploy-item.pending .deploy-item-icon { color: var(--text-dim); }
+
+.deploy-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-main);
+}
+
+.deploy-item-status {
+  font-size: 12px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.deploy-item.error .deploy-item-status { color: #e0556a; }
+
+/* mini spinner */
+.mini-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(91, 141, 239, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 错误信息 */
+.deploy-errors {
+  background: rgba(224, 85, 106, 0.08);
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.deploy-error-item {
+  font-size: 12px;
+  color: #e0556a;
+  padding: 2px 0;
+}
+
+.deploy-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+/* fade transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

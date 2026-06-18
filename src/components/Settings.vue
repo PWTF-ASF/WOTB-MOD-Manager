@@ -6,40 +6,17 @@
         <span class="sub-title">SYSTEM CONFIGURATION</span>
       </h2>
 
-      <!-- 设置组：背景模糊效果 -->
+      <!-- 设置组：外观设置 -->
       <section class="setting-group">
-        <h3 class="group-title">背景模糊 / BACKGROUND BLUR</h3>
+        <h3 class="group-title">外观设置 / APPEARANCE</h3>
 
-        <div class="setting-item vertical background-blur-item">
+        <!-- 背景图片 -->
+        <div class="setting-item vertical">
           <div class="setting-header">
             <div class="text-info">
-              <span class="label">背景模糊强度</span>
-              <span class="desc">单一滑块控制背景整体模糊程度，开启后营造深度层次感。</span>
+              <span class="label">背景图片</span>
+              <span class="desc">自定义背景图片与显示模式，增强界面视觉层次感。</span>
             </div>
-            <n-switch v-model:value="enableBackgroundBlur" size="small" />
-          </div>
-          <div class="slider-container blur-slider">
-            <n-slider
-              v-model:value="backgroundBlurAmount"
-              :min="0"
-              :max="20"
-              :step="1"
-              size="small"
-              :disabled="!enableBackgroundBlur"
-            />
-            <span class="slider-value">{{ backgroundBlurAmount }}px</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- 设置组：其他外观设置 -->
-      <section class="setting-group">
-        <h3 class="group-title">其他外观 / GENERAL VISUALS</h3>
-
-        <div class="setting-item vertical background-setting-item">
-          <div class="text-info">
-            <span class="label">背景设置</span>
-            <span class="desc">自定义背景图片与遮罩透明度调节，增强界面视觉层次感。</span>
           </div>
 
           <div class="background-control-row">
@@ -64,7 +41,7 @@
 
           <!-- 背景模式 -->
           <div class="mode-selector-row">
-            <span class="toggle-label">背景模式</span>
+            <span class="toggle-label">显示模式</span>
             <div class="mode-buttons">
               <button
                 v-for="mode in backgroundModes" :key="mode.value"
@@ -77,12 +54,13 @@
             </div>
           </div>
 
+          <!-- 背景遮罩 -->
           <div class="mask-toggle-row">
-            <span class="toggle-label">启用背景遮罩</span>
+            <span class="toggle-label">背景遮罩</span>
             <n-switch v-model:value="backgroundMask" size="small" />
           </div>
 
-          <div class="slider-container mask-slider">
+          <div class="slider-container">
             <span class="slider-label">遮罩透明度</span>
             <n-slider
               v-model:value="maskOpacity"
@@ -95,7 +73,25 @@
             <span class="slider-value">{{ maskOpacity }}%</span>
           </div>
 
-          <!-- 重置背景 -->
+          <!-- 背景模糊 -->
+          <div class="mask-toggle-row">
+            <span class="toggle-label">背景模糊</span>
+            <n-switch v-model:value="enableBackgroundBlur" size="small" />
+          </div>
+
+          <div class="slider-container">
+            <span class="slider-label">模糊强度</span>
+            <n-slider
+              v-model:value="backgroundBlurAmount"
+              :min="0"
+              :max="20"
+              :step="1"
+              size="small"
+              :disabled="!enableBackgroundBlur"
+            />
+            <span class="slider-value">{{ backgroundBlurAmount }}px</span>
+          </div>
+
           <div class="reset-bg-row">
             <n-button size="tiny" quaternary @click="handleResetBackground">
               恢复默认渐变背景
@@ -103,6 +99,7 @@
           </div>
         </div>
 
+        <!-- 主题模式 -->
         <div class="setting-item vertical">
           <div class="text-info">
             <span class="label">主题模式</span>
@@ -173,7 +170,7 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { NButton, NSwitch, NInput, NIcon, NSlider, NRadio, NRadioGroup } from 'naive-ui'
 import { RefreshOutline } from '@vicons/ionicons5'
-import { useNotify } from '@/composables/useNotification'
+import { useNotify, useConfirm } from '@/composables/useNotification'
 
 // 注入全局状态 - 背景模糊效果
 const enableBackgroundBlur = inject('enableBackgroundBlur') as Ref<boolean>
@@ -189,9 +186,11 @@ const themeMode = inject('ThemeMode') as Ref<'light' | 'dark' | 'system'>
 const backgroundImagePath = inject<Ref<string | null>>('backgroundImagePath')
 const setBackgroundImage = inject<(path: string | null) => Promise<void>>('setBackgroundImage')
 const resetVisualSettings = inject('resetVisualSettings') as () => void
+const invalidateModList = inject<() => void>('invalidateModList', () => {})
 
-// 通知
+// 通知 + 确认对话框
 const notify = useNotify()
+const { confirm } = useConfirm()
 
 // 背景模式
 const backgroundModes = [
@@ -204,7 +203,7 @@ const backgroundMode = inject('backgroundMode') as Ref<string>
 
 // 恢复默认渐变背景
 const handleResetBackground = async () => {
-  if (confirm('确定恢复为默认渐变背景吗？')) {
+  if (await confirm('确定恢复为默认渐变背景吗？')) {
     if (setBackgroundImage) {
       await setBackgroundImage(null)
     }
@@ -326,16 +325,17 @@ const selectPath = async (type: 'game' | 'mod') => {
     } else {
       config.modRepoPath = selected
       await invoke('set_mod_repo_path', { path: selected })
-      if (confirm('是否将当前默认目录中的 Mod 文件移动到新位置？')) {
+      if (await confirm('是否将当前默认目录中的 Mod 文件移动到新位置？')) {
         await invoke('migrate_mod_repo', { newPath: selected })
+        invalidateModList()
       }
     }
   }
 }
 
 // 重置视觉效果
-const handleResetVisuals = () => {
-  if (confirm('确定要重置所有视觉效果为默认值吗？')) {
+const handleResetVisuals = async () => {
+  if (await confirm('确定要重置所有视觉效果为默认值吗？')) {
     if (resetVisualSettings) {
       resetVisualSettings()
     }
@@ -344,7 +344,7 @@ const handleResetVisuals = () => {
 
 // 重置设置（原有）
 const resetToDefaults = async () => {
-  if (confirm('确定要重置所有设置吗？此操作无法撤销。')) {
+  if (await confirm('确定要重置所有设置吗？此操作无法撤销。')) {
     config.gamePath = ''
     config.modRepoPath = ''
     await invoke('set_game_path', { path: '' })
@@ -380,7 +380,7 @@ const resetToDefaults = async () => {
 
 /* ---- 标题 ---- */
 .page-title {
-  font-family: 'Rajdhani', sans-serif;
+  font-family: 'Rajdhani', 'Segoe UI', 'Arial Black', sans-serif;
   font-size: 32px;
   font-weight: 800;
   text-transform: uppercase;

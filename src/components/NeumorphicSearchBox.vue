@@ -24,7 +24,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import { NIcon } from 'naive-ui'
 import { SearchOutline, CloseOutline } from '@vicons/ionicons5'
@@ -34,16 +34,19 @@ defineProps({
   placeholder: { type: String, default: '搜索...' },
 })
 
-const emit = defineEmits(['update:modelValue', 'focus'])
+const emit = defineEmits<{
+  'update:modelValue': [value: string]
+  focus: [e: FocusEvent]
+}>()
 
-const inputRef = ref(null)
+const inputRef = ref<HTMLInputElement | null>(null)
 const isFocused = ref(false)
 
-function onInput(e) {
-  emit('update:modelValue', e.target.value)
+function onInput(e: Event) {
+  emit('update:modelValue', (e.target as HTMLInputElement).value)
 }
 
-function onFocus(e) {
+function onFocus(e: FocusEvent) {
   isFocused.value = true
   emit('focus', e)
 }

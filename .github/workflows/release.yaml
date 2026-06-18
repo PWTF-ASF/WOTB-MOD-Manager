@@ -2,6 +2,8 @@ name: "Release"
 
 on:
   push:
+    branches:
+      - "main"            # 明确指定分支，有助于触发
     tags:
       - "v*"
   workflow_dispatch:
@@ -48,6 +50,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
-          releaseBody: "请在此描述更新内容。"
+          releaseBody: "无"
           releaseDraft: true
           args: --target x86_64-pc-windows-msvc --bundles nsis

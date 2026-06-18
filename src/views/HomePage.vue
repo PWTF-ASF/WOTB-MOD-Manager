@@ -39,14 +39,16 @@
           >
             {{ DarkMode ? 'Dark' : 'Light' }}
           </n-button>
-          <div class="version">v1.3.9</div>
+          <div class="version">v{{ version }}</div>
         </div>
       </aside>
 
       <!-- 主视口容器 -->
       <main class="main-viewport">
-        <ModLibrary v-if="NavLinksId === 1" />
-        <Settings v-else-if="NavLinksId === 2" />
+        <KeepAlive>
+          <ModLibrary v-if="NavLinksId === 1" key="modlibrary" />
+          <Settings v-else-if="NavLinksId === 2" key="settings" />
+        </KeepAlive>
       </main>
     </div>
     </n-dialog-provider>
@@ -74,6 +76,14 @@ import ModLibrary from '@/components/ModLibrary.vue'
 import Settings from '@/components/Settings.vue'
 
 // ================= 平台检测 =================
+const store = useStore()
+const version = computed(() => store.version)
+
+// Mod 列表缓存失效信号（供跨组件通知刷新）
+const modListVersion = ref(0)
+provide('invalidateModList', () => { modListVersion.value++ })
+provide('modListVersion', modListVersion)
+
 const isLinux = ref(false)
 const isWindows = ref(false)
 const isMacOS = ref(false)
@@ -486,6 +496,7 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
 
 <style>
 /* ================= 全局变量定义 ================= */
+/* 显示字体：优先使用 Google Fonts 的 Rajdhani，加载失败时回退到系统字体 */
 @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap');
 
 :root {
