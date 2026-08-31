@@ -1,11 +1,6 @@
 name: "Release"
 
 on:
-  push:
-    branches:
-      - "main"            # 明确指定分支，有助于触发
-    tags:
-      - "v*"
   workflow_dispatch:
 
 jobs:

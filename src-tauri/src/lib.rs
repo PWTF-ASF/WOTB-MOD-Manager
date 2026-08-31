@@ -763,6 +763,33 @@ fn get_mod_repo_path(app: AppHandle) -> Result<Option<String>, String> {
     Ok(Some(path))
 }
 
+/// 使用系统文件管理器打开已配置的 Mod 仓库。
+/// 路径只从应用配置读取，前端无法借此打开任意本地路径。
+#[command]
+fn open_mod_repo(app: AppHandle) -> Result<(), String> {
+    let path = get_mod_repo_path(app)?
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "请先配置 Mod 仓库路径".to_string())?;
+    let repo_path = PathBuf::from(path);
+
+    if !repo_path.is_dir() {
+        return Err("Mod 仓库目录不存在，请重新配置路径".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    let mut command = std::process::Command::new("explorer.exe");
+    #[cfg(target_os = "macos")]
+    let mut command = std::process::Command::new("open");
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut command = std::process::Command::new("xdg-open");
+
+    command
+        .arg(&repo_path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("无法打开 Mod 仓库: {error}"))
+}
+
 /// 设置 Mod 存储库路径
 #[command]
 fn set_mod_repo_path(app: AppHandle, path: String) -> Result<(), String> {
@@ -1264,6 +1291,7 @@ pub fn run() {
             deploy_mods,
             get_mods_with_status,
             get_mod_repo_path,
+            open_mod_repo,
             set_mod_repo_path,
             migrate_mod_repo,
             rename_mod,

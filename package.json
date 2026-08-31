@@ -1,7 +1,7 @@
 {
   "name": "tauri-app",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "dev": "pnpm vite:dev",
@@ -20,8 +20,6 @@
     "@tauri-apps/plugin-dialog": "2.3",
     "@tauri-apps/plugin-fs": "2.3",
     "@tauri-apps/plugin-shell": "2.3",
-    "@vicons/ionicons5": "^0.13.0",
-    "naive-ui": "^2.43.2",
     "pinia": "^3.0.3",
     "vue": "^3.5.17",
     "vue-router": "^4.5.1"

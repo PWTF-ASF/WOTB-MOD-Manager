@@ -16,6 +16,10 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
   ask: vi.fn().mockResolvedValue(true),
 }))
 
+vi.mock('@tauri-apps/plugin-shell', () => ({
+  open: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn().mockResolvedValue(() => {}),
 }))

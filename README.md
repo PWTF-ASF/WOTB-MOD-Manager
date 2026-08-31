@@ -4,7 +4,7 @@
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.0.1-blue)
 
 ---
 
@@ -21,14 +21,14 @@
 | **加载页** | 启动时展示进度动画，依次扫描 Mod 目录、读取列表、检测冲突、加载设置 |
 | **欢迎菜单** | 零 Mod 时显示引导页，可直接添加 Mod 或打开文件夹 |
 | **模组库** | 网格/列表双视图，分类筛选（3D模型/语音/UI/地图等），关键词搜索 |
-| **模组管理** | 重命名、修改分类、上传自定义图标，Naive UI 模态框交互 |
+| **模组管理** | 重命名、修改分类、上传自定义图标，自研弹窗交互 |
 | **批量操作** | 全选、批量启用/禁用、批量删除 |
 | **一键部署** | 实时进度面板，逐项展示安装状态，单 Mod 失败不影响其余 |
 | **冲突检测** | 部署时自动检测文件覆盖冲突，卸载冲突旧 Mod 后安装 |
 | **启动游戏** | 自动检测/配置游戏路径，一键拉起 wotblitz.exe |
 | **系统设置** | 游戏路径、Mod 仓库路径、仓库迁移 |
 | **外观设置** | 自定义背景图片、显示模式（铺满/适应/拉伸/平铺）、遮罩透明度、背景模糊强度 |
-| **双主题** | 新拟态暗色/亮色，跟随系统自动切换 |
+| **双主题** | 扁平化暗色/亮色主题，跟随系统自动切换 |
 | **页面缓存** | `<KeepAlive>` 缓存组件状态，页面切换不重复请求、不丢失滚动和筛选 |
 | **拖拽导入** | 支持拖拽 ZIP 文件到窗口直接导入 |
 
@@ -42,8 +42,8 @@
 | 前端框架 | Vue 3（Composition API + `<script setup>`） |
 | 类型系统 | TypeScript |
 | 构建工具 | Vite 7 |
-| UI 组件库 | Naive UI |
-| 设计风格 | 新拟态（Neumorphism）自定义 CSS 变量体系 |
+| UI 组件 | 项目内自研基础组件，无第三方 UI 组件库 |
+| 设计风格 | 扁平化战术控制台，自定义设计令牌与主题体系 |
 | 样式 | Tailwind CSS 4 |
 | 状态管理 | Pinia |
 | 后端语言 | Rust |
@@ -93,14 +93,20 @@ pnpm test
 │   ├── splash.ts               # 加载页逻辑（监听 init-progress 事件）
 │   ├── assets/                 # 静态资源
 │   ├── components/
-│   │   ├── ModLibrary.vue             # 模组库主界面（核心组件）
-│   │   ├── NeumorphicSearchBox.vue    # 新拟态搜索框
+│   │   ├── ModLibrary.vue             # 模组库页面编排
 │   │   ├── Settings.vue               # 系统设置页
 │   │   └── WelcomeMenu.vue           # 欢迎引导页（空态）
+│   ├── features/mods/components/      # Mod 卡片、工具栏及业务弹窗
+│   ├── ui/                            # 按钮、表单、反馈和弹窗基础组件
+│   ├── stores/                        # 偏好、Mod、部署、通知与确认状态
+│   ├── services/tauri/                # Tauri IPC 服务适配层
+│   ├── styles/                        # 设计令牌、主题、基础与动效样式
+│   ├── types/                         # 领域类型
 │   ├── views/
-│   │   └── HomePage.vue               # 主页布局（侧边栏 + 主题注入 + KeepAlive）
+│   │   └── HomePage.vue               # 主页布局（侧边栏 + KeepAlive）
 │   ├── composables/
-│   │   └── useNotification.ts         # 通知/确认对话框封装
+│   │   ├── useToast.ts                # 应用内通知
+│   │   └── useConfirmDialog.ts        # 自定义确认弹窗
 │   └── router/
 │       └── index.ts                   # 路由配置
 ├── src-tauri/
@@ -113,7 +119,8 @@ pnpm test
 │       └── default.json         # 安全能力声明
 ├── tests/
 │   ├── unit/
-│   │   └── store.test.ts        # Pinia 单元测试
+│   │   ├── store.test.ts        # 全局状态测试
+│   │   └── *.test.ts            # 服务、路由与组件测试
 │   └── setup/
 │       ├── mocks.ts             # Tauri API Mock
 │       ├── testglobals.ts       # 测试全局配置
@@ -167,10 +174,10 @@ pnpm test
 本项目采用 **vibe coding** 方式开发——与 AI 结对编程，快速迭代。
 
 - 所有组件使用 `<script setup lang="ts">`
-- 新拟态样式通过 CSS 变量（`--neu-raised`、`--neu-inset`、`--neu-shadow-*`）统一管理
+- 基础组件位于 `src/ui`，通过 `--ui-*` 设计令牌保持控件和主题一致
 - 暗色/亮色主题通过 `:root.light-mode` / `:root.dark-mode` 切换 CSS 变量
 - Rust 命令同步执行文件 I/O，耗时的部署操作通过 `#[command] async fn` + `app.emit()` 推送进度
-- `<KeepAlive>` 作用于 `HomePage.vue` 内部的 `v-if` 切换，而非路由层
+- 路由页面通过 `<KeepAlive>` 缓存，跨页面切换时保留筛选、草稿和滚动状态
 - 加载页（splash）通过 Vite 多页面构建独立打包
 
 ---

@@ -1,0 +1,51 @@
+:root {
+  --ui-bg-app: #0b0f14;
+  --ui-bg-sidebar: #0f151d;
+  --ui-bg-surface: #151c25;
+  --ui-bg-surface-hover: #1a2430;
+  --ui-bg-elevated: #202b38;
+  --ui-bg-overlay: rgba(4, 8, 13, 0.76);
+
+  --ui-border-subtle: #263241;
+  --ui-border-strong: #36475b;
+
+  --ui-text-primary: #f2f5f8;
+  --ui-text-secondary: #9daaba;
+  --ui-text-muted: #687789;
+  --ui-text-on-accent: #ffffff;
+
+  --ui-accent: #4f8cff;
+  --ui-accent-hover: #6ba0ff;
+  --ui-accent-active: #3978e8;
+  --ui-success: #42b883;
+  --ui-warning: #e7aa3c;
+  --ui-danger: #e05b65;
+
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-5: 20px;
+  --ui-space-6: 24px;
+  --ui-space-8: 32px;
+  --ui-space-10: 40px;
+
+  --ui-radius-sm: 6px;
+  --ui-radius-md: 8px;
+  --ui-radius-lg: 10px;
+  --ui-radius-xl: 14px;
+
+  --ui-control-sm: 32px;
+  --ui-control-md: 38px;
+  --ui-control-lg: 44px;
+
+  --ui-shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.18);
+  --ui-shadow-md: 0 12px 32px rgba(0, 0, 0, 0.28);
+  --ui-focus-ring: 0 0 0 3px rgba(79, 140, 255, 0.34);
+
+  --ui-duration-fast: 120ms;
+  --ui-duration-normal: 180ms;
+  --ui-ease: cubic-bezier(0.2, 0, 0, 1);
+  --ui-font-body: "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --ui-font-display: "Rajdhani", "Segoe UI", sans-serif;
+}

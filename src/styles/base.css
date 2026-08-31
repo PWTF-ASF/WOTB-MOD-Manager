@@ -1,0 +1,15 @@
+button, input, select, textarea {
+  font: inherit;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+:where(button, input, select, textarea):focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+::selection {
+  color: var(--ui-text-on-accent);
+  background: var(--ui-accent);
+}

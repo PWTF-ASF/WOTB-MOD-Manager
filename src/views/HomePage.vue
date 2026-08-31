@@ -1,8 +1,5 @@
 <template>
-  <n-config-provider :theme-overrides="themeOverrides" :locale="zhCN" :date-locale="dateZhCN">
-    <n-notification-provider>
-    <n-dialog-provider>
-    <div class="command-center">
+  <div class="command-center">
       <!-- 背景图：使用 CSS 变量控制，浅色模式下可降低透明度或更换 -->
       <div class="background" :style="backgroundStyle"></div>
 
@@ -14,490 +11,108 @@
         </div>
 
         <nav class="nav-links">
-          <div class="nav-item" :class="{ active: NavLinksId === 1 }" @click="NavLinksId = 1">
+          <RouterLink to="/library" class="nav-item" active-class="active">
             <span class="icon">
-              <img :src="DarkMode ? HomeDarkIcon : NavLinksId === 1 ? HomeActiveIcon : HomeIcon" alt="模组库" />
+              <img :src="libraryIcon" alt="" />
             </span>
             <span class="label">模组库</span>
-          </div>
-          <div class="nav-item" :class="{ active: NavLinksId === 2 }" @click="NavLinksId = 2">
+          </RouterLink>
+          <RouterLink to="/settings" class="nav-item" active-class="active">
             <span class="icon">
-              <img :src="DarkMode ? SettingDarkIcon : NavLinksId === 2 ? SettingActiveIcon : SettingIcon" alt="设置" />
+              <img :src="settingsIcon" alt="" />
             </span>
             <span class="label">系统设置</span>
-          </div>
+          </RouterLink>
         </nav>
 
         <div class="sidebar-footer">
-          <!-- 使用 Naive UI 按钮替代原生调试开关 -->
-          <n-button
-            class="debug-toggle"
-            @click="toggleTheme()"
-            size="tiny"
-            :type="DarkMode ? 'primary' : 'default'"
-            title="点击切换主题演示"
-          >
-            {{ DarkMode ? 'Dark' : 'Light' }}
-          </n-button>
           <div class="version">v{{ version }}</div>
         </div>
       </aside>
 
       <!-- 主视口容器 -->
       <main class="main-viewport">
-        <KeepAlive>
-          <ModLibrary v-if="NavLinksId === 1" key="modlibrary" />
-          <Settings v-else-if="NavLinksId === 2" key="settings" />
-        </KeepAlive>
+        <RouterView v-slot="{ Component }">
+          <KeepAlive>
+            <component :is="Component" />
+          </KeepAlive>
+        </RouterView>
       </main>
-    </div>
-    </n-dialog-provider>
-    </n-notification-provider>
-  </n-config-provider>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, provide, computed, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-import { convertFileSrc } from '@tauri-apps/api/core'
-import { zhCN, dateZhCN, NConfigProvider, NButton, NNotificationProvider, NDialogProvider } from 'naive-ui'
-import type { GlobalThemeOverrides } from 'naive-ui'
+import { ref, provide, computed, onMounted, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useRoute } from 'vue-router'
+import { usePreferencesStore } from '@/stores/preferences'
 
 // ================= 图标资源 =================
 import SettingIcon from '@/assets/设置.svg'
 import SettingActiveIcon from '@/assets/设置_HL.svg'
 import SettingDarkIcon from '@/assets/设置Dark.svg'
+import SettingDarkActiveIcon from '@/assets/设置Dark_HL.svg'
 import HomeIcon from '@/assets/首页.svg'
 import HomeActiveIcon from '@/assets/首页_HL.svg'
 import HomeDarkIcon from '@/assets/首页Dark.svg'
-
-// ================= 组件 =================
-import ModLibrary from '@/components/ModLibrary.vue'
-import Settings from '@/components/Settings.vue'
+import HomeDarkActiveIcon from '@/assets/首页Dark_HL.svg'
 
 // ================= 平台检测 =================
 const store = useStore()
 const version = computed(() => store.version)
+const route = useRoute()
+const preferences = usePreferencesStore()
+const { isDark: DarkMode, backgroundStyle } = storeToRefs(preferences)
+const libraryIcon = computed(() => {
+  if (DarkMode.value) return route.name === 'library' ? HomeDarkActiveIcon : HomeDarkIcon
+  return route.name === 'library' ? HomeActiveIcon : HomeIcon
+})
+const settingsIcon = computed(() => {
+  if (DarkMode.value) return route.name === 'settings' ? SettingDarkActiveIcon : SettingDarkIcon
+  return route.name === 'settings' ? SettingActiveIcon : SettingIcon
+})
 
 // Mod 列表缓存失效信号（供跨组件通知刷新）
 const modListVersion = ref(0)
 provide('invalidateModList', () => { modListVersion.value++ })
 provide('modListVersion', modListVersion)
 
-const isLinux = ref(false)
-const isWindows = ref(false)
-const isMacOS = ref(false)
+onMounted(() => preferences.initialize())
+onUnmounted(() => preferences.dispose())
 
-// 检测运行平台（Linux适配关键）
-function detectPlatform() {
-  const userAgent = navigator.userAgent.toLowerCase()
-  isLinux.value = userAgent.includes('linux')
-  isWindows.value = userAgent.includes('win')
-  isMacOS.value = userAgent.includes('mac') || userAgent.includes('apple')
-}
-
-// ================= 响应式数据 =================
-const NavLinksId = ref(1)
-const DarkMode = ref(false)
-const BackgroundMask = ref(true) // 是否启用背景遮罩
-const MaskOpacity = ref(20) // 遮罩透明度，范围 0-100
-const backgroundImagePath = ref<string | null>(null)
-const backgroundImageBase64 = ref<string | null>(null)
-const ThemeMode = ref<'light' | 'dark' | 'system'>('system') // 主题模式：浅色、深色、跟随系统
-
-// 背景模糊效果相关变量
-const enableBackgroundBlur = ref(true)
-const backgroundBlurAmount = ref(10) // 模糊度，范围 0-20px
-
-// 背景显示模式
-const backgroundMode = ref('cover')
-
-// ================= 默认值配置 =================
-const defaultVisualSettings = {
-  enableBackgroundBlur: true,
-  backgroundBlurAmount: 10,
-  backgroundMask: true,
-  maskOpacity: 20,
-  backgroundMode: 'cover'
-}
-
-// 保存视觉设置到 localStorage
-function saveVisualSettings() {
-  localStorage.setItem('app-background-mask', JSON.stringify(BackgroundMask.value))
-  localStorage.setItem('app-mask-opacity', JSON.stringify(MaskOpacity.value))
-  localStorage.setItem('app-enable-blur', JSON.stringify(enableBackgroundBlur.value))
-  localStorage.setItem('app-blur-amount', JSON.stringify(backgroundBlurAmount.value))
-  localStorage.setItem('app-background-mode', backgroundMode.value)
-}
-
-// 从 localStorage 加载视觉设置
-function loadVisualSettings() {
-  const savedMask = localStorage.getItem('app-background-mask')
-  if (savedMask !== null) BackgroundMask.value = JSON.parse(savedMask)
-
-  const savedOpacity = localStorage.getItem('app-mask-opacity')
-  if (savedOpacity !== null) MaskOpacity.value = JSON.parse(savedOpacity)
-
-  const savedBlur = localStorage.getItem('app-enable-blur')
-  if (savedBlur !== null) enableBackgroundBlur.value = JSON.parse(savedBlur)
-
-  const savedBlurAmount = localStorage.getItem('app-blur-amount')
-  if (savedBlurAmount !== null) backgroundBlurAmount.value = JSON.parse(savedBlurAmount)
-
-  const savedBgMode = localStorage.getItem('app-background-mode')
-  if (savedBgMode !== null) backgroundMode.value = savedBgMode
-}
-
-// ================= 提供数据 =================
-provide('GlobalTheme', DarkMode)
-provide('ThemeMode', ThemeMode)
-provide('BackgroundMask', BackgroundMask)
-provide('MaskOpacity', MaskOpacity)
-provide('backgroundImagePath', backgroundImagePath)
-
-// 提供背景模糊相关变量
-provide('enableBackgroundBlur', enableBackgroundBlur)
-provide('backgroundBlurAmount', backgroundBlurAmount)
-
-// 提供背景显示模式
-provide('backgroundMode', backgroundMode)
-
-// 提供平台检测信息 (Linux适配)
-provide('isLinux', isLinux)
-
-// 提供重置视觉效果的方法
-provide('resetVisualSettings', resetVisualSettings)
-
-// ================= 背景图片Base64转换 (Linux适配核心) =================
-const convertBackgroundToBase64 = async (path: string): Promise<string | null> => {
-  if (!path) return null
-  try {
-    const base64 = await invoke('read_image_base64', { path }) as string
-    // 根据图片扩展名判断MIME类型
-    const ext = path.toLowerCase().split('.').pop()
-    let mimeType = 'image/jpeg'
-    if (ext === 'png') mimeType = 'image/png'
-    if (ext === 'webp') mimeType = 'image/webp'
-    return `data:${mimeType};base64,${base64}`
-  } catch (err) {
-    console.error('转换背景图片Base64失败:', err)
-    return null
-  }
-}
-
-// ================= 提供更新背景图片的方法 =================
-const setBackgroundImage = async (imagePath: string | null) => {
-  if (imagePath === null) {
-    // 移除背景
-    await invoke('remove_background_image')
-    backgroundImagePath.value = null
-    backgroundImageBase64.value = null
-  } else {
-    // 上传并保存背景
-    const savedPath = await invoke('set_background_image', { imagePath }) as string
-    backgroundImagePath.value = savedPath
-    
-    // Linux平台强制使用Base64方式显示图片
-    if (isLinux.value) {
-      backgroundImageBase64.value = await convertBackgroundToBase64(savedPath)
-    }
-  }
-}
-provide('setBackgroundImage', setBackgroundImage)
-
-// 重置视觉效果到默认值
-function resetVisualSettings() {
-  enableBackgroundBlur.value = defaultVisualSettings.enableBackgroundBlur
-  backgroundBlurAmount.value = defaultVisualSettings.backgroundBlurAmount
-  BackgroundMask.value = defaultVisualSettings.backgroundMask
-  MaskOpacity.value = defaultVisualSettings.maskOpacity
-  backgroundMode.value = defaultVisualSettings.backgroundMode
-  saveVisualSettings()
-}
-
-// 将变量应用到全局
-watch(
-  [BackgroundMask, MaskOpacity],
-  () => {
-    const root = document.documentElement;
-    const overlayOpacity = BackgroundMask.value ? MaskOpacity.value / 100 : 0;
-    root.style.setProperty('--overlay-opacity', `${overlayOpacity}`);
-  },
-  { immediate: true, deep: true }
-);
-// 计算背景样式
-const backgroundStyle = computed(() => {
-  const style: Record<string, string> = {};
-
-  // 仅当设置了自定义背景图片时才覆盖 backgroundImage
-  if (backgroundImagePath.value) {
-    let bgImage: string;
-    if (isLinux.value && backgroundImageBase64.value) {
-      bgImage = `url("${backgroundImageBase64.value}")`;
-    } else {
-      const url = convertFileSrc(backgroundImagePath.value);
-      bgImage = `url("${url}")`;
-    }
-    style.backgroundImage = bgImage;
-  }
-
-  // 计算遮罩颜色，根据当前主题模式使用不同的基础颜色
-  const maskColor = DarkMode.value ?
-    `rgba(0, 0, 0, ${BackgroundMask.value ? MaskOpacity.value / 100 : 0})` :
-    `rgba(255, 255, 255, ${BackgroundMask.value ? (85 + MaskOpacity.value * 0.15) / 100 : 0})`;
-
-  // 背景模糊效果 - 使用filter实现，而不是backdrop-filter
-  const blurFilter = enableBackgroundBlur.value && backgroundBlurAmount.value > 0
-    ? `blur(${backgroundBlurAmount.value}px)`
-    : 'none';
-
-  // 根据背景模式设置 background-size 和 background-repeat
-  const mode = backgroundMode.value;
-  let bgSize = 'cover';
-  let bgRepeat = 'no-repeat';
-  if (mode === 'contain') bgSize = 'contain';
-  else if (mode === 'fill') bgSize = '100% 100%';
-  else if (mode === 'tile') { bgSize = 'auto'; bgRepeat = 'repeat'; }
-
-  return {
-    backgroundSize: bgSize,
-    backgroundRepeat: bgRepeat,
-    backgroundPosition: 'center',
-    backgroundAttachment: 'fixed',
-    filter: blurFilter,
-    '--app-bg-overlay': maskColor,
-    ...style
-  };
-});
-
-// 检测系统主题
-const checkSystemTheme = () => {
-  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-}
-
-// 根据主题模式更新 DarkMode 状态
-const updateThemeMode = () => {
-  if (ThemeMode.value === 'system') {
-    DarkMode.value = checkSystemTheme()
-  } else {
-    DarkMode.value = ThemeMode.value === 'dark'
-  }
-}
-
-// 监听系统主题变化
-const setupSystemThemeListener = () => {
-  if (window.matchMedia) {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    mediaQuery.addEventListener('change', () => {
-      if (ThemeMode.value === 'system') {
-        updateThemeMode()
-      }
-    })
-  }
-}
-
-// 加载保存的背景图片和主题设置
-onMounted(async () => {
-  // 第一步：检测运行平台
-  detectPlatform()
-  console.log(`运行平台检测: Linux=${isLinux.value}, Windows=${isWindows.value}, macOS=${isMacOS.value}`)
-
-  // 加载保存的视觉设置
-  loadVisualSettings()
-
-  try {
-    const savedPath = await invoke('get_background_image')
-    if (savedPath && typeof savedPath === 'string') {
-      backgroundImagePath.value = savedPath
-      
-      // Linux平台强制转换为Base64显示
-      if (isLinux.value) {
-        backgroundImageBase64.value = await convertBackgroundToBase64(savedPath)
-        console.log('Linux环境: 背景图片已转换为Base64格式')
-      }
-    }
-  } catch (err) {
-    console.error('加载背景图片失败:', err)
-  }
-  
-  // 加载保存的主题设置
-  const savedThemeMode = localStorage.getItem('app-theme-mode') as 'light' | 'dark' | 'system'
-  if (savedThemeMode) {
-    ThemeMode.value = savedThemeMode
-  }
-  
-  // 更新主题
-  updateThemeMode()
-  
-  // 设置系统主题监听器
-  setupSystemThemeListener()
-})
-
-// ================= 主题切换逻辑 =================
-watch(
-  DarkMode,
-  isDark => {
-    const root = document.documentElement
-    if (isDark) {
-      root.classList.remove('light-mode')
-      root.classList.add('dark-mode')
-    } else {
-      root.classList.remove('dark-mode')
-      root.classList.add('light-mode')
-    }
-    localStorage.setItem('app-theme', isDark ? 'dark' : 'light')
-  },
-  { immediate: true }
-)
-
-// 切换主题的函数
-const toggleTheme = () => {
-  // 切换 DarkMode 状态
-  DarkMode.value = !DarkMode.value
-  // 更新 ThemeMode 为对应的模式，确保设置页同步
-  ThemeMode.value = DarkMode.value ? 'dark' : 'light'
-  // 保存主题设置到本地存储
-  localStorage.setItem('app-theme', DarkMode.value ? 'dark' : 'light')
-  localStorage.setItem('app-theme-mode', ThemeMode.value)
-  // 更新根元素的类
-  const root = document.documentElement
-  if (DarkMode.value) {
-    root.classList.remove('light-mode')
-    root.classList.add('dark-mode')
-  } else {
-    root.classList.remove('dark-mode')
-    root.classList.add('light-mode')
-  }
-}
-
-// 监听主题模式变化
-watch(
-  ThemeMode,
-  () => {
-    updateThemeMode()
-    localStorage.setItem('app-theme-mode', ThemeMode.value)
-  }
-)
-
-// ================= 自动保存视觉设置 =================
-// 监听所有视觉设置变更，自动保存到 localStorage
-watch(
-  [BackgroundMask, MaskOpacity, enableBackgroundBlur, backgroundBlurAmount, backgroundMode],
-  () => {
-    saveVisualSettings()
-  },
-  { deep: true }
-)
-
-// ================= Naive UI 主题覆盖 =================
-// 根据 DarkMode 动态生成覆盖变量，与全局 CSS 变量保持一致
-const themeOverrides = computed<GlobalThemeOverrides>(() => {
-  if (DarkMode.value) {
-    return {
-      common: {
-        primaryColor: '#3d5afe',
-        primaryColorHover: '#536dfe',
-        primaryColorPressed: '#2a3eb1',
-        primaryColorSuppl: '#3d5afe',
-        // 其他颜色可以从 CSS 变量中读取，但这里直接映射简化示例
-        bodyColor: 'transparent', // 背景透明，让背景图显示
-        textColorBase: '#ffffff',
-        textColor1: '#ffffff',
-        textColor2: '#9ca3af',
-        textColor3: '#6b7280',
-        borderColor: '#3a3d47',
-        borderRadius: '4px',
-        boxShadow1: '0 2px 8px 0 rgba(0, 0, 0, 0.2)',
-        // 输入框基础颜色
-        inputColor: '#1e1f24',
-        inputColorHover: '#25262b',
-        inputColorFocus: '#1a1b1f',
-        inputColorDisabled: '#2d2e33',
-        // 可添加更多变量以覆盖其他组件
-      },
-      Button: {
-        textColor: '#ffffff',
-        textColorHover: '#ffffff',
-        color: 'rgba(255, 255, 255, 0.05)',
-        colorHover: 'rgba(255, 255, 255, 0.08)',
-        border: '1px solid #3a3d47',
-        borderHover: '1px solid #3d5afe',
-      },
-      Input: {
-        // 输入框深色背景 - 暗色模式规范
-        color: '#1e1f24',
-        colorHover: '#25262b',
-        colorFocus: '#1a1b1f',
-        colorDisabled: '#2d2e33',
-        // 边框颜色
-        border: '1px solid #3a3d47',
-        borderHover: '1px solid #4a4d57',
-        borderFocus: '1px solid #3d5afe',
-        // 文本颜色 - 高对比度
-        textColor: '#ffffff',
-        textColorPlaceholder: '#6b7280',
-        // 图标颜色
-        iconColor: '#9ca3af',
-        iconColorHover: '#ffffff',
-        // 清除按钮颜色
-        clearColor: '#6b7280',
-        clearColorHover: '#ffffff',
-      },
-    }
-  } else {
-    // 亮色模式
-    return {
-      common: {
-        primaryColor: '#3d5afe',
-        primaryColorHover: '#536dfe',
-        primaryColorPressed: '#2a3eb1',
-        primaryColorSuppl: '#3d5afe',
-        bodyColor: 'transparent',
-        textColorBase: '#1e293b',
-        textColor1: '#1e293b',
-        textColor2: '#64748b',
-        textColor3: '#94a3b8',
-        borderColor: '#e2e8f0',
-        borderRadius: '4px',
-        boxShadow1: '0 2px 8px 0 rgba(0, 0, 0, 0.05)',
-      },
-      Button: {
-        textColor: '#1e293b',
-        textColorHover: '#1e293b',
-        color: 'rgba(255, 255, 255, 0.8)',
-        colorHover: 'rgba(255, 255, 255, 0.9)',
-        border: '1px solid #e2e8f0',
-        borderHover: '1px solid #3d5afe',
-      },
-      Input: {
-        // 亮色模式输入框 - 浅色背景
-        color: 'rgba(255, 255, 255, 0.9)',
-        colorHover: 'rgba(255, 255, 255, 0.95)',
-        colorFocus: '#ffffff',
-        colorDisabled: '#f1f5f9',
-        // 边框颜色
-        border: '1px solid #e2e8f0',
-        borderHover: '1px solid #cbd5e1',
-        borderFocus: '1px solid #3d5afe',
-        // 文本颜色 - 高对比度
-        textColor: '#1e293b',
-        textColorPlaceholder: '#94a3b8',
-        // 图标颜色
-        iconColor: '#64748b',
-        iconColorHover: '#1e293b',
-        // 清除按钮颜色
-        clearColor: '#94a3b8',
-        clearColorHover: '#1e293b',
-      },
-    }
-  }
-})
 </script>
 
 <style>
 /* ================= 全局变量定义 ================= */
-/* 显示字体：优先使用 Google Fonts 的 Rajdhani，加载失败时回退到系统字体 */
-@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap');
+/* 显示字体：Rajdhani 打包在本地，加载失败时回退到系统字体 */
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/rajdhani-latin-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../assets/fonts/rajdhani-latin-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../assets/fonts/rajdhani-latin-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../assets/fonts/rajdhani-latin-700.woff2') format('woff2');
+}
 
 :root {
   /* --- 动画配置 --- */
@@ -554,13 +169,6 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   /* 滚动条 */
   --scroll-track: rgba(255, 255, 255, 0.05);
 
-  /* --- 开关相关 --- */
-  --switch-track: rgba(255, 255, 255, 0.1);
-  --switch-track-checked: rgba(61, 90, 254, 0.3);
-  --switch-thumb: #ffffff;
-  --switch-thumb-checked: #ffffff;
-  --switch-border: rgba(255, 255, 255, 0.2);
-  --switch-border-checked: rgba(61, 90, 254, 0.8);
 }
 
 /* --- 浅色模式覆盖 --- */
@@ -608,13 +216,6 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   /* 滚动条 */
   --scroll-track: rgba(0, 0, 0, 0.05);
 
-  /* 开关 */
-  --switch-track: rgba(0, 0, 0, 0.1);
-  --switch-track-checked: rgba(61, 90, 254, 0.2);
-  --switch-thumb: #ffffff;
-  --switch-thumb-checked: #ffffff;
-  --switch-border: rgba(0, 0, 0, 0.2);
-  --switch-border-checked: rgba(61, 90, 254, 0.8);
 }
 
 </style>
@@ -654,20 +255,19 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   transition: background var(--animation-duration) ease;
 }
 
-/* ---- 侧边栏：新拟态凸起面板 ---- */
+/* ---- 侧边栏：扁平导航面板 ---- */
 .sidebar {
   width: var(--sidebar-width);
-  background: var(--neu-raised);
+  background: color-mix(in srgb, var(--ui-bg-sidebar) 96%, transparent);
   display: flex;
   flex-direction: column;
   align-items: center;
   padding-top: var(--sidebar-padding);
   z-index: 10;
   position: relative;
-  box-shadow:
-    4px 0 12px rgba(0, 0, 0, 0.2),
-    -2px 0 8px var(--neu-shadow-light);
-  transition: background var(--animation-duration) ease;
+  border-right: 1px solid var(--ui-border-subtle);
+  box-shadow: none;
+  transition: background var(--animation-duration) ease, border-color var(--animation-duration) ease;
 }
 
 /* ---- Logo ---- */
@@ -680,11 +280,10 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
 .logo-icon {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
-  background: var(--neu-inset);
-  box-shadow:
-    inset 2px 2px 6px var(--neu-shadow-dark),
-    inset -2px -2px 6px var(--neu-shadow-light);
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-bg-surface);
+  box-shadow: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -693,11 +292,7 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   padding: 8px;
 }
 
-.logo-icon:hover {
-  box-shadow:
-    inset 2px 2px 8px var(--neu-shadow-dark),
-    inset -2px -2px 8px var(--neu-shadow-light);
-}
+.logo-icon:hover { border-color: var(--ui-border-strong); }
 
 .logo-icon img {
   width: 100%;
@@ -714,7 +309,7 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   transition: color var(--animation-duration);
 }
 
-/* ---- 导航链接：新拟态凸起按钮 ---- */
+/* ---- 导航链接 ---- */
 .nav-links {
   display: flex;
   flex-direction: column;
@@ -732,11 +327,10 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   padding: 10px 0;
   color: var(--text-dim);
   min-height: var(--nav-item-height);
-  border-radius: var(--neu-radius-sm);
-  background: var(--neu-raised);
-  box-shadow:
-    -3px -3px 6px var(--neu-shadow-light),
-    3px 3px 6px var(--neu-shadow-dark);
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-md);
+  background: transparent;
+  box-shadow: none;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   animation: slide-up-fade 0.6s var(--animation-timing) backwards;
   position: relative;
@@ -747,10 +341,10 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
 
 .nav-item:hover {
   color: var(--text-main);
-  box-shadow:
-    -4px -4px 8px var(--neu-shadow-light),
-    4px 4px 8px var(--neu-shadow-dark);
-  transform: translateY(-1px);
+  border-color: var(--ui-border-subtle);
+  background: var(--ui-bg-surface-hover);
+  box-shadow: none;
+  transform: none;
 }
 
 .nav-item:hover .icon img {
@@ -759,14 +353,23 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
 
 .nav-item.active {
   color: var(--accent);
-  background: var(--neu-inset);
-  box-shadow:
-    inset 2px 2px 6px var(--neu-shadow-dark),
-    inset -2px -2px 6px var(--neu-shadow-light);
+  border-color: color-mix(in srgb, var(--ui-accent) 24%, var(--ui-border-subtle));
+  background: color-mix(in srgb, var(--ui-accent) 10%, transparent);
+  box-shadow: none;
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  width: 3px;
+  height: 28px;
+  border-radius: 0 3px 3px 0;
+  background: var(--ui-accent);
 }
 
 .nav-item.active .icon img {
-  filter: drop-shadow(0 0 6px var(--accent-glow));
+  filter: none;
 }
 
 .nav-item .icon {
@@ -787,7 +390,7 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
 }
 
 .nav-item.active .icon img {
-  transform: scale(1.1);
+  transform: none;
 }
 
 .nav-item .label {
@@ -804,42 +407,11 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   padding-bottom: var(--sidebar-padding);
   font-size: 10px;
   color: var(--text-dim);
+  text-decoration: none;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
   animation: slide-up-fade 0.6s var(--animation-timing) 0.25s backwards;
-}
-
-.debug-toggle {
-  cursor: pointer;
-  padding: 6px 14px;
-  border: none;
-  border-radius: 20px;
-  font-size: 9px;
-  font-weight: 600;
-  user-select: none;
-  background: var(--neu-raised);
-  color: var(--text-dim);
-  box-shadow:
-    -3px -3px 6px var(--neu-shadow-light),
-    3px 3px 6px var(--neu-shadow-dark);
-  transition: all 0.25s ease;
-}
-
-.debug-toggle:hover {
-  color: var(--text-main);
-  box-shadow:
-    -4px -4px 8px var(--neu-shadow-light),
-    4px 4px 8px var(--neu-shadow-dark);
-  transform: translateY(-1px);
-}
-
-.debug-toggle:active {
-  box-shadow:
-    inset 2px 2px 5px var(--neu-shadow-dark),
-    inset -2px -2px 5px var(--neu-shadow-light);
-  color: var(--accent);
 }
 
 .version {
@@ -916,7 +488,6 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
 .sidebar,
 .nav-item,
 .logo-text,
-.debug-toggle,
 .version {
   transition-property: background-color, color, box-shadow, transform;
   transition-duration: var(--animation-duration);
@@ -928,7 +499,6 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
 .nav-item,
 .logo-icon,
 .icon img {
-  will-change: transform, opacity;
   transform: translateZ(0);
 }
 

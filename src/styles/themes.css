@@ -1,0 +1,21 @@
+:root.light-mode,
+:root[data-theme='light'] {
+  --ui-bg-app: #edf1f5;
+  --ui-bg-sidebar: #f7f9fb;
+  --ui-bg-surface: #ffffff;
+  --ui-bg-surface-hover: #f2f5f8;
+  --ui-bg-elevated: #ffffff;
+  --ui-bg-overlay: rgba(238, 243, 248, 0.82);
+  --ui-border-subtle: #d9e0e8;
+  --ui-border-strong: #bcc8d5;
+  --ui-text-primary: #182230;
+  --ui-text-secondary: #526173;
+  --ui-text-muted: #7b8998;
+  --ui-shadow-sm: 0 4px 12px rgba(30, 48, 68, 0.08);
+  --ui-shadow-md: 0 14px 36px rgba(30, 48, 68, 0.14);
+}
+
+:root.dark-mode,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
