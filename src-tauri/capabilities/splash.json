@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-capability.json",
+  "identifier": "splash",
+  "description": "Minimal event permissions for the startup splash window",
+  "windows": ["splash"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+}

@@ -63,10 +63,12 @@ export const useDeploymentStore = defineStore('deployment', () => {
       isDeploying.value = false
     }
 
-    errors.value = results.value
+    const itemErrors = results.value
       .filter(result => result.status === 'error')
       .map(result => `${result.name}: 安装失败`)
-    if (commandError && errors.value.length === 0) errors.value.push(`部署过程出错：${commandError}`)
+    errors.value = commandError
+      ? [`部署失败：${commandError}`, ...itemErrors]
+      : itemErrors
 
     return {
       succeeded: results.value.filter(result => result.status === 'success').length,

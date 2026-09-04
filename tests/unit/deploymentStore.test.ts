@@ -38,7 +38,10 @@ describe('deployment store', () => {
       { name: 'one.zip', status: 'success' },
       { name: 'two.zip', status: 'error' },
     ])
-    expect(store.errors).toEqual(['two.zip: 安装失败'])
+    expect(store.errors).toEqual([
+      '部署失败：1 个成功, 1 个失败',
+      'two.zip: 安装失败',
+    ])
     expect(store.isDeploying).toBe(false)
     expect(unlisten).toHaveBeenCalledOnce()
   })

@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-page">
+  <div v-auto-hide-scrollbar class="settings-page">
     <header class="settings-header">
       <div>
         <p class="eyebrow">SYSTEM CONFIGURATION</p>
@@ -181,6 +181,7 @@ import { formatTauriError } from '@/services/tauri/errors'
 import { settingsService } from '@/services/tauri/settingsService'
 import { usePreferencesStore } from '@/stores/preferences'
 import type { BackgroundMode, ThemeMode } from '@/types/settings'
+import { vAutoHideScrollbar } from '@/ui/directives/autoHideScrollbar'
 
 const preferences = usePreferencesStore()
 const toast = useToast()

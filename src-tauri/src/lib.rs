@@ -4,13 +4,15 @@
 
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+mod deployment;
+
+use deployment::DeploymentState;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::{self, BufWriter, Read};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::{command, AppHandle, Emitter, Manager};
 use zip::ZipArchive;
 
@@ -20,15 +22,11 @@ const MODS_DIR: &str = "mods";
 const BACKUP_DIR: &str = "mod_backups"; // 全局备份目录（纯净镜像）
 const MOD_REPO_PATH_FILE: &str = "mod_repo_path.json"; // 新增
 const BACKGROUND_IMAGE_FILE: &str = "background_image.json";
+const DEPLOYMENT_STATE_FILE: &str = "deployment_state.json";
+static DEPLOYMENT_LOCK: Mutex<()> = Mutex::new(());
+static MODS_META_LOCK: Mutex<()> = Mutex::new(());
 
 // ================= 数据结构 =================
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct ModStatus {
-    name: String,
-    applied: bool,          // true = 正在运行, false = 未启用
-    conflicts: Vec<String>, // (可选) 未来可扩展显示与谁冲突
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct ModMeta {
     original_filename: String,             // 原始文件名（如 "mod.zip"）
@@ -51,10 +49,10 @@ struct ModInfo {
 // ================= 部署进度结构 =================
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct DeployProgress {
-    current: usize,       // 当前处理的 mod 序号
-    total: usize,         // 总 mod 数量
-    mod_name: String,     // 当前正在部署的 mod 名称
-    status: String,       // "installing" | "done" | "error"
+    current: usize,   // 当前处理的 mod 序号
+    total: usize,     // 总 mod 数量
+    mod_name: String, // 当前正在部署的 mod 名称
+    status: String,   // "installing" | "done" | "error"
 }
 
 // ================= 初始化进度结构 =================
@@ -95,8 +93,8 @@ fn set_background_image_path(app: &AppHandle, path: Option<String>) -> Result<()
     fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
     let file_path = config_dir.join(BACKGROUND_IMAGE_FILE);
     if let Some(path) = path {
-        let serialized = serde_json::to_string(&path).map_err(|e| e.to_string())?;
-        fs::write(&file_path, serialized).map_err(|e| e.to_string())?;
+        let serialized = serde_json::to_vec(&path).map_err(|e| e.to_string())?;
+        write_atomically(&file_path, &serialized)?;
     } else {
         if file_path.exists() {
             fs::remove_file(&file_path).map_err(|e| e.to_string())?;
@@ -156,203 +154,200 @@ fn read_mods_meta(app: &AppHandle) -> Result<HashMap<String, ModMeta>, String> {
     Ok(map)
 }
 
+fn write_atomically(path: &Path, content: &[u8]) -> Result<(), String> {
+    let parent = path.parent().ok_or("配置文件路径无效")?;
+    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    let token = uuid::Uuid::new_v4();
+    let temporary = parent.join(format!(".wotb-write-{token}.tmp"));
+    let previous = parent.join(format!(".wotb-write-{token}.bak"));
+    fs::write(&temporary, content).map_err(|error| error.to_string())?;
+
+    let had_previous = path.exists();
+    if had_previous {
+        fs::rename(path, &previous).map_err(|error| error.to_string())?;
+    }
+    if let Err(error) = fs::rename(&temporary, path) {
+        if had_previous {
+            let _ = fs::rename(&previous, path);
+        }
+        let _ = fs::remove_file(&temporary);
+        return Err(error.to_string());
+    }
+    if had_previous {
+        let _ = fs::remove_file(previous);
+    }
+    Ok(())
+}
+
 // 写入元数据文件
 fn write_mods_meta(app: &AppHandle, map: &HashMap<String, ModMeta>) -> Result<(), String> {
     let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     let meta_file = config_dir.join("mods_meta.json");
-    let content = serde_json::to_string_pretty(map).map_err(|e| e.to_string())?;
-    fs::write(meta_file, content).map_err(|e| e.to_string())?;
-    Ok(())
+    let content = serde_json::to_vec_pretty(map).map_err(|e| e.to_string())?;
+    write_atomically(&meta_file, &content)
 }
 
-/// 规范化路径：确保所有 Mod 文件都指向 Data 目录
-/// 例如： "3d/Tanks/..." -> "Data/3d/Tanks/..."
-fn normalize_mod_path(_mod_name: &str, original_path: &Path) -> PathBuf {
-    // 如果已经是 Data 开头，保持不变
-    if original_path.starts_with("Data") {
-        return original_path.to_path_buf();
-    }
-    // 如果是 3d, Gfx 等常见资源目录，加上 Data 前缀
-    if original_path.starts_with("3d") || original_path.starts_with("Gfx") {
-        return PathBuf::from("Data").join(original_path);
-    }
-    // 默认加上 Data，防止解压到根目录弄乱游戏
-    PathBuf::from("Data").join(original_path)
+fn update_mods_meta<T, F>(app: &AppHandle, update: F) -> Result<T, String>
+where
+    F: FnOnce(&mut HashMap<String, ModMeta>) -> Result<T, String>,
+{
+    let _guard = MODS_META_LOCK
+        .lock()
+        .map_err(|_| "Mod 元数据锁已损坏，请重启应用后重试".to_string())?;
+    let mut map = read_mods_meta(app)?;
+    let result = update(&mut map)?;
+    write_mods_meta(app, &map)?;
+    Ok(result)
 }
 
-/// 计算文件的 SHA256 哈希值
-fn calculate_hash<R: Read>(reader: &mut R) -> Result<String, String> {
-    let mut hasher = Sha256::new();
-    io::copy(reader, &mut hasher).map_err(|e| e.to_string())?;
-    let hash = hasher.finalize();
-    Ok(hex::encode(hash))
+fn deployment_state_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?
+        .join(DEPLOYMENT_STATE_FILE))
 }
 
-/// 获取 ZIP 包内所有文件的相对路径列表 (用于冲突检测)
-fn get_zip_file_list(zip_path: &Path, mod_name: &str) -> Result<HashSet<PathBuf>, String> {
-    let file = File::open(zip_path).map_err(|e| format!("无法打开ZIP: {}", e))?;
-    let mut archive = ZipArchive::new(file).map_err(|e| format!("ZIP解析失败: {}", e))?;
-    let mut files = HashSet::new();
-
-    for i in 0..archive.len() {
-        let entry = archive.by_index(i).map_err(|e| e.to_string())?;
-        if entry.is_dir() {
-            continue;
-        }
-
-        // 获取并清洗路径
-        let raw_path = entry.mangled_name();
-        let rel_path = normalize_mod_path(mod_name, &raw_path);
-        files.insert(rel_path);
+fn validate_game_directory(game_dir: &Path) -> Result<(), String> {
+    if !game_dir.is_dir() {
+        return Err(format!("游戏目录不存在: {}", game_dir.display()));
     }
-    Ok(files)
-}
-
-/// 核心逻辑：安装单个 Mod (带备份功能)
-fn install_mod_logic(app: &AppHandle, mod_name: &str) -> Result<(), String> {
-    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    let mods_dir = get_mods_dir(app)?;
-    let backup_root = config_dir.join(BACKUP_DIR);
-
-    let game_path_str = get_game_path(app.clone())?.ok_or("游戏路径未设置")?;
-    let game_dir = PathBuf::from(game_path_str);
-
-    // 确保备份目录存在
-    if !backup_root.exists() {
-        fs::create_dir_all(&backup_root).map_err(|e| e.to_string())?;
+    if !game_dir.join("Data").is_dir() {
+        return Err("所选目录不是有效的 WOTB 游戏目录：缺少 Data 文件夹".into());
     }
-
-    let zip_path = mods_dir.join(mod_name);
-    let file = File::open(&zip_path).map_err(|e| e.to_string())?;
-    let mut archive = ZipArchive::new(file).map_err(|e| e.to_string())?;
-
-    for i in 0..archive.len() {
-        let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
-        if entry.is_dir() {
-            continue;
-        }
-
-        let raw_path = entry.mangled_name();
-        let rel_path = normalize_mod_path(mod_name, &raw_path);
-        let target_file = game_dir.join(&rel_path);
-
-        // === 1. 备份逻辑 (Vanilla Mirror) ===
-        // 如果游戏目录里有这个文件，且备份目录里没有，说明这是原厂文件，备份它！
-        if target_file.exists() {
-            let backup_file = backup_root.join(&rel_path);
-            if !backup_file.exists() {
-                if let Some(p) = backup_file.parent() {
-                    fs::create_dir_all(p).map_err(|e| e.to_string())?;
-                }
-                println!("[备份] {:?} -> {:?}", target_file, backup_file);
-                fs::copy(&target_file, &backup_file).map_err(|e| e.to_string())?;
-            }
-        }
-
-        // === 2. 覆盖逻辑（使用 64KB 缓冲写入，减少磁盘 I/O 次数） ===
-        if let Some(p) = target_file.parent() {
-            fs::create_dir_all(p).map_err(|e| e.to_string())?;
-        }
-        let out = File::create(&target_file).map_err(|e| e.to_string())?;
-        let mut out = BufWriter::with_capacity(64 * 1024, out);
-        io::copy(&mut entry, &mut out).map_err(|e| e.to_string())?;
-    }
-
-    Ok(())
-}
-
-/// 核心逻辑：卸载单个 Mod (从备份恢复)
-fn uninstall_mod_logic(app: &AppHandle, mod_name: &str) -> Result<(), String> {
-    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    let mods_dir = get_mods_dir(app)?;
-    let backup_root = config_dir.join(BACKUP_DIR);
-
-    let game_path_str = get_game_path(app.clone())?.ok_or("游戏路径未设置")?;
-    let game_dir = PathBuf::from(game_path_str);
-
-    let zip_path = mods_dir.join(mod_name);
-    // 即使zip被删了，如果只是为了恢复文件，其实只需要知道它改了哪些文件
-    // 但这里为了简单，我们还是假设 zip 存在用于读取文件列表
-    if !zip_path.exists() {
-        return Ok(()); // 文件都不在了，忽略
-    }
-
-    let file = File::open(&zip_path).map_err(|e| e.to_string())?;
-    let mut archive = ZipArchive::new(file).map_err(|e| e.to_string())?;
-
-    for i in 0..archive.len() {
-        let entry = archive.by_index(i).map_err(|e| e.to_string())?;
-        if entry.is_dir() {
-            continue;
-        }
-
-        let rel_path = normalize_mod_path(mod_name, &entry.mangled_name());
-        let game_file = game_dir.join(&rel_path);
-        let backup_file = backup_root.join(&rel_path);
-
-        if backup_file.exists() {
-            // 恢复原厂文件
-            if let Some(p) = game_file.parent() {
-                fs::create_dir_all(p).map_err(|e| e.to_string())?;
-            }
-            // println!("[恢复] {:?} -> {:?}", backup_file, game_file);
-            fs::copy(&backup_file, &game_file).map_err(|e| e.to_string())?;
-        } else {
-            // 如果没有备份，说明这文件是 Mod 纯新增的，直接删除游戏里的文件
-            if game_file.exists() {
-                // println!("[删除] 新增文件 {:?}", game_file);
-                let _ = fs::remove_file(game_file);
-            }
-        }
+    #[cfg(target_os = "windows")]
+    if !game_dir.join("wotblitz.exe").is_file() {
+        return Err("所选目录不是有效的 WOTB 游戏目录：缺少 wotblitz.exe".into());
     }
     Ok(())
 }
 
-/// 核心逻辑：检查 Mod 是否已应用 (通过 Hash 对比)
-fn check_mod_applied(app: &AppHandle, mod_name: &str) -> Result<bool, String> {
+fn legacy_deployment_state(app: &AppHandle) -> Result<DeploymentState, String> {
     let mods_dir = get_mods_dir(app)?;
-    let game_path_str = get_game_path(app.clone())?.ok_or("NoPath")?; // 没路径直接返回错
-    let game_dir = PathBuf::from(game_path_str);
+    let meta = read_mods_meta(app)?;
+    let game_dir = get_game_path(app.clone())?.map(PathBuf::from);
+    let mut enabled_mods = Vec::new();
+    let mut managed_files = HashSet::new();
 
-    let zip_path = mods_dir.join(mod_name);
-    let file = File::open(&zip_path).map_err(|e| e.to_string())?;
-    let mut archive = ZipArchive::new(file).map_err(|e| e.to_string())?;
-
-    // 为了性能，我们只检查前 3 个非文件夹文件。
-    // 如果前 3 个文件的 Hash 都匹配，我们就认为已安装。
-    // (如果想要绝对准确，可以去掉 .take(3)，检查所有文件)
-    let mut checked_count = 0;
-
-    for i in 0..archive.len() {
-        let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
-        if entry.is_dir() {
+    for (name, _) in meta.iter().filter(|(_, item)| item.install_date.is_some()) {
+        if deployment::validate_mod_name(name).is_err() {
             continue;
         }
-
-        let rel_path = normalize_mod_path(mod_name, &entry.mangled_name());
-        let game_file = game_dir.join(&rel_path);
-
-        if !game_file.exists() {
-            return Ok(false); // 文件缺失，肯定没装
+        let zip_path = mods_dir.join(name);
+        if !zip_path.is_file() {
+            continue;
         }
-
-        // 1. 算 Zip 里文件的 Hash
-        let mod_hash = calculate_hash(&mut entry)?;
-        // 2. 算 游戏目录文件的 Hash
-        let mut game_f = File::open(&game_file).map_err(|e| e.to_string())?;
-        let game_hash = calculate_hash(&mut game_f)?;
-
-        if mod_hash != game_hash {
-            return Ok(false); // Hash 不匹配，没装
+        if let Ok(manifest) = deployment::inspect_archive(&zip_path, name) {
+            managed_files.extend(manifest.managed_paths());
         }
-
-        checked_count += 1;
-        if checked_count >= 5 {
-            break;
-        } // 检查5个文件就收手，兼顾性能
+        if let Some(game_dir) = &game_dir {
+            if deployment::archive_matches_game(game_dir, &zip_path, name).unwrap_or(false) {
+                enabled_mods.push(name.clone());
+            }
+        }
     }
 
-    Ok(true)
+    let mut managed_files = managed_files.into_iter().collect::<Vec<_>>();
+    managed_files.sort();
+    enabled_mods.sort();
+    let has_managed_files = !managed_files.is_empty();
+    Ok(DeploymentState {
+        game_path: game_dir.map(|path| {
+            fs::canonicalize(&path)
+                .unwrap_or(path)
+                .to_string_lossy()
+                .to_string()
+        }),
+        backup_id: has_managed_files.then(|| "legacy".to_string()),
+        enabled_mods,
+        managed_files,
+        managed_hashes: Default::default(),
+    })
+}
+
+fn read_current_deployment_state(app: &AppHandle) -> Result<DeploymentState, String> {
+    match deployment::read_deployment_state(&deployment_state_path(app)?)? {
+        Some(state) => Ok(state),
+        None => legacy_deployment_state(app),
+    }
+}
+
+fn deploy_mods_logic_unlocked(
+    app: &AppHandle,
+    mod_names: &[String],
+) -> Result<DeploymentState, String> {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?;
+    let mods_dir = get_mods_dir(app)?;
+    let game_path = get_game_path(app.clone())?.ok_or("请先设置游戏安装路径")?;
+    let game_dir = PathBuf::from(game_path);
+    validate_game_directory(&game_dir)?;
+    let previous_state = read_current_deployment_state(app)?;
+    if !previous_state.managed_files.is_empty() {
+        if let Some(previous_game_path) = &previous_state.game_path {
+            let previous = fs::canonicalize(previous_game_path)
+                .unwrap_or_else(|_| PathBuf::from(previous_game_path));
+            let current = fs::canonicalize(&game_dir).unwrap_or_else(|_| game_dir.clone());
+            if previous.to_string_lossy().to_lowercase() != current.to_string_lossy().to_lowercase()
+            {
+                return Err(format!(
+                    "部署状态属于另一个游戏目录（{}）。请先切回原目录并停用全部 Mod",
+                    previous.display()
+                ));
+            }
+        }
+    }
+    let backup_id = if previous_state.managed_files.is_empty() {
+        deployment::game_backup_id(&game_dir)
+    } else {
+        previous_state
+            .backup_id
+            .clone()
+            .unwrap_or_else(|| "legacy".into())
+    };
+    let backup_root = if backup_id == "legacy" {
+        config_dir.join(BACKUP_DIR)
+    } else {
+        config_dir.join(BACKUP_DIR).join(&backup_id)
+    };
+    let total = mod_names.len();
+    let transaction_root = config_dir
+        .join("deployment_transactions")
+        .join(uuid::Uuid::new_v4().to_string());
+    let state_file = deployment_state_path(app)?;
+
+    deployment::reconcile_deployment(
+        deployment::DeploymentRequest {
+            game_dir: &game_dir,
+            mods_dir: &mods_dir,
+            backup_root: &backup_root,
+            transaction_root: &transaction_root,
+            state_file: &state_file,
+            backup_id: &backup_id,
+            previous_state: &previous_state,
+            desired_mods: mod_names,
+        },
+        |index, name, status| {
+            let _ = app.emit(
+                "deploy-progress",
+                DeployProgress {
+                    current: index + 1,
+                    total,
+                    mod_name: name.to_string(),
+                    status: status.to_string(),
+                },
+            );
+        },
+    )
+}
+
+fn deploy_mods_logic(app: &AppHandle, mod_names: &[String]) -> Result<DeploymentState, String> {
+    let _guard = DEPLOYMENT_LOCK
+        .lock()
+        .map_err(|_| "部署锁已损坏，请重启应用后重试".to_string())?;
+    deploy_mods_logic_unlocked(app, mod_names)
 }
 
 fn get_mods_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -377,12 +372,70 @@ fn get_icons_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(icons_dir)
 }
 
-// ================= Tauri 命令 (供前端调用) =================
+fn validate_image_file(path: &Path, allow_gif: bool) -> Result<String, String> {
+    if !path.is_file() {
+        return Err("所选图片不存在".into());
+    }
+    let metadata = fs::metadata(path).map_err(|error| error.to_string())?;
+    if metadata.len() > 25 * 1024 * 1024 {
+        return Err("图片不能超过 25 MB".into());
+    }
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(str::to_lowercase)
+        .ok_or("图片缺少文件扩展名")?;
+    let allowed = matches!(extension.as_str(), "png" | "jpg" | "jpeg" | "webp")
+        || (allow_gif && extension == "gif");
+    if !allowed {
+        return Err(if allow_gif {
+            "仅支持 PNG、JPG、GIF、WEBP 图片".into()
+        } else {
+            "仅支持 PNG、JPG、WEBP 图片".into()
+        });
+    }
 
-#[command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! Rust 后端运行正常。", name)
+    let mut signature = [0u8; 12];
+    let read = File::open(path)
+        .and_then(|mut file| file.read(&mut signature))
+        .map_err(|error| error.to_string())?;
+    let valid_signature = match extension.as_str() {
+        "png" => read >= 8 && signature[..8] == [137, 80, 78, 71, 13, 10, 26, 10],
+        "jpg" | "jpeg" => read >= 3 && signature[..3] == [0xff, 0xd8, 0xff],
+        "gif" => read >= 6 && (&signature[..6] == b"GIF87a" || &signature[..6] == b"GIF89a"),
+        "webp" => read >= 12 && &signature[..4] == b"RIFF" && &signature[8..12] == b"WEBP",
+        _ => false,
+    };
+    if !valid_signature {
+        return Err("图片内容与文件格式不匹配".into());
+    }
+    Ok(extension)
 }
+
+fn remove_managed_image(root: &Path, path: &Path) -> Result<(), String> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let root = fs::canonicalize(root).map_err(|error| error.to_string())?;
+    let path = fs::canonicalize(path).map_err(|error| error.to_string())?;
+    if !path.is_file() || !path.starts_with(&root) {
+        return Err("拒绝删除应用图片目录之外的文件".into());
+    }
+    fs::remove_file(path).map_err(|error| error.to_string())
+}
+
+fn is_managed_image(app: &AppHandle, path: &Path) -> Result<bool, String> {
+    let path = fs::canonicalize(path).map_err(|error| error.to_string())?;
+    for root in [get_icons_dir(app)?, get_backgrounds_dir(app)?] {
+        let root = fs::canonicalize(root).map_err(|error| error.to_string())?;
+        if path.starts_with(root) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+// ================= Tauri 命令 (供前端调用) =================
 
 #[command]
 async fn rename_mod(
@@ -390,14 +443,18 @@ async fn rename_mod(
     original_filename: String,
     new_display_name: String,
 ) -> Result<(), String> {
-    let mut meta_map = read_mods_meta(&app)?;
-    if let Some(meta) = meta_map.get_mut(&original_filename) {
-        meta.display_name = new_display_name;
-        write_mods_meta(&app, &meta_map)?;
-        Ok(())
-    } else {
-        Err("Mod not found".to_string())
+    deployment::validate_mod_name(&original_filename)?;
+    let display_name = new_display_name.trim().to_string();
+    if display_name.is_empty() {
+        return Err("Mod 显示名称不能为空".into());
     }
+    update_mods_meta(&app, |meta_map| {
+        let meta = meta_map
+            .get_mut(&original_filename)
+            .ok_or_else(|| "找不到该 Mod".to_string())?;
+        meta.display_name = display_name;
+        Ok(())
+    })
 }
 
 #[command]
@@ -414,11 +471,41 @@ fn get_game_path(app: AppHandle) -> Result<Option<String>, String> {
 
 #[command]
 fn set_game_path(app: AppHandle, path: String) -> Result<(), String> {
+    let _guard = DEPLOYMENT_LOCK
+        .lock()
+        .map_err(|_| "操作锁已损坏，请重启应用后重试".to_string())?;
+    let trimmed = path.trim();
     let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
     let file_path = config_dir.join(GAME_PATH_FILE);
-    let serialized = serde_json::to_string(&path).map_err(|e| e.to_string())?;
-    fs::write(&file_path, serialized).map_err(|e| e.to_string())
+    if trimmed.is_empty() {
+        if !read_current_deployment_state(&app)?
+            .managed_files
+            .is_empty()
+        {
+            return Err("当前游戏目录仍有 Mod 文件受管理，请先停用全部 Mod，再清除游戏路径".into());
+        }
+        if file_path.exists() {
+            fs::remove_file(file_path).map_err(|error| error.to_string())?;
+        }
+        return Ok(());
+    }
+    let game_dir = PathBuf::from(trimmed);
+    validate_game_directory(&game_dir)?;
+    if let Some(old_path) = get_game_path(app.clone())? {
+        let old_dir = fs::canonicalize(&old_path).unwrap_or_else(|_| PathBuf::from(&old_path));
+        let new_dir = fs::canonicalize(&game_dir).unwrap_or_else(|_| game_dir.clone());
+        if old_dir.to_string_lossy().to_lowercase() != new_dir.to_string_lossy().to_lowercase()
+            && !read_current_deployment_state(&app)?
+                .managed_files
+                .is_empty()
+        {
+            return Err("当前游戏目录仍有 Mod 文件受管理，请先停用全部 Mod，再更换游戏路径".into());
+        }
+    }
+    fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
+    let serialized =
+        serde_json::to_vec(&game_dir.to_string_lossy().to_string()).map_err(|e| e.to_string())?;
+    write_atomically(&file_path, &serialized)
 }
 
 #[command]
@@ -440,252 +527,154 @@ fn launch_game(app: AppHandle) -> Result<(), String> {
 }
 
 /// 将用户选的 ZIP 复制到 Mod 库
-#[command]
-fn copy_mod_file(app: AppHandle, src: String) -> Result<(), String> {
-    let mods_dir = get_mods_dir(&app)?;
+fn copy_mod_file_logic(app: &AppHandle, src: &str) -> Result<(), String> {
+    let _guard = DEPLOYMENT_LOCK
+        .lock()
+        .map_err(|_| "操作锁已损坏，请重启应用后重试".to_string())?;
+    let mods_dir = get_mods_dir(app)?;
     fs::create_dir_all(&mods_dir).map_err(|e| e.to_string())?;
-    let src_path = PathBuf::from(&src);
-    let file_name = src_path.file_name().ok_or("无效文件名")?;
-    let dest = mods_dir.join(file_name);
-    fs::copy(&src_path, &dest).map_err(|e| e.to_string())?;
+    let src_path = PathBuf::from(src);
+    if !src_path.is_file() {
+        return Err("所选 Mod 文件不存在".into());
+    }
+    let file_name = src_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or("Mod 文件名不是有效文本")?
+        .to_string();
+    deployment::validate_mod_name(&file_name)?;
+    deployment::inspect_archive(&src_path, &file_name)?;
+    let dest = mods_dir.join(&file_name);
+    let same_file =
+        dest.exists() && fs::canonicalize(&src_path).ok() == fs::canonicalize(&dest).ok();
+    if dest.exists() && !same_file {
+        return Err(format!("同名 Mod「{file_name}」已存在，请先删除或重命名"));
+    }
+    if !same_file {
+        let temporary = mods_dir.join(format!(".import-{}.tmp", uuid::Uuid::new_v4()));
+        fs::copy(&src_path, &temporary).map_err(|e| format!("复制 Mod 文件失败: {e}"))?;
+        if let Err(error) = deployment::inspect_archive(&temporary, &file_name) {
+            let _ = fs::remove_file(&temporary);
+            return Err(error);
+        }
+        if let Err(error) = fs::rename(&temporary, &dest) {
+            let _ = fs::remove_file(&temporary);
+            return Err(format!("保存 Mod 文件失败: {error}"));
+        }
+    }
 
     // 添加元数据
-    let mut meta_map = read_mods_meta(&app)?;
-    let original_filename = file_name.to_string_lossy().to_string();
-    if !meta_map.contains_key(&original_filename) {
-        let display_name = Path::new(&original_filename)
-            .file_stem()
-            .unwrap_or_default()
-            .to_str()
-            .unwrap_or(&original_filename)
-            .to_string();
-        let category = infer_category(&dest);
-        let new_meta = ModMeta {
-            original_filename: original_filename.clone(),
-            display_name,
-            install_date: None,
-            category,
-            icon_path: None,
-        };
-        meta_map.insert(original_filename, new_meta);
-        write_mods_meta(&app, &meta_map)?;
-    }
-    Ok(())
-}
-
-#[command]
-fn list_mods(app: AppHandle) -> Result<Vec<String>, String> {
-    let mods_dir = get_mods_dir(&app)?;
-    if !mods_dir.exists() {
-        return Ok(Vec::new());
-    }
-
-    let mut names = Vec::new();
-    for entry in fs::read_dir(&mods_dir).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        if entry
-            .path()
-            .extension()
-            .map_or(false, |e| e.eq_ignore_ascii_case("zip"))
-        {
-            if let Some(n) = entry.file_name().to_str() {
-                names.push(n.to_string());
-            }
+    let original_filename = file_name;
+    update_mods_meta(app, |meta_map| {
+        if !meta_map.contains_key(&original_filename) {
+            let display_name = Path::new(&original_filename)
+                .file_stem()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or(&original_filename)
+                .to_string();
+            let category = infer_category(&dest);
+            let new_meta = ModMeta {
+                original_filename: original_filename.clone(),
+                display_name,
+                install_date: None,
+                category,
+                icon_path: None,
+            };
+            meta_map.insert(original_filename.clone(), new_meta);
         }
-    }
-    Ok(names)
-}
-
-/// 智能应用 Mod (Smart Apply)
-/// 自动检测冲突，卸载冲突的旧 Mod，安装新 Mod
-#[command]
-async fn apply_mod_exclusive(app: AppHandle, mod_name: String) -> Result<Vec<String>, String> {
-    let mods_dir = get_mods_dir(&app)?; // ✅ 存储库目录
-
-    // 1. 获取目标 Mod 的文件列表
-    let target_zip = mods_dir.join(&mod_name);
-    let target_files = get_zip_file_list(&target_zip, &mod_name)?;
-
-    // 2. 遍历所有已存在的 Mod，寻找冲突
-    let all_mods = list_mods(app.clone())?;
-    let mut conflicts = Vec::new();
-
-    for other_mod in all_mods {
-        if other_mod == mod_name {
-            continue;
-        } // 跳过自己
-
-        // 检查 Mod 是否正在运行 (Hash 检查)
-        // 注意：这里可能会有点慢，如果Mod很多，可以考虑加缓存
-        let is_applied = check_mod_applied(&app, &other_mod).unwrap_or(false);
-
-        if is_applied {
-            let other_zip = mods_dir.join(&other_mod);
-            let other_files = get_zip_file_list(&other_zip, &other_mod)?;
-
-            // 检查是否有交集
-            if !target_files.is_disjoint(&other_files) {
-                // 发现冲突！
-                println!(
-                    "冲突检测: {} 与 {} 冲突，准备卸载旧 Mod...",
-                    mod_name, other_mod
-                );
-                conflicts.push(other_mod);
-            }
-        }
-    }
-
-    // 3. 卸载冲突的 Mod
-    for conflict_mod in &conflicts {
-        uninstall_mod_logic(&app, conflict_mod)?;
-    }
-
-    // 4. 安装新 Mod
-    install_mod_logic(&app, &mod_name)?;
-
-    // 返回被卸载的 Mod 列表，方便前端更新开关状态
-    Ok(conflicts)
-}
-
-/// 卸载/恢复 Mod
-#[command]
-async fn restore_mod(app: AppHandle, mod_name: String) -> Result<(), String> {
-    uninstall_mod_logic(&app, &mod_name)
+        Ok(())
+    })
 }
 
 /// 删除 Mod 文件
-#[command]
-async fn delete_mod_file(app: AppHandle, mod_name: String) -> Result<(), String> {
-    // 只在 Mod 确实已部署时才恢复游戏文件，避免误删游戏原厂文件
-    let is_deployed = check_mod_applied(&app, &mod_name).unwrap_or(false);
-    if is_deployed {
-        if let Err(e) = uninstall_mod_logic(&app, &mod_name) {
-            eprintln!("[delete_mod_file] 恢复原文件失败（继续删除Mod）: {}", e);
-        }
+fn delete_mod_file_logic(app: &AppHandle, mod_name: &str) -> Result<(), String> {
+    deployment::validate_mod_name(mod_name)?;
+    let _guard = DEPLOYMENT_LOCK
+        .lock()
+        .map_err(|_| "部署锁已损坏，请重启应用后重试".to_string())?;
+    let mods_dir = get_mods_dir(app)?;
+    let zip_path = mods_dir.join(mod_name);
+    let state_file_exists = deployment_state_path(app)?.exists();
+    let state = read_current_deployment_state(app)?;
+    let meta_map = read_mods_meta(app)?;
+    let was_legacy_deployed = !state_file_exists
+        && meta_map
+            .get(mod_name)
+            .is_some_and(|meta| meta.install_date.is_some());
+    if state.enabled_mods.iter().any(|name| name == mod_name) || was_legacy_deployed {
+        let desired = state
+            .enabled_mods
+            .iter()
+            .filter(|name| name.as_str() != mod_name)
+            .cloned()
+            .collect::<Vec<_>>();
+        deploy_mods_logic_unlocked(app, &desired)?;
     }
-    let mods_dir = get_mods_dir(&app)?;
-    let zip_path = mods_dir.join(&mod_name);
     if zip_path.exists() {
-        fs::remove_file(zip_path).map_err(|e| e.to_string())?;
+        fs::remove_file(&zip_path).map_err(|error| format!("删除 Mod 文件失败: {error}"))?;
     }
-    // 删除元数据
-    let mut meta_map = read_mods_meta(&app)?;
-    // 删除图标文件（如果有）
-    if let Some(meta) = meta_map.get(&mod_name) {
-        if let Some(icon_path) = &meta.icon_path {
-            let icon_path_buf = Path::new(icon_path);
-            if icon_path_buf.exists() {
-                let _ = fs::remove_file(icon_path_buf);
-            }
+    let icon_path = update_mods_meta(app, |meta_map| {
+        Ok(meta_map.remove(mod_name).and_then(|meta| meta.icon_path))
+    })?;
+    if let Some(icon_path) = icon_path {
+        if let Err(error) = remove_managed_image(&get_icons_dir(app)?, Path::new(&icon_path)) {
+            eprintln!("[delete_mod_file] 清理图标失败: {error}");
         }
     }
-    meta_map.remove(&mod_name);
-    write_mods_meta(&app, &meta_map)?;
     Ok(())
 }
 
-/// 获取所有 Mod 的状态 (是否应用)
 #[command]
-async fn get_mod_status(app: AppHandle) -> Result<Vec<ModStatus>, String> {
-    let mod_names = list_mods(app.clone())?;
-    let mut statuses = Vec::new();
-
-    for name in mod_names {
-        // 使用 Hash 检查
-        let applied = check_mod_applied(&app, &name).unwrap_or(false);
-        statuses.push(ModStatus {
-            name,
-            applied,
-            conflicts: Vec::new(),
-        });
-    }
-
-    Ok(statuses)
+async fn delete_mod_file(app: AppHandle, mod_name: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || delete_mod_file_logic(&app, &mod_name))
+        .await
+        .map_err(|error| format!("删除 Mod 任务异常结束: {error}"))?
 }
 
 #[command]
 async fn deploy_mods(app: AppHandle, mod_names: Vec<String>) -> Result<(), String> {
     let total = mod_names.len();
-    if total == 0 {
-        return Ok(());
-    }
-
-    let now = Local::now();
-    let mods_dir = get_mods_dir(&app)?;
-
-    // 批量优化：一次性读取元数据，避免每部署一个 Mod 都读写磁盘
-    let mut meta_map = read_mods_meta(&app)?;
-
-    let mut success_count = 0;
-    let mut error_messages: Vec<String> = Vec::new();
-
-    for (i, name) in mod_names.iter().enumerate() {
-        // 发射安装进度事件
-        let _ = app.emit(
-            "deploy-progress",
-            DeployProgress {
-                current: i + 1,
-                total,
-                mod_name: name.clone(),
-                status: "installing".to_string(),
-            },
-        );
-
-        // 安装 Mod（内部已使用缓冲写入优化磁盘 I/O）
-        match install_mod_logic(&app, name) {
-            Ok(()) => {
-                success_count += 1;
-                // 仅操作内存中的元数据
-                if let Some(meta) = meta_map.get_mut(name) {
+    let progress_names = mod_names.clone();
+    let worker_app = app.clone();
+    let deployment_result = tauri::async_runtime::spawn_blocking(move || {
+        let state = deploy_mods_logic(&worker_app, &mod_names)?;
+        let enabled = state.enabled_mods.iter().collect::<HashSet<_>>();
+        let now = Local::now();
+        if let Err(error) = update_mods_meta(&worker_app, |meta_map| {
+            for (name, meta) in meta_map {
+                if enabled.contains(name) {
                     if meta.install_date.is_none() {
                         meta.install_date = Some(now);
                     }
                 } else {
-                    let display_name = Path::new(name)
-                        .file_stem()
-                        .unwrap_or_default()
-                        .to_str()
-                        .unwrap_or(name)
-                        .to_string();
-                    let category = infer_category(&mods_dir.join(name));
-                    let new_meta = ModMeta {
-                        original_filename: name.clone(),
-                        display_name,
-                        install_date: Some(now),
-                        category,
-                        icon_path: None,
-                    };
-                    meta_map.insert(name.clone(), new_meta);
+                    meta.install_date = None;
                 }
-                let _ = app.emit(
-                    "deploy-progress",
-                    DeployProgress {
-                        current: i + 1,
-                        total,
-                        mod_name: name.clone(),
-                        status: "done".to_string(),
-                    },
-                );
             }
-            Err(e) => {
-                error_messages.push(format!("{}: {}", name, e));
-                let _ = app.emit(
-                    "deploy-progress",
-                    DeployProgress {
-                        current: i + 1,
-                        total,
-                        mod_name: name.clone(),
-                        status: "error".to_string(),
-                    },
-                );
-            }
+            Ok(())
+        }) {
+            eprintln!("[deploy_mods] 部署成功，但更新展示元数据失败: {error}");
         }
+        Ok::<(), String>(())
+    })
+    .await
+    .map_err(|error| format!("部署任务异常结束: {error}"))?;
+
+    if let Err(error) = deployment_result {
+        for (index, name) in progress_names.iter().enumerate() {
+            let _ = app.emit(
+                "deploy-progress",
+                DeployProgress {
+                    current: index + 1,
+                    total,
+                    mod_name: name.clone(),
+                    status: "error".into(),
+                },
+            );
+        }
+        return Err(error);
     }
 
-    // 批量优化：所有 Mod 部署完成后，一次性写入元数据
-    write_mods_meta(&app, &meta_map)?;
-
-    // 发射完成事件
     let _ = app.emit(
         "deploy-progress",
         DeployProgress {
@@ -695,36 +684,55 @@ async fn deploy_mods(app: AppHandle, mod_names: Vec<String>) -> Result<(), Strin
             status: "done".to_string(),
         },
     );
-
-    if !error_messages.is_empty() {
-        return Err(format!(
-            "{} 个成功, {} 个失败: {}",
-            success_count,
-            error_messages.len(),
-            error_messages.join("; ")
-        ));
-    }
-
     Ok(())
 }
 
 #[command]
-async fn get_mods_with_status(app: AppHandle) -> Result<Vec<ModInfo>, String> {
-    let mods_dir = get_mods_dir(&app)?;
+async fn analyze_mod_conflicts(
+    app: AppHandle,
+    mod_names: Vec<String>,
+) -> Result<Vec<deployment::ModConflict>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = DEPLOYMENT_LOCK
+            .lock()
+            .map_err(|_| "操作锁已损坏，请重启应用后重试".to_string())?;
+        let mods_dir = get_mods_dir(&app)?;
+        let mut manifests = Vec::new();
+        let mut seen = HashSet::new();
+        for name in mod_names {
+            deployment::validate_mod_name(&name)?;
+            if !seen.insert(name.to_lowercase()) {
+                continue;
+            }
+            manifests.push(deployment::inspect_archive(&mods_dir.join(&name), &name)?);
+        }
+        Ok(deployment::find_conflicts(&manifests))
+    })
+    .await
+    .map_err(|error| format!("冲突分析任务异常结束: {error}"))?
+}
+
+fn get_mods_with_status_logic(app: &AppHandle) -> Result<Vec<ModInfo>, String> {
+    let _guard = DEPLOYMENT_LOCK
+        .lock()
+        .map_err(|_| "操作锁已损坏，请重启应用后重试".to_string())?;
+    let mods_dir = get_mods_dir(app)?;
     if !mods_dir.exists() {
         return Ok(Vec::new());
     }
-    let meta_map = read_mods_meta(&app)?;
+    let meta_map = read_mods_meta(app)?;
+    let state = read_current_deployment_state(app)?;
+    let enabled = state.enabled_mods.into_iter().collect::<HashSet<_>>();
     let mut infos = Vec::new();
     for entry in fs::read_dir(&mods_dir).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         if entry
             .path()
             .extension()
-            .map_or(false, |e| e.eq_ignore_ascii_case("zip"))
+            .is_some_and(|e| e.eq_ignore_ascii_case("zip"))
         {
             if let Some(name) = entry.file_name().to_str() {
-                let applied = check_mod_applied(&app, name).unwrap_or(false);
+                let applied = enabled.contains(name);
                 let meta = meta_map.get(name);
                 let display_name = meta.map(|m| m.display_name.clone()).unwrap_or_else(|| {
                     Path::new(name)
@@ -747,7 +755,20 @@ async fn get_mods_with_status(app: AppHandle) -> Result<Vec<ModInfo>, String> {
             }
         }
     }
+    infos.sort_by(|first, second| {
+        first
+            .display_name
+            .to_lowercase()
+            .cmp(&second.display_name.to_lowercase())
+    });
     Ok(infos)
+}
+
+#[command]
+async fn get_mods_with_status(app: AppHandle) -> Result<Vec<ModInfo>, String> {
+    tauri::async_runtime::spawn_blocking(move || get_mods_with_status_logic(&app))
+        .await
+        .map_err(|error| format!("读取 Mod 列表任务异常结束: {error}"))?
 }
 
 /// 获取 Mod 存储库路径
@@ -793,54 +814,127 @@ fn open_mod_repo(app: AppHandle) -> Result<(), String> {
 /// 设置 Mod 存储库路径
 #[command]
 fn set_mod_repo_path(app: AppHandle, path: String) -> Result<(), String> {
+    let _guard = DEPLOYMENT_LOCK
+        .lock()
+        .map_err(|_| "操作锁已损坏，请重启应用后重试".to_string())?;
     let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
     let file_path = config_dir.join(MOD_REPO_PATH_FILE);
-    let serialized = serde_json::to_string(&path).map_err(|e| e.to_string())?;
-    fs::write(&file_path, serialized).map_err(|e| e.to_string())
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        if !read_current_deployment_state(&app)?
+            .managed_files
+            .is_empty()
+        {
+            return Err("仍有 Mod 文件受管理，请先停用全部 Mod，再清除仓库路径".into());
+        }
+        if file_path.exists() {
+            fs::remove_file(file_path).map_err(|error| error.to_string())?;
+        }
+        return Ok(());
+    }
+    let repo_path = PathBuf::from(trimmed);
+    fs::create_dir_all(&repo_path).map_err(|error| format!("无法创建 Mod 仓库目录: {error}"))?;
+    let state = read_current_deployment_state(&app)?;
+    if !state.enabled_mods.is_empty()
+        && state
+            .enabled_mods
+            .iter()
+            .any(|name| !repo_path.join(name).is_file())
+    {
+        return Err("新仓库缺少当前启用的 Mod，请先迁移仓库或停用全部 Mod".into());
+    }
+    let serialized =
+        serde_json::to_vec(&repo_path.to_string_lossy().to_string()).map_err(|e| e.to_string())?;
+    write_atomically(&file_path, &serialized)
+}
+
+fn migrate_mod_repo_logic(app: &AppHandle, new_path: &str) -> Result<(), String> {
+    let _guard = DEPLOYMENT_LOCK
+        .lock()
+        .map_err(|_| "操作锁已损坏，请重启应用后重试".to_string())?;
+    let trimmed = new_path.trim();
+    if trimmed.is_empty() {
+        return Err("新 Mod 仓库路径不能为空".into());
+    }
+    let old_mods_dir = get_mods_dir(app)?;
+    let new_mods_dir = PathBuf::from(trimmed);
+    fs::create_dir_all(&old_mods_dir).map_err(|error| format!("无法读取当前 Mod 仓库: {error}"))?;
+    fs::create_dir_all(&new_mods_dir).map_err(|error| format!("无法创建新 Mod 仓库: {error}"))?;
+    let old_canonical = fs::canonicalize(&old_mods_dir).map_err(|error| error.to_string())?;
+    let new_canonical = fs::canonicalize(&new_mods_dir).map_err(|error| error.to_string())?;
+    if old_canonical == new_canonical {
+        return Ok(());
+    }
+
+    let sources = fs::read_dir(&old_mods_dir)
+        .map_err(|error| error.to_string())?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("zip"))
+        })
+        .collect::<Vec<_>>();
+
+    for source in &sources {
+        let file_name = source.file_name().ok_or("Mod 文件名无效")?;
+        let destination = new_mods_dir.join(file_name);
+        if destination.exists()
+            && deployment::file_hash(source)? != deployment::file_hash(&destination)?
+        {
+            return Err(format!(
+                "新仓库中存在内容不同的同名文件: {}",
+                file_name.to_string_lossy()
+            ));
+        }
+    }
+
+    let mut completed: Vec<(PathBuf, PathBuf, bool)> = Vec::new();
+    for source in sources {
+        let destination = new_mods_dir.join(source.file_name().ok_or("Mod 文件名无效")?);
+        let destination_preexisted = destination.exists();
+        let move_result = if destination_preexisted {
+            fs::remove_file(&source).map_err(|error| error.to_string())
+        } else if fs::rename(&source, &destination).is_ok() {
+            Ok(())
+        } else {
+            fs::copy(&source, &destination)
+                .map_err(|error| error.to_string())
+                .and_then(|_| {
+                    if deployment::file_hash(&source)? != deployment::file_hash(&destination)? {
+                        return Err("迁移后的文件校验失败".into());
+                    }
+                    fs::remove_file(&source).map_err(|error| error.to_string())
+                })
+        };
+
+        if let Err(error) = move_result {
+            if !destination_preexisted && destination.exists() && source.exists() {
+                let _ = fs::remove_file(&destination);
+            }
+            for (old_source, new_destination, existed) in completed.into_iter().rev() {
+                if existed {
+                    let _ = fs::copy(&new_destination, &old_source);
+                } else if fs::rename(&new_destination, &old_source).is_err()
+                    && fs::copy(&new_destination, &old_source).is_ok()
+                {
+                    let _ = fs::remove_file(&new_destination);
+                }
+            }
+            return Err(format!("迁移 Mod 仓库失败，已尝试回滚: {error}"));
+        }
+        completed.push((source, destination, destination_preexisted));
+    }
+
+    Ok(())
 }
 
 #[command]
 async fn migrate_mod_repo(app: AppHandle, new_path: String) -> Result<(), String> {
-    let old_mods_dir = app
-        .path()
-        .app_config_dir()
-        .map_err(|e| e.to_string())?
-        .join(MODS_DIR);
-
-    let new_mods_dir = PathBuf::from(&new_path);
-
-    // 如果旧目录存在且有文件，则移动
-    if old_mods_dir.exists() {
-        for entry in fs::read_dir(&old_mods_dir).map_err(|e| e.to_string())? {
-            let entry = entry.map_err(|e| e.to_string())?;
-            if entry
-                .path()
-                .extension()
-                .map_or(false, |e| e.eq_ignore_ascii_case("zip"))
-            {
-                let file_name = entry.file_name();
-                let dest = new_mods_dir.join(&file_name);
-                // 避免覆盖已有文件
-                if !dest.exists() {
-                    // try atomic rename first; fall back to copy+remove for cross-volume
-                    if fs::rename(entry.path(), &dest).is_err() {
-                        fs::copy(entry.path(), &dest).map_err(|e| e.to_string())?;
-                        fs::remove_file(entry.path()).map_err(|e| e.to_string())?;
-                    }
-                }
-            }
-        }
-        // 如果旧目录变空，可以删除（可选）
-        if fs::read_dir(&old_mods_dir)
-            .map_err(|e| e.to_string())?
-            .next()
-            .is_none()
-        {
-            let _ = fs::remove_dir(old_mods_dir);
-        }
-    }
-    Ok(())
+    tauri::async_runtime::spawn_blocking(move || migrate_mod_repo_logic(&app, &new_path))
+        .await
+        .map_err(|error| format!("迁移 Mod 仓库任务异常结束: {error}"))?
 }
 
 // 更新mod类型
@@ -850,14 +944,21 @@ async fn update_mod_category(
     original_filename: String,
     category: Option<String>,
 ) -> Result<(), String> {
-    let mut meta_map = read_mods_meta(&app)?;
-    if let Some(meta) = meta_map.get_mut(&original_filename) {
+    deployment::validate_mod_name(&original_filename)?;
+    update_mods_meta(&app, |meta_map| {
+        let meta = meta_map
+            .get_mut(&original_filename)
+            .ok_or_else(|| "找不到该 Mod".to_string())?;
         meta.category = category;
-        write_mods_meta(&app, &meta_map)?;
         Ok(())
-    } else {
-        Err("Mod not found".to_string())
-    }
+    })
+}
+
+#[command]
+async fn copy_mod_file(app: AppHandle, src: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || copy_mod_file_logic(&app, &src))
+        .await
+        .map_err(|error| format!("导入 Mod 任务异常结束: {error}"))?
 }
 
 //设置mod图标
@@ -867,83 +968,83 @@ async fn set_mod_icon(
     mod_name: String,
     image_path: String,
 ) -> Result<String, String> {
+    deployment::validate_mod_name(&mod_name)?;
     let icons_dir = get_icons_dir(&app)?;
     let src_path = Path::new(&image_path);
-    let ext = src_path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("png");
-    let target_name = format!("{}.{}", mod_name, ext);
+    let ext = validate_image_file(src_path, true)?;
+    if !read_mods_meta(&app)?.contains_key(&mod_name) {
+        return Err("找不到该 Mod".into());
+    }
+    let target_name = format!("{}.{}", uuid::Uuid::new_v4(), ext);
     let target_path = icons_dir.join(target_name);
 
-    // 复制文件
     fs::copy(src_path, &target_path).map_err(|e| format!("复制图标文件失败: {}", e))?;
-    println!("图标已复制到: {:?}", target_path);
-
-    // 更新元数据
-    let mut meta_map = read_mods_meta(&app)?;
-    if let Some(meta) = meta_map.get_mut(&mod_name) {
-        // 存储绝对路径，且转换为字符串时确保使用正斜杠（Windows 下也能被 convertFileSrc 处理）
-        let path_str = target_path.to_string_lossy().replace('\\', "/");
-        meta.icon_path = Some(path_str.clone());
-        write_mods_meta(&app, &meta_map)?;
-        Ok(path_str)
-    } else {
-        Err("Mod not found".to_string())
+    let path_str = target_path.to_string_lossy().replace('\\', "/");
+    let update_result = update_mods_meta(&app, |meta_map| {
+        let meta = meta_map
+            .get_mut(&mod_name)
+            .ok_or_else(|| "找不到该 Mod".to_string())?;
+        let old_path = meta.icon_path.replace(path_str.clone());
+        Ok(old_path)
+    });
+    let old_path = match update_result {
+        Ok(path) => path,
+        Err(error) => {
+            let _ = fs::remove_file(&target_path);
+            return Err(error);
+        }
+    };
+    if let Some(old_path) = old_path {
+        if let Err(error) = remove_managed_image(&icons_dir, Path::new(&old_path)) {
+            eprintln!("[set_mod_icon] 清理旧图标失败: {error}");
+        }
     }
+    Ok(path_str)
 }
 
 //清除mod图标
 #[command]
 async fn clear_mod_icon(app: AppHandle, mod_name: String) -> Result<(), String> {
-    let mut meta_map = read_mods_meta(&app)?;
-    if let Some(meta) = meta_map.get_mut(&mod_name) {
-        if let Some(icon_path) = meta.icon_path.take() {
-            let path = Path::new(&icon_path);
-            if path.exists() {
-                fs::remove_file(path).map_err(|e| format!("删除图标文件失败: {}", e))?;
-                println!("图标文件已删除: {:?}", path);
-            }
+    deployment::validate_mod_name(&mod_name)?;
+    let icon_path = update_mods_meta(&app, |meta_map| {
+        let meta = meta_map
+            .get_mut(&mod_name)
+            .ok_or_else(|| "找不到该 Mod".to_string())?;
+        Ok(meta.icon_path.take())
+    })?;
+    if let Some(icon_path) = icon_path {
+        if let Err(error) = remove_managed_image(&get_icons_dir(&app)?, Path::new(&icon_path)) {
+            eprintln!("[clear_mod_icon] 清理图标失败: {error}");
         }
-        write_mods_meta(&app, &meta_map)?;
-        Ok(())
-    } else {
-        Err("Mod not found".to_string())
     }
+    Ok(())
 }
 
 /// 设置自定义背景图片
 #[command]
 async fn set_background_image(app: AppHandle, image_path: String) -> Result<String, String> {
     let src_path = PathBuf::from(&image_path);
-    if !src_path.exists() {
-        return Err("源文件不存在".to_string());
-    }
+    let ext = validate_image_file(&src_path, false)?;
 
     let bg_dir = get_backgrounds_dir(&app)?;
 
-    // 生成唯一文件名（保留原扩展名）
-    let ext = src_path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("jpg");
     let file_name = format!("{}.{}", uuid::Uuid::new_v4(), ext);
     let dest_path = bg_dir.join(file_name);
 
     // 复制图片
     fs::copy(&src_path, &dest_path).map_err(|e| format!("复制图片失败: {}", e))?;
 
-    // 删除旧背景文件（如果有）
-    if let Some(old_path) = get_background_image_path(&app)? {
-        let old_path = PathBuf::from(&old_path);
-        if old_path.exists() {
-            let _ = fs::remove_file(&old_path); // 忽略删除失败
+    let old_path = get_background_image_path(&app)?;
+    let dest_path_str = dest_path.to_string_lossy().replace('\\', "/");
+    if let Err(error) = set_background_image_path(&app, Some(dest_path_str.clone())) {
+        let _ = fs::remove_file(&dest_path);
+        return Err(error);
+    }
+    if let Some(old_path) = old_path {
+        if let Err(error) = remove_managed_image(&bg_dir, Path::new(&old_path)) {
+            eprintln!("[set_background_image] 清理旧背景失败: {error}");
         }
     }
-
-    // 存储新路径（确保使用正斜杠，兼容前端 convertFileSrc）
-    let dest_path_str = dest_path.to_string_lossy().replace('\\', "/");
-    set_background_image_path(&app, Some(dest_path_str.clone()))?;
 
     Ok(dest_path_str)
 }
@@ -959,70 +1060,49 @@ async fn get_background_image(app: AppHandle) -> Result<Option<String>, String> 
 async fn remove_background_image(app: AppHandle) -> Result<(), String> {
     if let Some(path) = get_background_image_path(&app)? {
         let path = PathBuf::from(&path);
-        if path.exists() {
-            fs::remove_file(&path).map_err(|e| format!("删除背景文件失败: {}", e))?;
-        }
         set_background_image_path(&app, None)?;
+        if let Err(error) = remove_managed_image(&get_backgrounds_dir(&app)?, &path) {
+            eprintln!("[remove_background_image] 清理背景文件失败: {error}");
+        }
     }
     Ok(())
 }
 
 /// 读取图片并返回 base64 编码（解决 Linux asset 协议问题）
 #[command]
-async fn read_image_base64(path: String) -> Result<String, String> {
+async fn read_image_base64(app: AppHandle, path: String) -> Result<String, String> {
     let img_path = PathBuf::from(&path);
-    if !img_path.exists() {
-        return Err(format!("图片不存在: {}", path));
+    validate_image_file(&img_path, true)?;
+    if !is_managed_image(&app, &img_path)? {
+        return Err("拒绝读取应用图片目录之外的文件".into());
     }
-    
     let mut file = File::open(&img_path).map_err(|e| e.to_string())?;
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
-    
+
     use base64::Engine;
     Ok(base64::engine::general_purpose::STANDARD.encode(&buffer))
 }
 
-/// 轻量级冲突检测：仅比较已部署 Mod 的文件列表是否有交集（不做 Hash 校验）
-fn detect_conflicts_lightweight(app: &AppHandle) -> Result<usize, String> {
+/// 比较已启用 Mod 的最终目标路径与内容哈希。
+fn detect_deployed_conflicts(app: &AppHandle) -> Result<usize, String> {
     let mods_dir = get_mods_dir(app)?;
     if !mods_dir.exists() {
         return Ok(0);
     }
-
-    let meta_map = read_mods_meta(app)?;
-
-    let deployed_mods: Vec<String> = meta_map
-        .iter()
-        .filter(|(_, meta)| meta.install_date.is_some())
-        .map(|(name, _)| name.clone())
-        .collect();
-
-    if deployed_mods.len() < 2 {
+    let state = read_current_deployment_state(app)?;
+    if state.enabled_mods.len() < 2 {
         return Ok(0);
     }
-
-    let mut mod_file_lists: Vec<(String, HashSet<PathBuf>)> = Vec::new();
-    for mod_name in &deployed_mods {
+    let mut manifests = Vec::new();
+    for mod_name in &state.enabled_mods {
         let zip_path = mods_dir.join(mod_name);
         if !zip_path.exists() {
             continue;
         }
-        if let Ok(files) = get_zip_file_list(&zip_path, mod_name) {
-            mod_file_lists.push((mod_name.clone(), files));
-        }
+        manifests.push(deployment::inspect_archive(&zip_path, mod_name)?);
     }
-
-    let mut conflict_count = 0usize;
-    for i in 0..mod_file_lists.len() {
-        for j in (i + 1)..mod_file_lists.len() {
-            if !mod_file_lists[i].1.is_disjoint(&mod_file_lists[j].1) {
-                conflict_count += 1;
-            }
-        }
-    }
-
-    Ok(conflict_count)
+    Ok(deployment::find_conflicts(&manifests).len())
 }
 
 // ================= 入口函数 =================
@@ -1031,8 +1111,6 @@ fn detect_conflicts_lightweight(app: &AppHandle) -> Result<usize, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let splash = app
                 .get_webview_window("splash")
@@ -1058,7 +1136,7 @@ pub fn run() {
             let splash_async = splash.clone();
             let main_async = main_window.clone();
 
-            tauri::async_runtime::spawn(async move {
+            tauri::async_runtime::spawn_blocking(move || {
                 let splash = splash_async;
                 let main_window = main_async;
                 let mut had_error = false;
@@ -1082,11 +1160,9 @@ pub fn run() {
                                     .map(|rd| {
                                         rd.filter_map(|e| e.ok())
                                             .filter(|e| {
-                                                e.path()
-                                                    .extension()
-                                                    .map_or(false, |ext| {
-                                                        ext.eq_ignore_ascii_case("zip")
-                                                    })
+                                                e.path().extension().is_some_and(|ext| {
+                                                    ext.eq_ignore_ascii_case("zip")
+                                                })
                                             })
                                             .count()
                                     })
@@ -1182,7 +1258,7 @@ pub fn run() {
                             error: None,
                         },
                     );
-                    match detect_conflicts_lightweight(&handle) {
+                    match detect_deployed_conflicts(&handle) {
                         Ok(conflict_count) => {
                             let msg = if conflict_count == 0 {
                                 "检测 Mod 冲突 (未发现冲突)".into()
@@ -1262,12 +1338,32 @@ pub fn run() {
                 // Brief pause so user can see all "done" states
                 std::thread::sleep(std::time::Duration::from_millis(500));
 
-                // Show main first (renders behind alwaysOnTop splash), then close splash
-                // so there's no gap where no window is visible
-                let _ = main_window.show();
-                std::thread::sleep(std::time::Duration::from_millis(80));
-                let _ = splash.close();
-                let _ = main_window.set_focus();
+                // 主窗口显示失败时保留启动页，避免用户只看到黑屏。
+                match main_window.show() {
+                    Ok(()) => {
+                        std::thread::sleep(std::time::Duration::from_millis(80));
+                        if let Err(error) = splash.close() {
+                            eprintln!("[init] 关闭启动页失败: {error}");
+                        }
+                        if let Err(error) = main_window.set_focus() {
+                            eprintln!("[init] 聚焦主窗口失败: {error}");
+                        }
+                    }
+                    Err(error) => {
+                        had_error = true;
+                        eprintln!("[init] 显示主窗口失败: {error}");
+                        let _ = handle.emit(
+                            "init-progress",
+                            InitProgress {
+                                step: total,
+                                total,
+                                message: "打开主窗口失败".into(),
+                                status: "error".into(),
+                                error: Some(error.to_string()),
+                            },
+                        );
+                    }
+                }
 
                 // Log any non-fatal errors
                 if had_error {
@@ -1278,17 +1374,13 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            greet,
             get_game_path,
             set_game_path,
             launch_game,
             copy_mod_file,
-            list_mods,
-            apply_mod_exclusive,
-            restore_mod,
             delete_mod_file,
-            get_mod_status,
             deploy_mods,
+            analyze_mod_conflicts,
             get_mods_with_status,
             get_mod_repo_path,
             open_mod_repo,
@@ -1310,42 +1402,6 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_normalize_mod_path_data_prefix() {
-        let path = Path::new("Data/3d/Tanks/some_file.dds");
-        let result = normalize_mod_path("test_mod", path);
-        assert_eq!(result, PathBuf::from("Data/3d/Tanks/some_file.dds"));
-    }
-
-    #[test]
-    fn test_normalize_mod_path_adds_data_prefix() {
-        let path = Path::new("3d/Tanks/some_file.dds");
-        let result = normalize_mod_path("test_mod", path);
-        assert_eq!(result, PathBuf::from("Data/3d/Tanks/some_file.dds"));
-    }
-
-    #[test]
-    fn test_normalize_mod_path_gfx_adds_data_prefix() {
-        let path = Path::new("Gfx/UI/icon.dds");
-        let result = normalize_mod_path("test_mod", path);
-        assert_eq!(result, PathBuf::from("Data/Gfx/UI/icon.dds"));
-    }
-
-    #[test]
-    fn test_normalize_mod_path_unknown_adds_data_prefix() {
-        let path = Path::new("some_random_folder/file.txt");
-        let result = normalize_mod_path("test_mod", path);
-        assert_eq!(result, PathBuf::from("Data/some_random_folder/file.txt"));
-    }
-
-    #[test]
-    fn test_normalize_mod_path_already_has_data_prefix_case_insensitive() {
-        // Only exact "Data" prefix matches; mixed case gets prefix added
-        let path = Path::new("data/3d/Tanks/some_file.dds");
-        let result = normalize_mod_path("test_mod", path);
-        assert_eq!(result, PathBuf::from("Data/data/3d/Tanks/some_file.dds"));
-    }
 
     #[test]
     fn test_init_progress_serialization() {

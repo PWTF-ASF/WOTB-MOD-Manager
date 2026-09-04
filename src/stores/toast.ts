@@ -14,11 +14,13 @@ export interface ToastMessage {
 let nextToastId = 1
 const timers = new Map<number, ReturnType<typeof setTimeout>>()
 
-const DEFAULT_TITLES: Record<ToastTone, string> = {
-  success: '操作成功',
-  info: '提示',
-  warning: '请注意',
-  error: '操作失败',
+const defaultTitle = (tone: ToastTone) => {
+  switch (tone) {
+    case 'success': return '操作成功'
+    case 'warning': return '请注意'
+    case 'error': return '操作失败'
+    default: return '提示'
+  }
 }
 
 export const useToastStore = defineStore('toast', {
@@ -39,7 +41,7 @@ export const useToastStore = defineStore('toast', {
       this.messages.push({
         id,
         tone,
-        title: options?.title ?? DEFAULT_TITLES[tone],
+        title: options?.title ?? defaultTitle(tone),
         message,
         duration,
         createdAt: now,

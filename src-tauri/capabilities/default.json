@@ -4,16 +4,6 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "dialog:default",
-    "shell:default",
-    "fs:default",
-    {
-      "identifier": "fs:allow-read",
-      "allow": [
-        { "path": "$APPDATA/**" },
-        { "path": "$CONFIG/**" },
-        { "path": "$HOME/**" }
-      ]
-    }
+    "dialog:default"
   ]
 }

@@ -1,5 +1,5 @@
 <template>
-  <article class="mod-card" :class="{ 'mod-card--enabled': item.desiredEnabled, 'mod-card--pending': isPending }">
+  <article class="mod-card" :class="{ 'mod-card--enabled': item.desiredEnabled, 'mod-card--pending': isPending, 'mod-card--selected': item.selected }">
     <header>
       <UiCheckbox :model-value="item.selected" @update:model-value="emit('update:selected', $event)" />
       <div class="card-actions">
@@ -40,6 +40,7 @@ const isPending = computed(() => props.item.deployed !== props.item.desiredEnabl
 <style scoped>
 .mod-card { display:grid; grid-template-rows:auto auto 1fr auto; min-width:0; min-height:260px; padding:var(--ui-space-4); border:1px solid var(--ui-border-subtle); border-radius:var(--ui-radius-lg); color:var(--ui-text-primary); background:var(--ui-bg-surface); box-shadow:var(--ui-shadow-sm); transition:border-color var(--ui-duration-fast),transform var(--ui-duration-fast); }
 .mod-card:hover { border-color:var(--ui-border-strong); transform:translateY(-1px); }
+.mod-card--selected { border-color:var(--ui-accent); background:color-mix(in srgb,var(--ui-accent) 7%,var(--ui-bg-surface)); }
 .mod-card--enabled { border-top-color:var(--ui-accent); }
 .mod-card--pending { box-shadow:inset 0 2px 0 var(--ui-warning),var(--ui-shadow-sm); }
 .mod-card header,.mod-card footer { display:flex; align-items:center; justify-content:space-between; gap:var(--ui-space-3); }

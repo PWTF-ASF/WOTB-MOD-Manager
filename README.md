@@ -1,10 +1,10 @@
 # WOTB MOD Manager
 
-> 坦克世界闪击战（World of Tanks Blitz）模组管理器 — Tauri v2 跨平台桌面应用，AI 驱动开发（vibe coding）。
+> 坦克世界闪击战（World of Tanks Blitz）Windows 模组管理器，基于 Tauri v2 与 Vue 3。
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)
-![Version](https://img.shields.io/badge/version-1.0.1-blue)
+![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
+![Version](https://img.shields.io/badge/version-1.0.2-blue)
 
 ---
 
@@ -23,8 +23,8 @@
 | **模组库** | 网格/列表双视图，分类筛选（3D模型/语音/UI/地图等），关键词搜索 |
 | **模组管理** | 重命名、修改分类、上传自定义图标，自研弹窗交互 |
 | **批量操作** | 全选、批量启用/禁用、批量删除 |
-| **一键部署** | 实时进度面板，逐项展示安装状态，单 Mod 失败不影响其余 |
-| **冲突检测** | 部署时自动检测文件覆盖冲突，卸载冲突旧 Mod 后安装 |
+| **一键部署** | 事务化部署并实时展示进度；任一写入失败时自动回滚整个部署 |
+| **冲突检测** | 部署前检测目标路径和文件内容，阻止内容不同的 Mod 同时覆盖同一文件 |
 | **启动游戏** | 自动检测/配置游戏路径，一键拉起 wotblitz.exe |
 | **系统设置** | 游戏路径、Mod 仓库路径、仓库迁移 |
 | **外观设置** | 自定义背景图片、显示模式（铺满/适应/拉伸/平铺）、遮罩透明度、背景模糊强度 |
@@ -49,7 +49,7 @@
 | 后端语言 | Rust |
 | 测试 | Vitest（前端）+ Rust `#[cfg(test)]` |
 | 包管理器 | pnpm |
-| 代码质量 | Biome + ESLint + vue-tsc |
+| 代码质量 | ESLint + vue-tsc |
 
 ---
 
@@ -73,11 +73,11 @@ pnpm install
 # 开发
 pnpm tauri dev
 
-# 构建
-pnpm tauri build
+# 完整检查
+pnpm verify
 
-# 测试
-pnpm test
+# 构建 Windows NSIS 安装包
+pnpm tauri build --bundles nsis
 ```
 
 ---
@@ -112,11 +112,13 @@ pnpm test
 ├── src-tauri/
 │   ├── src/
 │   │   ├── main.rs              # Rust 入口
-│   │   └── lib.rs               # 全部 Tauri 命令（~40 个）
+│   │   ├── lib.rs               # Tauri 命令与应用启动流程
+│   │   └── deployment.rs        # 冲突分析、事务部署、备份与回滚
 │   ├── Cargo.toml
 │   ├── tauri.conf.json          # 窗口、打包、权限配置
 │   └── capabilities/
-│       └── default.json         # 安全能力声明
+│       ├── default.json         # 主窗口安全能力声明
+│       └── splash.json          # 启动页最小事件权限
 ├── tests/
 │   ├── unit/
 │   │   ├── store.test.ts        # 全局状态测试
@@ -129,9 +131,8 @@ pnpm test
 ├── vite.config.ts
 ├── vitest.config.ts
 ├── tsconfig*.json
-├── biome.json
 ├── eslint.config.cjs
-└── .github/workflows/release.yaml   # CI 自动构建发布
+└── .github/workflows/release.yaml   # 可选的手动 GitHub Actions 构建流程
 ```
 
 ---
@@ -152,18 +153,19 @@ pnpm test
              ▼                   ▼
 ┌── Rust 后端 ───────────────────────────┐
 │  Tauri Commands                         │
-│  ├── get_mods_with_status / list_mods   │
+│  ├── get_mods_with_status                │
+│  ├── analyze_mod_conflicts               │
 │  ├── deploy_mods → deploy-progress 事件 │
-│  ├── apply_mod_exclusive / restore_mod  │
 │  ├── copy_mod_file / delete_mod_file    │
 │  ├── rename_mod / update_mod_category   │
 │  ├── set_mod_icon / clear_mod_icon      │
 │  ├── get_game_path / set_game_path      │
 │  ├── set_background_image / ...         │
-│  └── greet（调试用）                     │
 │                                          │
 │  文件系统：mods_meta.json、game_path.json│
-│  备份机制：mod_backups/（纯净镜像）       │
+│  部署状态：deployment_state.json          │
+│  备份机制：mod_backups/（按游戏目录隔离） │
+│  事务目录：deployment_transactions/       │
 └──────────────────────────────────────────┘
 ```
 
@@ -176,7 +178,7 @@ pnpm test
 - 所有组件使用 `<script setup lang="ts">`
 - 基础组件位于 `src/ui`，通过 `--ui-*` 设计令牌保持控件和主题一致
 - 暗色/亮色主题通过 `:root.light-mode` / `:root.dark-mode` 切换 CSS 变量
-- Rust 命令同步执行文件 I/O，耗时的部署操作通过 `#[command] async fn` + `app.emit()` 推送进度
+- 耗时文件操作通过 `spawn_blocking` 离开异步运行时，部署进度通过 `app.emit()` 推送
 - 路由页面通过 `<KeepAlive>` 缓存，跨页面切换时保留筛选、草稿和滚动状态
 - 加载页（splash）通过 Vite 多页面构建独立打包
 

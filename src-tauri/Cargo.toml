@@ -1,9 +1,10 @@
 [package]
-name        = "tauri-app"
-version     = "1.0.1"
-description = "A Tauri App"
-authors     = ["you"]
+name        = "wotb-mod-manager"
+version     = "1.0.2"
+description = "A Windows mod manager for World of Tanks Blitz"
+authors     = ["PWTF-ASF"]
 edition     = "2021"
+license     = "MIT"
 repository  = "https://github.com/PWTF-ASF/WOTB-MOD-Manager"
 
 [lib]
@@ -15,12 +16,8 @@ tauri-build = { version = "2.3", features = [] }
 
 [dependencies]
 tauri                        = { version = "2.3", features = ["protocol-asset"] }
-tauri-plugin-shell           = "2.3"
-tauri-plugin-prevent-default = "2.1"       # 无需改动
 tauri-plugin-dialog          = "2.3"
-tauri-plugin-fs              = "2.3"
 
-# 其余依赖保持不变
 zip = "2.0"
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }

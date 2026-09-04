@@ -6,6 +6,7 @@ export interface ConfirmOptions {
   message: string
   confirmLabel?: string
   cancelLabel?: string
+  showCancel?: boolean
   tone?: 'default' | 'danger'
 }
 
@@ -17,6 +18,7 @@ const DEFAULTS = {
   title: '确认操作',
   confirmLabel: '确认',
   cancelLabel: '取消',
+  showCancel: true,
   tone: 'default' as const,
 }
 

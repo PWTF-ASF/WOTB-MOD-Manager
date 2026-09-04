@@ -25,7 +25,10 @@ withDefaults(defineProps<{
   readonly?: boolean
 }>(), {
   modelValue: '',
+  label: '',
+  hint: '',
   type: 'text',
+  placeholder: '',
   disabled: false,
   readonly: false,
 })

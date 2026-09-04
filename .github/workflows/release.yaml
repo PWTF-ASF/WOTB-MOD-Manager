@@ -2,6 +2,15 @@ name: "Release"
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "要发布的已有标签，例如 v1.0.2"
+        required: true
+        type: string
+
+env:
+  RELEASE_REF: refs/tags/${{ inputs.tag }}
+  RELEASE_TAG: ${{ inputs.tag }}
 
 jobs:
   create-release:
@@ -12,11 +21,14 @@ jobs:
       release_id: ${{ steps.create-release.outputs.id }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_REF }}
 
       - id: create-release
         uses: taiki-e/create-gh-release-action@v1
         with:
-          title: ${{ github.ref_name }}
+          ref: ${{ env.RELEASE_REF }}
+          title: ${{ env.RELEASE_TAG }}
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -27,17 +39,30 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_REF }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "26.2.0"
+          node-version: "24"
 
       - uses: pnpm/action-setup@v4
         with:
           version: "10.33.4"
 
       - name: Install frontend dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Verify frontend and backend
+        run: pnpm verify
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0

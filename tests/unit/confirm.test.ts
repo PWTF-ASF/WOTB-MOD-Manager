@@ -19,12 +19,22 @@ describe('confirm store', () => {
       message: '确定删除这个 Mod 吗？',
       confirmLabel: '删除',
       cancelLabel: '取消',
+      showCancel: true,
       tone: 'danger',
     })
 
     store.confirm()
     await expect(result).resolves.toBe(true)
     expect(store.current).toBeNull()
+  })
+
+  test('supports acknowledgement dialogs without a cancel action', async () => {
+    const store = useConfirmStore()
+    const result = store.request({ message: '发现冲突', confirmLabel: '知道了', showCancel: false })
+
+    expect(store.current?.showCancel).toBe(false)
+    store.confirm()
+    await expect(result).resolves.toBe(true)
   })
 
   test('queues a second request until the active dialog is handled', async () => {

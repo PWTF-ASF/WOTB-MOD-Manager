@@ -76,8 +76,8 @@ export const useModLibraryStore = defineStore('modLibrary', () => {
     filteredItems.value.forEach(item => { item.selected = nextSelected })
   }
 
-  function setSelectedVisibleEnabled(enabled: boolean) {
-    selectedVisibleItems.value.forEach(item => { item.desiredEnabled = enabled })
+  function setSelectedEnabled(enabled: boolean) {
+    selectedItems.value.forEach(item => { item.desiredEnabled = enabled })
   }
 
   async function importFiles(paths: string[]): Promise<ImportModsSummary> {
@@ -91,8 +91,8 @@ export const useModLibraryStore = defineStore('modLibrary', () => {
     items.value = items.value.filter(item => item.filename !== filename)
   }
 
-  async function removeSelectedVisible(): Promise<RemoveModsSummary> {
-    const targets = [...selectedVisibleItems.value]
+  async function removeSelected(): Promise<RemoveModsSummary> {
+    const targets = [...selectedItems.value]
     const summary: RemoveModsSummary = { succeeded: [], failed: [] }
 
     for (const item of targets) {
@@ -152,10 +152,10 @@ export const useModLibraryStore = defineStore('modLibrary', () => {
     toggleLayout,
     selectCategory,
     toggleSelectAllVisible,
-    setSelectedVisibleEnabled,
+    setSelectedEnabled,
     importFiles,
     remove,
-    removeSelectedVisible,
+    removeSelected,
     rename,
     updateCategory,
     setIcon,

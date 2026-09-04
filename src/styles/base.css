@@ -13,3 +13,42 @@ button, input, select, textarea {
   color: var(--ui-text-on-accent);
   background: var(--ui-accent);
 }
+
+/* Auto-hiding scrollbars keep the layout stable while reducing idle visual noise. */
+.ui-auto-hide-scrollbar {
+  scrollbar-color: transparent transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.ui-auto-hide-scrollbar.is-scrolling {
+  scrollbar-color: color-mix(in srgb, var(--ui-text-muted) 62%, transparent) transparent;
+}
+
+.ui-auto-hide-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.ui-auto-hide-scrollbar::-webkit-scrollbar-track,
+.ui-auto-hide-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.ui-auto-hide-scrollbar::-webkit-scrollbar-thumb {
+  min-width: 28px;
+  min-height: 28px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  background-clip: padding-box;
+  transition: background-color var(--ui-duration-normal) var(--ui-ease);
+}
+
+.ui-auto-hide-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--ui-text-muted) 62%, transparent);
+}
+
+.ui-auto-hide-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--ui-accent) 72%, transparent);
+}

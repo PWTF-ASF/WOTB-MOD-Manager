@@ -5,25 +5,23 @@ import { resolve } from 'node:path'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { defineConfig } from 'vite'
-import { nodePolyfills } from 'vite-plugin-node-polyfills'
-import topLevelAwait from 'vite-plugin-top-level-await'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import { version as pkgVersion } from './package.json'
 
 const HOST = process.env.TAURI_DEV_HOST
 const PLATFORM = process.env.TAURI_ENV_PLATFORM
+const DEV_HOST = HOST || '127.0.0.1'
 process.env.VITE_APP_VERSION = pkgVersion
 if (process.env.NODE_ENV === 'production') {
   process.env.VITE_APP_BUILD_EPOCH = new Date().getTime().toString()
 }
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
  plugins: [
     tailwind(),
-    topLevelAwait(),
     vue(),
-    vueDevTools(),
+    ...(command === 'serve' ? [vueDevTools()] : []),
     AutoImport({
       imports: [
         'vue',
@@ -38,10 +36,6 @@ export default defineConfig({
     }),
     Components({
       dts: 'components.d.ts',
-    }),
-    nodePolyfills({
-      protocolImports: true,
-      crypto: true,
     }),
   ],
   resolve: {
@@ -58,7 +52,7 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
-    host: HOST || false,
+    host: DEV_HOST,
     hmr: HOST
       ? {
           protocol: 'ws',
@@ -86,4 +80,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

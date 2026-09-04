@@ -13,7 +13,7 @@
       <p>{{ request?.message }}</p>
     </div>
     <template #footer>
-      <UiButton @click="store.cancel()">{{ request?.cancelLabel ?? '取消' }}</UiButton>
+      <UiButton v-if="request?.showCancel !== false" @click="store.cancel()">{{ request?.cancelLabel ?? '取消' }}</UiButton>
       <UiButton :variant="request?.tone === 'danger' ? 'danger' : 'primary'" autofocus @click="store.confirm()">
         {{ request?.confirmLabel ?? '确认' }}
       </UiButton>
@@ -38,7 +38,7 @@ const handleVisibility = (value: boolean) => {
 
 <style scoped>
 .confirm-content { display:grid; grid-template-columns:40px 1fr; align-items:start; gap:var(--ui-space-4); }
-.confirm-content p { margin:0; padding:3px 0 0; color:var(--ui-text-primary); font-size:14px; line-height:1.65; }
+.confirm-content p { margin:0; padding:3px 0 0; color:var(--ui-text-primary); font-size:14px; line-height:1.65; white-space:pre-line; }
 .confirm-icon { width:40px; height:40px; display:grid; place-items:center; border-radius:50%; color:var(--ui-accent); background:color-mix(in srgb,var(--ui-accent) 12%,transparent); }
 .confirm-icon svg { width:22px; height:22px; }
 .confirm-content--danger .confirm-icon { color:var(--ui-danger); background:color-mix(in srgb,var(--ui-danger) 12%,transparent); }

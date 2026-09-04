@@ -1,5 +1,5 @@
 <template>
-  <article class="mod-row" :class="{ 'mod-row--pending': isPending }">
+  <article class="mod-row" :class="{ 'mod-row--pending': isPending, 'mod-row--selected': item.selected }">
     <UiCheckbox :model-value="item.selected" @update:model-value="emit('update:selected',$event)" />
     <button class="row-icon" type="button" aria-label="修改 Mod 图标" @click="emit('icon')">
       <img v-if="iconUrl" :src="iconUrl" alt="" @load="emit('icon-load')" @error="emit('icon-error')" />
@@ -27,5 +27,6 @@ const isPending=computed(()=>props.item.deployed!==props.item.desiredEnabled)
 
 <style scoped>
 .mod-row{display:grid;grid-template-columns:20px 42px minmax(150px,1fr) auto 40px 30px 30px;align-items:center;gap:var(--ui-space-3);min-height:62px;padding:8px 12px;border:1px solid var(--ui-border-subtle);border-radius:var(--ui-radius-md);color:var(--ui-text-primary);background:var(--ui-bg-surface)}
+.mod-row--selected{border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 7%,var(--ui-bg-surface))}
 .mod-row--pending{border-left:3px solid var(--ui-warning)}.row-icon{display:grid;place-items:center;width:40px;height:40px;margin:0;padding:0;overflow:hidden;border:1px solid var(--ui-border-subtle);border-radius:10px;color:var(--ui-text-muted);background:var(--ui-bg-app);cursor:pointer}.row-icon img{width:100%;height:100%;object-fit:cover}.row-icon svg{width:20px;height:20px}.row-info{display:grid;min-width:0;gap:3px}.row-info strong,.row-info span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.row-info strong{font-size:13px}.row-info span{color:var(--ui-text-muted);font-size:11px}@media(max-width:760px){.mod-row{grid-template-columns:20px 38px 1fr 40px 30px}.mod-row>:nth-child(4),.mod-row>:last-child{display:none}}
 </style>

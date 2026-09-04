@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { ImportModsSummary, ModCategory, ModItem, RawModInfo } from '@/types/mod'
+import type { ImportModsSummary, ModCategory, ModConflict, ModItem, RawModInfo } from '@/types/mod'
 import { MOD_CATEGORIES } from '@/types/mod'
 import { formatTauriError, runTauriOperation } from './errors'
 
@@ -78,5 +78,11 @@ export const modService = {
 
   deploy(filenames: string[]): Promise<void> {
     return runTauriOperation('部署 Mod', () => invoke('deploy_mods', { modNames: filenames }))
+  },
+
+  analyzeConflicts(filenames: string[]): Promise<ModConflict[]> {
+    return runTauriOperation('分析 Mod 冲突', () =>
+      invoke<ModConflict[]>('analyze_mod_conflicts', { modNames: filenames }),
+    )
   },
 }

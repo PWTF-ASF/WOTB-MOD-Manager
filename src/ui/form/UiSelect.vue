@@ -19,7 +19,7 @@
     </button>
 
     <Transition name="select-menu">
-      <div v-if="open" class="ui-select__menu" role="listbox" :aria-label="label">
+      <div v-if="open" v-auto-hide-scrollbar class="ui-select__menu" role="listbox" :aria-label="label">
         <button
           v-for="option in options"
           :key="option.value"
@@ -39,6 +39,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { vAutoHideScrollbar } from '@/ui/directives/autoHideScrollbar'
 
 const props = withDefaults(defineProps<{
   modelValue: string
@@ -61,8 +62,9 @@ const move = (direction: number) => {
     return
   }
   const current = props.options.findIndex(option => option.value === props.modelValue)
-  const next = (current + direction + props.options.length) % props.options.length
-  if (props.options[next]) emit('update:modelValue', props.options[next].value)
+  const nextIndex = (current + direction + props.options.length) % props.options.length
+  const nextOption = props.options.at(nextIndex)
+  if (nextOption) emit('update:modelValue', nextOption.value)
 }
 const closeOnOutsideClick = (event: PointerEvent) => {
   if (!root.value?.contains(event.target as Node)) open.value = false
@@ -79,7 +81,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
 .ui-select__trigger:focus-visible,.ui-select--open .ui-select__trigger { border-color:var(--ui-accent); box-shadow:var(--ui-focus-ring); outline:0; }
 .ui-select__trigger svg { width:16px; height:16px; flex:none; color:var(--ui-text-muted); transition:transform var(--ui-duration-normal) var(--ui-ease); }
 .ui-select--open .ui-select__trigger svg { transform:rotate(180deg); }
-.ui-select__menu { position:absolute; z-index:80; top:calc(100% + 6px); left:0; width:100%; max-height:260px; overflow:auto; box-sizing:border-box; padding:5px; border:1px solid var(--ui-border-subtle); border-radius:var(--ui-radius-lg); background:var(--ui-bg-elevated); box-shadow:var(--ui-shadow-md); }
+.ui-select__menu { position:absolute; z-index:80; top:calc(100% + 6px); left:0; width:100%; max-height:260px; overflow:auto; box-sizing:border-box; padding:5px; border:1px solid var(--ui-border-subtle); border-radius:var(--ui-radius-lg); background:var(--ui-bg-elevated); box-shadow:var(--ui-shadow-md); scrollbar-gutter:auto; }
 .ui-select__menu button { width:100%; min-height:34px; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 9px; border:0; border-radius:var(--ui-radius-md); color:var(--ui-text-secondary); background:transparent; font:500 13px var(--ui-font-body); text-align:left; cursor:pointer; }
 .ui-select__menu button:hover { color:var(--ui-text-primary); background:var(--ui-bg-surface-hover); }
 .ui-select__menu button.selected { color:var(--ui-accent); background:color-mix(in srgb,var(--ui-accent) 12%,transparent); font-weight:650; }

@@ -90,4 +90,14 @@ describe('modService', () => {
       imagePath: 'C:/images/custom.png',
     })
   })
+
+  test('requests content-aware conflict analysis for the desired Mod set', async () => {
+    const conflicts = [{ first_mod: 'a.zip', second_mod: 'b.zip', paths: ['Data/a.dvpl'] }]
+    mockedInvoke.mockResolvedValueOnce(conflicts)
+
+    await expect(modService.analyzeConflicts(['a.zip', 'b.zip'])).resolves.toEqual(conflicts)
+    expect(mockedInvoke).toHaveBeenCalledWith('analyze_mod_conflicts', {
+      modNames: ['a.zip', 'b.zip'],
+    })
+  })
 })

@@ -22,8 +22,6 @@ function updateTask(step: number, status: "running" | "done" | "error") {
   item.className = `task-item ${status}`
 }
 
-let hasError = false
-
 async function main() {
   try {
     const unlisten = await listen<InitProgress>("init-progress", (event) => {
@@ -38,7 +36,6 @@ async function main() {
 
       // Handle error
       if (status === "error" && error) {
-        hasError = true
         errorMsg.textContent = error
         mainSpinner.style.borderTopColor = "#e0556a"
       }
@@ -53,7 +50,6 @@ async function main() {
     // Keep the listener alive
     ;(window as unknown as Record<string, unknown>).__splash_unlisten = unlisten
   } catch (err) {
-    hasError = true
     errorMsg.textContent = `初始化失败: ${String(err)}`
     mainSpinner.style.borderTopColor = "#e0556a"
   }

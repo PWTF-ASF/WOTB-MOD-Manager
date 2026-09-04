@@ -45,20 +45,26 @@ describe('mod library store', () => {
     expect(store.filteredItems).toHaveLength(0)
   })
 
-  test('selects and changes only visible items', async () => {
+  test('selects visible items and updates every selected item across filters', async () => {
     mockedInvoke.mockResolvedValueOnce(rawMods)
     const store = useModLibraryStore()
     await store.refresh()
     store.selectCategory('model')
     store.toggleSelectAllVisible()
-    store.setSelectedVisibleEnabled(true)
+    store.selectCategory('voice')
+    store.toggleSelectAllVisible()
+    store.selectCategory('model')
+    store.setSelectedEnabled(false)
 
     expect(store.items.find(item => item.filename === 'model.zip')).toMatchObject({
       selected: true,
-      desiredEnabled: true,
+      desiredEnabled: false,
     })
-    expect(store.items.find(item => item.filename === 'voice.zip')?.selected).toBe(false)
-    expect(store.pendingChanges.map(item => item.filename)).toEqual(['model.zip'])
+    expect(store.items.find(item => item.filename === 'voice.zip')).toMatchObject({
+      selected: true,
+      desiredEnabled: false,
+    })
+    expect(store.pendingChanges.map(item => item.filename)).toEqual(['voice.zip'])
   })
 
   test('preserves draft changes on ordinary refresh and discards them after deployment', async () => {

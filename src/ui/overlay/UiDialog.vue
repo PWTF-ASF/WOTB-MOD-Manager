@@ -20,7 +20,7 @@
           </svg>
         </button>
       </header>
-      <div :id="descriptionId" class="ui-dialog__content"><slot /></div>
+      <div :id="descriptionId" v-auto-hide-scrollbar class="ui-dialog__content"><slot /></div>
       <footer v-if="$slots.footer" class="ui-dialog__footer"><slot name="footer" /></footer>
     </section>
   </dialog>
@@ -28,6 +28,7 @@
 
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
+import { vAutoHideScrollbar } from '@/ui/directives/autoHideScrollbar'
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
@@ -36,6 +37,7 @@ const props = withDefaults(defineProps<{
   closeOnBackdrop?: boolean
   closeOnEscape?: boolean
 }>(), {
+  eyebrow: '',
   closeOnBackdrop: true,
   closeOnEscape: true,
 })

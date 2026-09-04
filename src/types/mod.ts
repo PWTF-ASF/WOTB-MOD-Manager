@@ -36,3 +36,9 @@ export interface ImportModsSummary {
   failed: number
   results: ImportModResult[]
 }
+
+export interface ModConflict {
+  first_mod: string
+  second_mod: string
+  paths: string[]
+}

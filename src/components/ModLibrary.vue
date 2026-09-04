@@ -14,7 +14,11 @@
     <ModToolbar v-if="modlist.length" v-model:search="searchQuery" v-model:category="currentCategory" :categories="categories" :is-grid="isGridLayout" :total-count="modlist.length" :visible-count="filtermodlist.length" @toggle-layout="toggleLayout" />
 
     <!-- ===== Mod 卡片网格 ===== -->
-    <main class="modules-grid">
+    <main
+      v-auto-hide-scrollbar
+      class="modules-grid"
+      :class="{ 'modules-grid--selection-active': library.selectedItems.length > 0 }"
+    >
       <!-- 加载状态 -->
       <div v-if="isLoading" class="state-container">
         <UiSpinner :size="28" />
@@ -67,6 +71,7 @@ import { useModLibraryStore } from '@/stores/modLibrary'
 import { useDeploymentStore } from '@/stores/deployment'
 import { gameService } from '@/services/tauri/gameService'
 import { formatTauriError } from '@/services/tauri/errors'
+import { modService } from '@/services/tauri/modService'
 
 // 缓存失效信号（来自 HomePage 的 provide）
 const modListVersion = inject<Ref<number>>('modListVersion', ref(0))
@@ -86,6 +91,8 @@ import ModSelectionBar from '@/features/mods/components/ModSelectionBar.vue'
 import DeployProgressDialog from '@/features/mods/components/DeployProgressDialog.vue'
 import ModEditorDialog from '@/features/mods/components/ModEditorDialog.vue'
 import ModIconDialog from '@/features/mods/components/ModIconDialog.vue'
+import { formatConflictMessage } from '@/features/mods/conflicts'
+import { vAutoHideScrollbar } from '@/ui/directives/autoHideScrollbar'
 
 // ================= 响应式数据 =================
 const notify = useToast()
@@ -118,7 +125,6 @@ const isLaunching = ref(false)
 const loadingIcon = ref(false)      // 预览图片加载状态
 const isDraggingOver = ref(false)   // 拖拽导入状态
 const brokenIconPaths = ref<Set<string>>(new Set()) // 加载失败的图标路径
-let dragCounter = 0                 // 拖拽进出计数
 
 // 图标预览模态框相关
 const showIconModal = ref(false)      // 控制模态框显示
@@ -173,12 +179,12 @@ const selectAll = () => {
 
 // 批量启用/禁用
 const handleBatchToggle = (enable: boolean) => {
-  library.setSelectedVisibleEnabled(enable)
+  library.setSelectedEnabled(enable)
 }
 
 // 批量删除
 const handleBatchDelete = async () => {
-  const selectedMods = [...library.selectedVisibleItems]
+  const selectedMods = [...library.selectedItems]
   if (selectedMods.length === 0) {
     notify.warning('请先选择要删除的Mod')
     return
@@ -190,7 +196,7 @@ const handleBatchDelete = async () => {
     confirmLabel: '删除',
   })
   if (!confirmDelete) return
-  const summary = await library.removeSelectedVisible()
+  const summary = await library.removeSelected()
   if (summary.failed.length === 0) {
     notify.success(`已成功删除 ${summary.succeeded.length} 个Mod`)
   } else if (summary.succeeded.length === 0) {
@@ -293,11 +299,28 @@ const handleDeployMods = async () => {
     if (!proceed) return
   }
 
+  try {
+    const conflicts = await modService.analyzeConflicts(activeModNames)
+    if (conflicts.length > 0) {
+      await confirm({
+        title: '无法部署：发现 Mod 冲突',
+        message: formatConflictMessage(conflicts),
+        tone: 'danger',
+        confirmLabel: '知道了',
+        showCancel: false,
+      })
+      return
+    }
+  } catch (error) {
+    notify.error(`冲突检查失败: ${formatTauriError(error)}`)
+    return
+  }
+
   const summary = await deployment.deploy(activeModNames)
-  if (summary.failed > 0) {
-    notify.warning(`部署完成: ${summary.succeeded} 成功, ${summary.failed} 失败`)
-  } else if (summary.commandError) {
+  if (summary.commandError) {
     notify.error(`部署失败: ${summary.commandError}`)
+  } else if (summary.failed > 0) {
+    notify.warning(`部署完成: ${summary.succeeded} 成功, ${summary.failed} 失败`)
   } else {
     notify.success(`部署成功！已应用 ${activeModNames.length} 个项目。`)
   }
@@ -447,7 +470,7 @@ const uploadIconForCurrentMod = async () => {
     await library.setIcon(filename, selected)
 
     // 重新获取当前 Mod 的最新引用
-    const updatedMod = modlist.value.find(m => m.filename === filename)
+    const updatedMod = modlist.value.find(mod => mod.filename === filename)
     if (updatedMod) {
       currentMod.value = updatedMod
     }
@@ -474,7 +497,7 @@ const clearCurrentModIcon = async () => {
     await library.clearIcon(filename)
 
     // 重新获取当前 Mod 的最新引用
-    const updatedMod = modlist.value.find(m => m.filename === filename)
+    const updatedMod = modlist.value.find(mod => mod.filename === filename)
     if (updatedMod) {
       currentMod.value = updatedMod
     }
@@ -573,6 +596,11 @@ onUnmounted(() => {
   flex-direction: column;
   overflow-y: auto;
   padding: var(--ui-space-5);
+  transition: padding-bottom var(--ui-duration-normal) var(--ui-ease);
+}
+
+.modules-grid--selection-active {
+  padding-bottom: calc(var(--ui-space-5) + 64px);
 }
 
 .grid-container {
@@ -655,21 +683,6 @@ onUnmounted(() => {
   margin-top: calc(var(--ui-space-2) * -1);
   color: var(--ui-text-muted);
   font-size: 12px;
-}
-
-.modules-grid::-webkit-scrollbar {
-  width: 8px;
-}
-
-.modules-grid::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.modules-grid::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background: var(--ui-border-strong);
-  background-clip: padding-box;
 }
 
 @media (max-width: 680px) {
